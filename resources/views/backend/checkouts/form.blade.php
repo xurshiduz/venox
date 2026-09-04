@@ -404,7 +404,7 @@
                                     @php
                                         $commissionOptions = [
                                             'special' => 'Spes — KPI 0% · Agent 8% · Venox 0%',
-                                            'contract' => 'Shartnoma — KPI 5% · Agent 8% · Venox 25%',
+                                            'contract' => 'Shartnoma — KPI 0% · Agent 8% · Venox 5%',
                                             'venox_10' => 'Venox bonus 10% — KPI 5% · Agent 8%',
                                             'venox_15' => 'Venox bonus 15% — KPI 5% · Agent 8%',
                                             'venox_20' => 'Venox bonus 20% — KPI 5% · Agent 8%',

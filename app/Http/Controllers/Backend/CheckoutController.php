@@ -1493,7 +1493,7 @@ class CheckoutController extends Controller
     {
         $schemes = [
             'special' => ['label' => 'Spes', 'kpi' => 0, 'agent' => 8, 'venox' => 0],
-            'contract' => ['label' => 'Shartnoma', 'kpi' => 5, 'agent' => 8, 'venox' => 25],
+            'contract' => ['label' => 'Shartnoma', 'kpi' => 0, 'agent' => 8, 'venox' => 5],
             'venox_10' => ['label' => 'Venox bonus 10%', 'kpi' => 5, 'agent' => 8, 'venox' => 10],
             'venox_15' => ['label' => 'Venox bonus 15%', 'kpi' => 5, 'agent' => 8, 'venox' => 15],
             'venox_20' => ['label' => 'Venox bonus 20%', 'kpi' => 5, 'agent' => 8, 'venox' => 20],
