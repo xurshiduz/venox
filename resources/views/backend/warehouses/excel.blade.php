@@ -1,3 +1,8 @@
+@php
+    $usdRate = isset($usdRate) && (float) $usdRate > 0
+        ? (float) $usdRate
+        : (float) (App\Models\Currency::where('type_id', 1)->latest('id')->value('price') ?? 1);
+@endphp
 <table>
     <tbody>
         <tr>
@@ -12,10 +17,10 @@
             <th>Штрих-код</th>
             <th>O'lchov birligi</th>
             <th>Umumiy qoldiq</th>
-            <th>Kirim narxi</th>
-            <th>Kirim summasi</th>
-            <th>Sotuv narxi</th>
-            <th>Sotuv summasi</th>
+            <th>Kirim narxi (UZS)</th>
+            <th>Kirim summasi (UZS)</th>
+            <th>Sotuv narxi (UZS)</th>
+            <th>Sotuv summasi (UZS)</th>
             <th>Qancha ustiga qo'yilgani (%)</th>
         </tr>
 
@@ -32,32 +37,42 @@
 
             $stocks = $stocks->get();
 
-            $usdRate = (float) (App\Models\Currency::where('type_id', 1)
-                ->latest('id')
-                ->value('price') ?? 1);
+            $usdRate = $usdRate > 0 ? $usdRate : 1;
+
+            $toUzs = static function (float $price, int $sourceCurrency) use ($usdRate): float {
+                if ($sourceCurrency === 1) {
+                    return $price * $usdRate;
+                }
+
+                return $price;
+            };
         @endphp
 
         @foreach($stocks as $item)
             @php
-                $checkinPrice = (float) $item->checkin_price;
+                $latestCheckin = $item->productid->checkindetails()
+                    ->with('checkid')
+                    ->where('warehouse_id', $wareid->id)
+                    ->where('status', 1)
+                    ->where('price', '>', 0)
+                    ->latest('created_at')
+                    ->latest('id')
+                    ->first();
 
-                if ($checkinPrice <= 0) {
-                    $checkinPrice = (float) ($item->productid->checkindetails()
-                        ->where('warehouse_id', $wareid->id)
-                        ->where('status', 1)
-                        ->where('price', '>', 0)
-                        ->latest('created_at')
-                        ->value('price') ?? 0);
-                }
+                $checkinRawPrice = $latestCheckin
+                    ? (float) $latestCheckin->price
+                    : (float) $item->checkin_price;
+                $checkinCurrency = $latestCheckin && $latestCheckin->checkid
+                    ? (int) $latestCheckin->checkid->currency_type
+                    : 2;
+                $checkinPrice = $toUzs($checkinRawPrice, $checkinCurrency);
 
-                $checkoutPrice = (float) $item->checkout_price;
-                if ($checkoutPrice <= 0) {
-                    $checkoutPrice = (float) ($item->productid->price ?? 0);
+                $checkoutRawPrice = (float) $item->checkout_price;
+                if ($checkoutRawPrice <= 0) {
+                    $checkoutRawPrice = (float) ($item->productid->price ?? 0);
                 }
-
-                if ((int) $item->productid->currency_type === 1) {
-                    $checkoutPrice *= $usdRate;
-                }
+                $checkoutCurrency = (int) ($item->productid->currency_type ?? 2);
+                $checkoutPrice = $toUzs($checkoutRawPrice, $checkoutCurrency);
 
                 $stock = (float) $item->stock;
                 $checkinTotal = $checkinPrice * $stock;

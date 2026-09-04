@@ -21,6 +21,7 @@ use App\Models\Warehouse;
 use App\Models\Product;
 use App\Models\History;
 use App\Models\Dealer;
+use App\Models\Currency;
 
 use Carbon\Carbon;
 use Session;
@@ -30,7 +31,7 @@ use Str;
 
 class WarehouseController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         
         if(Auth::user()->hasAnyRole('admin|cashier')){
@@ -39,7 +40,9 @@ class WarehouseController extends Controller
             $data = Warehouse::orderBy('id', 'desc')->where('dealer_id', Auth::user()->dealer_id)->paginate(20); 
         } 
         $keyword = NULL; 
-        return view('backend.warehouses.index', compact('data', 'keyword'));
+        $usdRate = $this->resolveUsdRate($request->usd_rate);
+
+        return view('backend.warehouses.index', compact('data', 'keyword', 'usdRate'));
         
         //
         
@@ -114,9 +117,11 @@ class WarehouseController extends Controller
         return Excel::download(new WarehouseProductList($id), 'export- ' . $id . '.xlsx');
     }
     
-    public function warehouse_stock($id)
+    public function warehouse_stock(Request $request, $id)
     { 
-        return Excel::download(new StockExport($id), 'export- ' . $id . '.xlsx');
+        $usdRate = $this->resolveUsdRate($request->usd_rate);
+
+        return Excel::download(new StockExport($id, $usdRate), 'export- ' . $id . '.xlsx');
     }
     
     public function warehouse_stock_param($id, $take, $pag)
@@ -131,7 +136,22 @@ class WarehouseController extends Controller
         $id = $request->id;
         $take = $request->take;
         $pag = $request->pag;
-        return Excel::download(new StockExportParam($id, $take, $pag), 'filter- ' . $wareid . '-' . $take . '-' . $pag . '.xlsx');
+        $usdRate = $this->resolveUsdRate($request->usd_rate);
+
+        return Excel::download(new StockExportParam($id, $take, $pag, $usdRate), 'filter- ' . $wareid . '-' . $take . '-' . $pag . '.xlsx');
+    }
+
+    private function resolveUsdRate($value): float
+    {
+        $value = (float) str_replace([' ', ','], ['', '.'], (string) $value);
+
+        if ($value > 0) {
+            return $value;
+        }
+
+        $latestRate = (float) (Currency::where('type_id', 1)->latest('id')->value('price') ?? 1);
+
+        return $latestRate > 0 ? $latestRate : 1;
     }
     
     public function warehouse_stock_refresh($id)

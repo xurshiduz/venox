@@ -14,15 +14,18 @@ use App\Models\Warehouse;
 class StockExport implements FromView, WithEvents, WithTitle
 { 
     
-    function __construct($id) {
+    function __construct($id, $usdRate = null) {
         $this->id = $id;
+        $this->usdRate = (float) $usdRate;
     }
         
     public function view(): View
     {
         $wareid = Warehouse::where('code', $this->id)->first();
         
-        return view('backend.warehouses.excel', compact('wareid'));
+        $usdRate = $this->usdRate;
+
+        return view('backend.warehouses.excel', compact('wareid', 'usdRate'));
     }
 
     public function title(): string

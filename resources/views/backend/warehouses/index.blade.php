@@ -12,6 +12,15 @@
     .warehouse-table tbody tr:hover { background: #f8f9fc; }
     .warehouse-name { font-weight: 600; color: #364a63; }
     .warehouse-action { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 96px; }
+    .exchange-rate-box { padding: 12px 14px; border: 1px solid #c4d4ff; border-radius: 8px; background: #f5f8ff; }
+    .exchange-rate-box .form-label { color: #364a63; font-size: 13px; }
+    .exchange-rate-row { display: flex; align-items: stretch; }
+    .exchange-rate-currency { display: flex; align-items: center; justify-content: center; min-width: 66px; padding: 0 12px; border: 1px solid #c4d4ff; background: #fff; color: #364a63; font-weight: 700; }
+    .exchange-rate-currency:first-child { border-radius: 6px 0 0 6px; }
+    .exchange-rate-currency:last-child { border-radius: 0 6px 6px 0; }
+    .exchange-rate-equals { border-left: 0; border-right: 0; min-width: 38px; color: #8094ae; }
+    .exchange-rate-input { border-radius: 0 !important; border-color: #c4d4ff !important; text-align: right; font-size: 16px; font-weight: 700; color: #364a63; }
+    .exchange-rate-help { display: block; margin-top: 7px; color: #6576a0; font-size: 11px; line-height: 1.35; }
     @media (max-width: 767px) { .warehouse-toolbar .form-group { margin-bottom: 12px; } }
 </style>
 <div class="nk-content ">
@@ -26,7 +35,7 @@
                             <div class="col-md-9">
                                 <form method="GET" action="{{ route('warehouses_stock_excel_input') }}">
                                     <div class="row align-items-end">
-                                        <div class="col-md-3">
+                                        <div class="col-md-2">
                                             <div class="form-group">
                                                 <label class="form-label">{{ trans('backend.input.name') }}</label>
                                                 <select class="form-select js-select2" name="id" required data-search="on">
@@ -36,20 +45,32 @@
                                                 </select>
                                             </div>
                                         </div>
-                                        <div class="col-md-3">
+                                        <div class="col-md-2">
                                             <div class="form-group">
                                               <label class="form-label">{{ trans('backend.table.from_text') }}</label>
                                               <input type="number" min="0" class="form-control" name="take" required placeholder="0">
                                             </div>
                                         </div>
                                         
-                                        <div class="col-md-3">
+                                        <div class="col-md-2">
                                             <div class="form-group">
                                               <label class="form-label">{{ trans('backend.table.to_text') }}</label>
                                               <input type="number" min="1" class="form-control" name="pag" required placeholder="{{ App\Models\Product::count() }}">
                                             </div>
                                         </div>
-                                        <div class="col-md-3">
+                                        <div class="col-md-4">
+                                            <div class="form-group exchange-rate-box">
+                                                <label class="form-label">Excel uchun hisoblash kursi</label>
+                                                <div class="exchange-rate-row">
+                                                    <span class="exchange-rate-currency">1 USD</span>
+                                                    <span class="exchange-rate-currency exchange-rate-equals">=</span>
+                                                    <input type="number" min="1" step="0.01" class="form-control warehouse-usd-rate exchange-rate-input" name="usd_rate" value="{{ $usdRate }}" aria-label="Bir AQSH dollarining so‘mdagi kursi" required>
+                                                    <span class="exchange-rate-currency">UZS</span>
+                                                </div>
+                                                <small class="exchange-rate-help">Masalan: 11 800. USDdagi sotuv narxi shu kursda so‘mga aylantirilib, kirim narxi bilan solishtiriladi.</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-2">
                                            <button type="submit" class="btn btn-success btn-block warehouse-action"><em class="icon ni ni-download"></em>{{ trans('backend.table.download') }}</button>
                                         </div>
                                     </div>
@@ -95,7 +116,7 @@
                                        @hasanyrole('admin|arrival')
                                        <!--<td><a href="#"><img width="22px" src="/upload/view-files.png"> PDF </a></td>-->
                                        <td>
-                                           <a class="btn btn-sm btn-success warehouse-action" href="{{ route('warehouses_stock_excel', ['id' => $item->code]) }}"><em class="icon ni ni-download"></em> Excel</a>
+                                           <a class="btn btn-sm btn-success warehouse-action warehouse-excel-link" href="{{ route('warehouses_stock_excel', ['id' => $item->code, 'usd_rate' => $usdRate]) }}"><em class="icon ni ni-download"></em> Excel</a>
                                            <!--<a href="{{ route('warehouses_stock_excel_param', ['id' => $item->code, 'take' => 0, 'pag' => 8000]) }}"><img width="22px" src="/upload/excel.png"> Excel 0-8000</a> <br>
                                            <a href="{{ route('warehouses_stock_excel_param', ['id' => $item->code, 'take' => 8000, 'pag' => 16000]) }}"><img width="22px" src="/upload/excel.png"> Excel 8001-16000</a> -->
                                        </td>
@@ -127,4 +148,18 @@
         </div>
     </div>
 </div>
+@endsection
+
+@section('script')
+<script>
+    $('.warehouse-usd-rate').on('input change', function () {
+        const usdRate = this.value;
+
+        $('.warehouse-excel-link').each(function () {
+            const url = new URL(this.href, window.location.origin);
+            url.searchParams.set('usd_rate', usdRate);
+            this.href = url.toString();
+        });
+    });
+</script>
 @endsection
