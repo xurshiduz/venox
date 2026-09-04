@@ -55,7 +55,7 @@ class CashReceiptController extends Controller
         }
 
         $receipts = $query
-            ->with(['clientname', 'tname'])
+            ->with(['clientname', 'tname', 'checkout'])
             ->orderBy('date')
             ->orderBy('id')
             ->get();

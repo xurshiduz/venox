@@ -328,6 +328,7 @@ Route::group(
         Route::post('/checkout_send_success', 'Backend\CheckoutController@send_success')->name('checkout_send_success');
         Route::get('/checkout_filter', 'Backend\CheckoutController@checkout_filter')->name('checkout_filter');
         Route::post('/checkout_discount', 'Backend\CheckoutController@checkout_discount')->name('checkout_discount');
+        Route::post('/checkout_commission_scheme', 'Backend\CheckoutController@checkout_commission_scheme')->name('checkout_commission_scheme');
         
         Route::get('/checkout_report', 'Backend\CheckoutController@index_report')->name('checkouts_index_report');
         Route::get('/checkout_report_print/{id}', 'Backend\CheckoutController@report_print')->name('checkouts_report_print');

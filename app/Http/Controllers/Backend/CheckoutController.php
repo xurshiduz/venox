@@ -1488,6 +1488,43 @@ class CheckoutController extends Controller
             'details'     => $updatedDetails
         ]);
     }
+
+    public function checkout_commission_scheme(Request $request)
+    {
+        $schemes = [
+            'special' => ['label' => 'Spes', 'kpi' => 0, 'agent' => 8, 'venox' => 0],
+            'contract' => ['label' => 'Shartnoma', 'kpi' => 5, 'agent' => 8, 'venox' => 25],
+            'venox_10' => ['label' => 'Venox bonus 10%', 'kpi' => 5, 'agent' => 8, 'venox' => 10],
+            'venox_15' => ['label' => 'Venox bonus 15%', 'kpi' => 5, 'agent' => 8, 'venox' => 15],
+            'venox_20' => ['label' => 'Venox bonus 20%', 'kpi' => 5, 'agent' => 8, 'venox' => 20],
+            'venox_25' => ['label' => 'Venox bonus 25%', 'kpi' => 5, 'agent' => 8, 'venox' => 25],
+        ];
+
+        $validated = $request->validate([
+            'checkout_id' => ['required', 'integer', 'exists:checkouts,id'],
+            'scheme' => ['required', 'string', 'in:' . implode(',', array_keys($schemes))],
+        ]);
+
+        $checkout = Checkout::findOrFail($validated['checkout_id']);
+        $scheme = $schemes[$validated['scheme']];
+        $factoryPercent = 100 - $scheme['kpi'] - $scheme['agent'] - $scheme['venox'];
+
+        $checkout->update([
+            'commission_scheme' => $validated['scheme'],
+            'kpi_percent' => $scheme['kpi'],
+            'agent_percent' => $scheme['agent'],
+            'venox_bonus_percent' => $scheme['venox'],
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'label' => $scheme['label'],
+            'kpi_percent' => $scheme['kpi'],
+            'agent_percent' => $scheme['agent'],
+            'venox_bonus_percent' => $scheme['venox'],
+            'factory_percent' => $factoryPercent,
+        ]);
+    }
     
     public function checkout_reference_change()
     {

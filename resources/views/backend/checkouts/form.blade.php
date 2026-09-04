@@ -400,6 +400,51 @@
                                             </tbody>
                                         </table>
                                     </div>
+
+                                    @php
+                                        $commissionOptions = [
+                                            'special' => 'Spes — KPI 0% · Agent 8% · Venox 0%',
+                                            'contract' => 'Shartnoma — KPI 5% · Agent 8% · Venox 25%',
+                                            'venox_10' => 'Venox bonus 10% — KPI 5% · Agent 8%',
+                                            'venox_15' => 'Venox bonus 15% — KPI 5% · Agent 8%',
+                                            'venox_20' => 'Venox bonus 20% — KPI 5% · Agent 8%',
+                                            'venox_25' => 'Venox bonus 25% — KPI 5% · Agent 8%',
+                                        ];
+                                        $commissionSelected = $item->commission_scheme;
+                                        $factoryPercent = 100
+                                            - (float) ($item->kpi_percent ?? 0)
+                                            - (float) ($item->agent_percent ?? 0)
+                                            - (float) ($item->venox_bonus_percent ?? 0);
+                                    @endphp
+                                    <div class="card border mt-3 commission-card">
+                                        <div class="card-inner py-3">
+                                            <div class="row gy-2 align-items-end">
+                                                <div class="col-lg-5 col-md-6">
+                                                    <label class="form-label mb-1">KPI va bonus hisoblash turi</label>
+                                                    <select class="form-select commission-scheme" data-id="{{ $item->id }}">
+                                                        <option value="">Tanlanmagan</option>
+                                                        @foreach($commissionOptions as $value => $label)
+                                                            <option value="{{ $value }}" @if($commissionSelected === $value) selected @endif>{{ $label }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                </div>
+                                                <div class="col-lg-5 col-md-6">
+                                                    <div class="d-flex flex-wrap commission-summary" style="gap: 8px;">
+                                                        <span class="badge bg-outline-primary">KPI: <b class="commission-kpi">{{ number_format((float) ($item->kpi_percent ?? 0), 0) }}</b>%</span>
+                                                        <span class="badge bg-outline-info">Agent: <b class="commission-agent">{{ number_format((float) ($item->agent_percent ?? 0), 0) }}</b>%</span>
+                                                        <span class="badge bg-outline-warning">Venox: <b class="commission-venox">{{ number_format((float) ($item->venox_bonus_percent ?? 0), 0) }}</b>%</span>
+                                                        <span class="badge bg-outline-success">Zavod: <b class="commission-factory">{{ number_format($factoryPercent, 0) }}</b>%</span>
+                                                    </div>
+                                                </div>
+                                                <div class="col-lg-2 col-md-12">
+                                                    <button type="button" class="btn btn-success btn-block apply-commission-btn" data-id="{{ $item->id }}">
+                                                        <em class="icon ni ni-check"></em><span>Saqlash</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <small class="text-soft d-block mt-2">Bu foizlar chegirma emas. Ular ushbu nakladnoy uchun saqlanadi va kassa Excel hisobotida ishlatiladi.</small>
+                                        </div>
+                                    </div>
                                     
                                     @endif
                                     @if($item && $item->details()->count())
@@ -673,6 +718,46 @@
             error: function(xhr) {
                 console.log(xhr.responseText);
                 alert("Xatolik yuz berdi!");
+            },
+            complete: function() {
+                btn.prop('disabled', false);
+            }
+        });
+    });
+
+    $('.apply-commission-btn').click(function(e) {
+        e.preventDefault();
+        var btn = $(this);
+        var scheme = $('.commission-scheme').val();
+
+        if (!scheme) {
+            alert('KPI va bonus hisoblash turini tanlang.');
+            return;
+        }
+
+        btn.prop('disabled', true);
+        $.ajax({
+            type: 'POST',
+            url: '{{ route("checkout_commission_scheme") }}',
+            dataType: 'JSON',
+            data: {
+                checkout_id: btn.data('id'),
+                scheme: scheme
+            },
+            success: function(data) {
+                if (data.status === 'success') {
+                    $('.commission-kpi').text(data.kpi_percent);
+                    $('.commission-agent').text(data.agent_percent);
+                    $('.commission-venox').text(data.venox_bonus_percent);
+                    $('.commission-factory').text(data.factory_percent);
+                    alert('KPI va bonus hisoblash turi saqlandi.');
+                }
+            },
+            error: function(xhr) {
+                var message = xhr.responseJSON && xhr.responseJSON.message
+                    ? xhr.responseJSON.message
+                    : 'Hisoblash turini saqlashda xatolik yuz berdi.';
+                alert(message);
             },
             complete: function() {
                 btn.prop('disabled', false);
