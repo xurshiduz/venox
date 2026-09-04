@@ -3,11 +3,9 @@
 namespace App\Exports;
 
 use Illuminate\Contracts\View\View;
-use Maatwebsite\Excel\Concerns\FromView;
-use App\Models\Product;
 use App\Models\Warehouse;
 
-class StockExportParam implements FromView
+class StockExportParam extends StockExport
 { 
     
     function __construct($id, $take, $pag) {
@@ -22,6 +20,6 @@ class StockExportParam implements FromView
         $take = $this->take;
         $pag = $this->pag;
         
-        return view('backend.warehouses.excel_param', compact('wareid', 'take', 'pag'));
+        return view('backend.warehouses.excel', compact('wareid', 'take', 'pag'));
     }
 }

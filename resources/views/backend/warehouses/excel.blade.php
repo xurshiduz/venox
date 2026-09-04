@@ -24,8 +24,13 @@
                 ->where('stock', '>', 0)
                 ->whereHas('productid')
                 ->with(['productid.unitid'])
-                ->orderBy('product_id')
-                ->get();
+                ->orderBy('product_id');
+
+            if (isset($take, $pag)) {
+                $stocks->skip((int) $take)->take((int) $pag);
+            }
+
+            $stocks = $stocks->get();
 
             $usdRate = (float) (App\Models\Currency::where('type_id', 1)
                 ->latest('id')
