@@ -70,6 +70,7 @@ Route::group(
             Route::get('/get_change_client_id', 'Backend\CashReceiptController@get_change_client_id')->name('get_change_client_id');  
             Route::get('/cash_receipts', 'Backend\CashReceiptController@index')->name('cash_receipts_index');  
             Route::get('/cash_receipts_his', 'Backend\CashReceiptController@index_his')->name('cash_receipts_index_his');   
+            Route::get('/cash_receipts_excel', 'Backend\CashReceiptController@excel')->name('cash_receipts_excel');
             Route::get('/cash_receipt/form/{id?}/{page?}/{checkout?}', 'Backend\CashReceiptController@form')->name('cash_receipt_form');
             Route::post('/cash_receipt/form/{id?}/{page?}/{checkout?}', 'Backend\CashReceiptController@save');
             Route::get('/cash_receipt/{id}/status/{page?}/{checkout?}', 'Backend\CashReceiptController@status')->name('cash_receipt_status');

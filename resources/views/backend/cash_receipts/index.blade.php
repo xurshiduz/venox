@@ -8,7 +8,7 @@
                 <div class="components-preview mx-auto">
                     <div class="nk-block nk-block-lg">
                         <div class="row">
-                            <div class="col-md-8 mb-3">
+                            <div class="col-md-6 mb-3">
                                 <!--<form method="POST" action="{{ route('products_search') }}">
                                     @csrf
                                     <input type="text" class="form-control" value="{{ $keyword ? $keyword : NULL }}" name="search" required placeholder="Поиск по штрих-код и наименование">
@@ -16,6 +16,10 @@
                             </div>
                             <div class="col-md-2 mb-2">
                                <a href="{{ route('cash_receipts_index_his') }}" class="btn btn-warning btn-block">Отмененные платежи</a> 
+                            </div>
+
+                            <div class="col-md-2 mb-2">
+                               <a href="{{ route('cash_receipts_excel') }}" class="btn btn-success btn-block"><em class="icon ni ni-download"></em> Excel</a>
                             </div>
                             
                             <div class="col-md-2 mb-2">

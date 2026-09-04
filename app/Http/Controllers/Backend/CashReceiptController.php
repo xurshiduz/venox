@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Backend;
 
+use App\Exports\CashReceiptsExport;
 use App\Http\Controllers\Controller; 
 use GuzzleHttp\Client as GClient;
 use Illuminate\Http\Request;
+use Maatwebsite\Excel\Facades\Excel;
 
 use App\Models\CashReceipt;
 use App\Models\History;
@@ -40,6 +42,28 @@ class CashReceiptController extends Controller
         }
         $keyword = NULL; 
         return view('backend.cash_receipts.index', compact('data', 'keyword'));
+    }
+
+    public function excel()
+    {
+        $query = CashReceipt::query()->where('status', 1);
+
+        if (Auth::user()->hasAnyRole('dealer_admin|diler_admin')) {
+            $query->where('dealer_id', Auth::user()->dealer_id);
+        } elseif (! Auth::user()->hasAnyRole('admin|cashier')) {
+            $query->where('user_id', Auth::id());
+        }
+
+        $receipts = $query
+            ->with(['clientname', 'tname'])
+            ->orderBy('date')
+            ->orderBy('id')
+            ->get();
+
+        return Excel::download(
+            new CashReceiptsExport($receipts),
+            'kassa-kirimlari-' . Carbon::now()->format('Y-m-d') . '.xlsx'
+        );
     }
     
     public function portfolio()
