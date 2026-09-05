@@ -10,15 +10,26 @@
                     <img class="logo-dark logo-img" src="/venox_logo_white.png" srcset="/venox_logo_white.png 2x" alt="logo-dark">
                 </a>
             </div><!-- .nk-header-brand -->
-           @foreach(App\Models\CurrencyType::where('status', 1)->where('id', '!=', 2)->get() as $currency)
-            <a href="{{ route('currencies_index') }}">
-            <div class="nk-header-news d-xl-block">
+            @php($globalUsdRate = App\Models\Currency::usdRate())
+            <div class="nk-header-news d-none d-md-block">
                 <div class="nk-news-list">
-                    <div style="font-size: 12px; color: #526484;"><b>1 {{ $currency->belgi }}:</b><br> {{ $currency->currencyid->count() ? $currency->currencyid->first()->price : trans('backend.main.no') }}</div>
+                    @role('admin')
+                    <form method="POST" action="{{ route('global_usd_rate.update') }}" class="d-flex align-items-center" style="gap: 7px;">
+                        @csrf
+                        <span class="badge bg-light text-dark border" style="font-size: 12px; white-space: nowrap;">Asosiy valyuta: UZS</span>
+                        <label for="global-usd-rate" class="mb-0" style="font-size: 12px; color: #526484; white-space: nowrap; font-weight: 600;">1 USD =</label>
+                        <input id="global-usd-rate" type="number" name="usd_rate" value="{{ $globalUsdRate }}" min="1" max="1000000" step="0.01" required class="form-control form-control-sm" style="width: 112px; text-align: right; font-weight: 700;" aria-label="Umumiy USD kursi">
+                        <span style="font-size: 12px; color: #526484; font-weight: 600;">UZS</span>
+                        <button type="submit" class="btn btn-sm btn-primary" title="Butun tizim uchun kursni saqlash">Saqlash</button>
+                    </form>
+                    @else
+                    <div class="d-flex align-items-center" style="gap: 7px; font-size: 12px; color: #526484;">
+                        <span class="badge bg-light text-dark border">Asosiy valyuta: UZS</span>
+                        <strong>1 USD = {{ number_format($globalUsdRate, 2, '.', ' ') }} UZS</strong>
+                    </div>
+                    @endrole
                 </div>
             </div>
-            </a>
-            @endforeach
 
             <div class="nk-header-tools">
                 <ul class="nk-quick-nav">

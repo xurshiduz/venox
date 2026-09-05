@@ -158,6 +158,24 @@ class CurrencyController extends Controller
 
         return redirect()->action('Backend\CurrencyController@index');
     }
+
+    public function saveGlobalUsdRate(Request $request)
+    {
+        abort_unless(Auth::user()->hasRole('admin'), 403);
+
+        $validated = $request->validate([
+            'usd_rate' => ['required', 'numeric', 'min:1', 'max:1000000'],
+        ]);
+
+        Currency::create([
+            'price' => round((float) $validated['usd_rate'], 2),
+            'code' => Str::uuid(),
+            'user_id' => Auth::id(),
+            'type_id' => 1,
+        ]);
+
+        return back()->with('success', 'Umumiy USD kursi yangilandi. Yangi hisob-kitoblarda shu kurs ishlatiladi.');
+    }
     //End Currency
 
     public function currency_type_form($id = null)

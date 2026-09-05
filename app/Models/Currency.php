@@ -10,6 +10,43 @@ class Currency extends Model
     use HasFactory; 
     protected $guarded = [];
 
+    /**
+     * Tizim bo'yicha yagona amaldagi USD -> UZS kursi.
+     */
+    public static function usdRate(): float
+    {
+        $rate = (float) static::where('type_id', 1)->latest('id')->value('price');
+
+        return $rate > 0 ? $rate : 1;
+    }
+
+    /**
+     * Berilgan summani asosiy hisobot valyutasi — UZSga o'tkazadi.
+     * currency_type: 1 = USD, 2 = UZS.
+     * Tarixiy hujjat uchun $documentRate berilsa, aynan o'sha kurs saqlanadi.
+     */
+    public static function toUzs(float $amount, ?int $currencyType, ?float $documentRate = null): float
+    {
+        if ($currencyType !== 1) {
+            return $amount;
+        }
+
+        $rate = $documentRate && $documentRate > 1
+            ? $documentRate
+            : static::usdRate();
+
+        return $amount * $rate;
+    }
+
+    public static function markupPercent(float $costUzs, float $saleUzs): ?float
+    {
+        if ($costUzs <= 0 || $saleUzs <= 0) {
+            return null;
+        }
+
+        return (($saleUzs - $costUzs) / $costUzs) * 100;
+    }
+
     public function products()
     {
         return $this->hasMany('App\Models\Product', 'category_id');

@@ -1,7 +1,5 @@
 @php
-    $usdRate = isset($usdRate) && (float) $usdRate > 0
-        ? (float) $usdRate
-        : (float) (App\Models\Currency::where('type_id', 1)->latest('id')->value('price') ?? 1);
+    $usdRate = App\Models\Currency::usdRate();
 @endphp
 <table>
     <tbody>
@@ -61,25 +59,28 @@
                 $checkinRate = (float) ($latestCheckin->currency_type_price
                     ?? optional($latestCheckin->checkid ?? null)->currency_type_price
                     ?? $usdRate);
-                $checkinRate = $checkinRate > 1 ? $checkinRate : $usdRate;
-                $checkinPrice = $checkinCurrency === 1
-                    ? $checkinRawPrice * $checkinRate
-                    : $checkinRawPrice;
+                $checkinPrice = App\Models\Currency::toUzs(
+                    $checkinRawPrice,
+                    $checkinCurrency,
+                    $checkinRate
+                );
 
                 $checkoutRawPrice = (float) $item->checkout_price;
                 if ($checkoutRawPrice <= 0) {
                     $checkoutRawPrice = (float) ($item->productid->price ?? 0);
                 }
-                // Sotuv narxlari amalda USDda yuritiladi va tanlangan kurs
-                // bo‘yicha UZSga aylantiriladi.
-                $checkoutPrice = $checkoutRawPrice * $usdRate;
+                // Mahsulot kartasidagi valyuta turiga qarab UZSga o'tkaziladi.
+                // USD narx kursga ko'payadi, UZS narx o'zgarmaydi.
+                $checkoutPrice = App\Models\Currency::toUzs(
+                    $checkoutRawPrice,
+                    (int) ($item->productid->currency_type ?? 2),
+                    $usdRate
+                );
 
                 $stock = (float) $item->stock;
                 $checkinTotal = $checkinPrice * $stock;
                 $checkoutTotal = $checkoutPrice * $stock;
-                $markup = $checkinPrice > 0 && $checkoutPrice > 0
-                    ? (($checkoutPrice - $checkinPrice) / $checkinPrice) * 100
-                    : null;
+                $markup = App\Models\Currency::markupPercent($checkinPrice, $checkoutPrice);
             @endphp
             <tr>
                 <td></td>

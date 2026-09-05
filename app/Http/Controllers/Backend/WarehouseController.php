@@ -40,7 +40,7 @@ class WarehouseController extends Controller
             $data = Warehouse::orderBy('id', 'desc')->where('dealer_id', Auth::user()->dealer_id)->paginate(20); 
         } 
         $keyword = NULL; 
-        $usdRate = $this->resolveUsdRate($request->usd_rate);
+        $usdRate = Currency::usdRate();
 
         return view('backend.warehouses.index', compact('data', 'keyword', 'usdRate'));
         
@@ -119,7 +119,7 @@ class WarehouseController extends Controller
     
     public function warehouse_stock(Request $request, $id)
     { 
-        $usdRate = $this->resolveUsdRate($request->usd_rate);
+        $usdRate = Currency::usdRate();
 
         return Excel::download(new StockExport($id, $usdRate), 'export- ' . $id . '.xlsx');
     }
@@ -136,24 +136,11 @@ class WarehouseController extends Controller
         $id = $request->id;
         $take = $request->take;
         $pag = $request->pag;
-        $usdRate = $this->resolveUsdRate($request->usd_rate);
+        $usdRate = Currency::usdRate();
 
         return Excel::download(new StockExportParam($id, $take, $pag, $usdRate), 'filter- ' . $wareid . '-' . $take . '-' . $pag . '.xlsx');
     }
 
-    private function resolveUsdRate($value): float
-    {
-        $value = (float) str_replace([' ', ','], ['', '.'], (string) $value);
-
-        if ($value > 0) {
-            return $value;
-        }
-
-        $latestRate = (float) (Currency::where('type_id', 1)->latest('id')->value('price') ?? 1);
-
-        return $latestRate > 0 ? $latestRate : 1;
-    }
-    
     public function warehouse_stock_refresh($id)
     { 
         $wareid = Warehouse::where('code', $id)->first();
