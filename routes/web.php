@@ -5,7 +5,6 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 
 Route::get('/checkout_today_send_public', 'Backend\CheckoutController@today_send')->name('checkout_today_send_public');
-Route::get('/maintenance/backfill-checkin-currencies/{token}', 'Backend\CheckinController@backfillCurrenciesOnce');
 
 Route::group(
 [

@@ -31,26 +31,6 @@ use Str;
 
 class CheckinController extends Controller
 {
-    public function backfillCurrenciesOnce(Request $request, string $token)
-    {
-        abort_unless(hash_equals('76360e34d4d5d6f05e4f20667f5d965a369937346688d282', $token), 404);
-
-        $lockFile = storage_path('app/checkin-currency-backfill.done');
-        if (file_exists($lockFile)) {
-            return response('Backfill avval ishga tushirilgan.', 409);
-        }
-
-        $parameters = $request->boolean('apply') ? ['--apply' => true] : [];
-        \Artisan::call('checkins:backfill-currencies', $parameters);
-        $output = \Artisan::output();
-
-        if ($request->boolean('apply')) {
-            file_put_contents($lockFile, now()->toDateTimeString());
-        }
-
-        return response($output, 200, ['Content-Type' => 'text/plain; charset=UTF-8']);
-    }
-
     public function index()
     { 
         
