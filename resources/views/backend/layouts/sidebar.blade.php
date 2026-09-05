@@ -127,7 +127,7 @@
                     </li>
                     @endhasanyrole
                     
-                    @hasanyrole('admin22|sale22|cashier22')
+                    @hasanyrole('admin|sale|cashier')
                     <li class="nk-menu-item {{ Request::routeIs('transfers_index') || Request::routeIs('transfers_form') ? 'active' : '' }}">
                         <a href="{{ route('transfers_index') }}" class="nk-menu-link">
                             <span class="nk-menu-icon"><em class="icon ni ni-tranx"></em></span>
