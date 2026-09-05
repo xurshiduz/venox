@@ -31,6 +31,26 @@ use Str;
 
 class CheckinController extends Controller
 {
+    public function backfillCurrenciesOnce(Request $request, string $token)
+    {
+        abort_unless(hash_equals('76360e34d4d5d6f05e4f20667f5d965a369937346688d282', $token), 404);
+
+        $lockFile = storage_path('app/checkin-currency-backfill.done');
+        if (file_exists($lockFile)) {
+            return response('Backfill avval ishga tushirilgan.', 409);
+        }
+
+        $parameters = $request->boolean('apply') ? ['--apply' => true] : [];
+        \Artisan::call('checkins:backfill-currencies', $parameters);
+        $output = \Artisan::output();
+
+        if ($request->boolean('apply')) {
+            file_put_contents($lockFile, now()->toDateTimeString());
+        }
+
+        return response($output, 200, ['Content-Type' => 'text/plain; charset=UTF-8']);
+    }
+
     public function index()
     { 
         
@@ -275,6 +295,13 @@ class CheckinController extends Controller
     
         $checkout->currency_type = $currencyType;
         $checkout->save();
+
+        $checkout->details()->update([
+            'currency_type' => $currencyType,
+            'currency_type_price' => (int) $currencyType === 1
+                ? (float) $checkout->currency_type_price
+                : 1,
+        ]);
         
         return response()->json([
             'status' => 'success'
@@ -293,11 +320,31 @@ class CheckinController extends Controller
         // Asosiy chekda narxni saqlash
         $checkout->currency_type_price = $price;
         $checkout->save();
+
+        $checkout->details()
+            ->where('currency_type', 1)
+            ->update(['currency_type_price' => $price]);
     
         return response()->json([
             'status' => 'success',
             'price'  => $price
         ]);
+    }
+
+    public function currency(Request $request)
+    {
+        $detail = CheckinDetail::with('checkid')->findOrFail($request->curcid);
+        $currencyType = (int) $request->currency;
+        $rate = $currencyType === 1
+            ? (float) ($detail->checkid->currency_type_price ?? 0)
+            : 1;
+
+        $detail->update([
+            'currency_type' => $currencyType,
+            'currency_type_price' => $rate,
+        ]);
+
+        return response()->json(['status' => 'success']);
     }
 
     public function save(Request $request, $id = null)
@@ -352,8 +399,8 @@ class CheckinController extends Controller
             'warehouse_id'        => $item->warehouse_id,
             'category_id'         => $product->category_id,
             'qty'                 => 1,
-            'currency_type'       => 2,
-            'currency_type_price' => 0,
+            'currency_type'       => $item->currency_type,
+            'currency_type_price' => $item->currency_type_price,
             'price'               => 1,
             'code'                => Str::uuid(),
             'barcode'             => mt_rand(10, 99) . time(),

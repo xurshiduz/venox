@@ -55,9 +55,16 @@
                 $checkinRawPrice = $latestCheckin
                     ? (float) $latestCheckin->price
                     : (float) $item->checkin_price;
-                // Kirim narxlari amalda UZSda saqlanadi. Eski yozuvlardagi
-                // valyuta belgisi ishonchsiz bo‘lgani uchun qayta ko‘paytirilmaydi.
-                $checkinPrice = $checkinRawPrice;
+                $checkinCurrency = (int) ($latestCheckin->currency_type
+                    ?? optional($latestCheckin->checkid ?? null)->currency_type
+                    ?? 2);
+                $checkinRate = (float) ($latestCheckin->currency_type_price
+                    ?? optional($latestCheckin->checkid ?? null)->currency_type_price
+                    ?? $usdRate);
+                $checkinRate = $checkinRate > 1 ? $checkinRate : $usdRate;
+                $checkinPrice = $checkinCurrency === 1
+                    ? $checkinRawPrice * $checkinRate
+                    : $checkinRawPrice;
 
                 $checkoutRawPrice = (float) $item->checkout_price;
                 if ($checkoutRawPrice <= 0) {

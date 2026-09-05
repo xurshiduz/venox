@@ -8,6 +8,7 @@ use Illuminate\Support\Collection;
 
 use App\Models\WarehouseStock;
 use App\Models\CheckinDetail;
+use App\Models\Checkin;
 use App\Models\Product;
 use Auth;
 use Str;
@@ -23,6 +24,7 @@ class ImportCheckin implements ToCollection
     {
         $part = $this->part;
         $wareid = $this->wareid;
+        $checkin = Checkin::findOrFail($part);
         
         foreach ($rows as $key => $row){
             if($key != 0){
@@ -34,8 +36,8 @@ class ImportCheckin implements ToCollection
                         'warehouse_id' => $wareid,
                         'category_id' => 1,
                         'product_id' => $pid->id,
-                        'currency_type' => 1,
-                        'currency_type_price' => 0,
+                        'currency_type' => $checkin->currency_type,
+                        'currency_type_price' => $checkin->currency_type_price,
                         'qty' => Str::replace(' ', '', Str::replace(' ', '', $row[1])),
                         'price' => Str::replace(' ', '', Str::replace(' ', '', $row[2])),
                         'total_price' => (Str::replace(' ', '', Str::replace(' ', '', $row[1])) * Str::replace(' ', '', Str::replace(' ', '', $row[2]))),
