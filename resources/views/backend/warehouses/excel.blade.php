@@ -39,13 +39,6 @@
 
             $usdRate = $usdRate > 0 ? $usdRate : 1;
 
-            $toUzs = static function (float $price, int $sourceCurrency) use ($usdRate): float {
-                if ($sourceCurrency === 1) {
-                    return $price * $usdRate;
-                }
-
-                return $price;
-            };
         @endphp
 
         @foreach($stocks as $item)
@@ -62,17 +55,17 @@
                 $checkinRawPrice = $latestCheckin
                     ? (float) $latestCheckin->price
                     : (float) $item->checkin_price;
-                $checkinCurrency = $latestCheckin && $latestCheckin->checkid
-                    ? (int) $latestCheckin->checkid->currency_type
-                    : 2;
-                $checkinPrice = $toUzs($checkinRawPrice, $checkinCurrency);
+                // Kirim narxlari amalda UZSda saqlanadi. Eski yozuvlardagi
+                // valyuta belgisi ishonchsiz bo‘lgani uchun qayta ko‘paytirilmaydi.
+                $checkinPrice = $checkinRawPrice;
 
                 $checkoutRawPrice = (float) $item->checkout_price;
                 if ($checkoutRawPrice <= 0) {
                     $checkoutRawPrice = (float) ($item->productid->price ?? 0);
                 }
-                $checkoutCurrency = (int) ($item->productid->currency_type ?? 2);
-                $checkoutPrice = $toUzs($checkoutRawPrice, $checkoutCurrency);
+                // Sotuv narxlari amalda USDda yuritiladi va tanlangan kurs
+                // bo‘yicha UZSga aylantiriladi.
+                $checkoutPrice = $checkoutRawPrice * $usdRate;
 
                 $stock = (float) $item->stock;
                 $checkinTotal = $checkinPrice * $stock;
