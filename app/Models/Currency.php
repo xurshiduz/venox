@@ -38,6 +38,23 @@ class Currency extends Model
         return $amount * $rate;
     }
 
+    /**
+     * Hujjat qatori va sarlavhasida valyuta bir-biriga zid bo'lsa, sarlavha ustun.
+     * Sotuvda tanlangan valyuta/kurs checkout sarlavhasida tarixiy holatda saqlanadi.
+     */
+    public static function documentAmountToUzs(
+        float $amount,
+        ?int $headerCurrencyType,
+        ?float $headerRate,
+        ?int $detailCurrencyType = null,
+        ?float $detailRate = null
+    ): float {
+        $currencyType = $headerCurrencyType ?: $detailCurrencyType;
+        $rate = ($headerRate && $headerRate > 1) ? $headerRate : $detailRate;
+
+        return static::toUzs($amount, $currencyType, $rate);
+    }
+
     public static function markupPercent(float $costUzs, float $saleUzs): ?float
     {
         if ($costUzs <= 0 || $saleUzs <= 0) {

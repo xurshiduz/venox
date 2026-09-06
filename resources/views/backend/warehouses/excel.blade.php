@@ -83,21 +83,24 @@
                 $checkoutRawPrice = $latestCheckout
                     ? (float) $latestCheckout->price
                     : (float) ($item->checkout_price ?: ($item->productid->price ?? 0));
-                $checkoutCurrency = (int) ($latestCheckout->currency_type
-                    ?? optional($latestCheckout->checkid ?? null)->currency_type
-                    ?? $item->productid->currency_type
-                    ?? 1);
-                $checkoutRate = (float) ($latestCheckout->currency_type_price
-                    ?? optional($latestCheckout->checkid ?? null)->currency_type_price
-                    ?? $usdRate);
-                if ($checkoutRate <= 1 && $latestCheckout && $latestCheckout->checkid) {
-                    $checkoutRate = (float) ($latestCheckout->checkid->currency_type_price ?: $usdRate);
+                if ($latestCheckout) {
+                    // Checkout sarlavhasi foydalanuvchi sotuvda tanlagan valyuta va
+                    // o'sha kundagi kursni saqlaydi. Eski detail qatorlarida noto'g'ri
+                    // currency_type uchragani uchun sarlavha doim birinchi olinadi.
+                    $checkoutPrice = App\Models\Currency::documentAmountToUzs(
+                        $checkoutRawPrice,
+                        optional($latestCheckout->checkid)->currency_type,
+                        optional($latestCheckout->checkid)->currency_type_price,
+                        $latestCheckout->currency_type,
+                        $latestCheckout->currency_type_price
+                    );
+                } else {
+                    $checkoutPrice = App\Models\Currency::toUzs(
+                        $checkoutRawPrice,
+                        (int) ($item->productid->currency_type ?? 1),
+                        $usdRate
+                    );
                 }
-                $checkoutPrice = App\Models\Currency::toUzs(
-                    $checkoutRawPrice,
-                    $checkoutCurrency,
-                    $checkoutRate
-                );
 
                 $stock = (float) $item->stock;
                 $markup = App\Models\Currency::markupPercent($checkinPrice, $checkoutPrice);

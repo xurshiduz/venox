@@ -21,6 +21,20 @@ class WarehouseStockPricingTest extends TestCase
         $this->assertSame(566400.0, Currency::toUzs(566400, 2, 11900));
     }
 
+    public function test_checkout_header_currency_wins_over_incorrect_legacy_detail_currency(): void
+    {
+        $saleUzs = Currency::documentAmountToUzs(
+            16.50,
+            1,
+            11900,
+            2,
+            1
+        );
+
+        $this->assertSame(196350.0, $saleUzs);
+        $this->assertEqualsWithDelta(60.416666, Currency::markupPercent(122400, $saleUzs), 0.0001);
+    }
+
     public function test_markup_uses_unit_prices_and_does_not_depend_on_stock_quantity(): void
     {
         $costUzs = 89250;
