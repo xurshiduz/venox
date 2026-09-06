@@ -5,6 +5,8 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 
 Route::get('/checkout_today_send_public', 'Backend\CheckoutController@today_send')->name('checkout_today_send_public');
+// TEMP: productionda faqat checkout komissiya ustunlarini yaratish uchun; ishga tushgach olib tashlanadi.
+Route::get('/maintenance/checkout-commission-columns-6f7c29', 'Backend\CheckoutController@installCheckoutCommissionColumns');
 
 Route::group(
 [
