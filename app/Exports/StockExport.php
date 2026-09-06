@@ -48,10 +48,8 @@ class StockExport implements FromView, WithEvents, WithTitle
                     'E' => 17,
                     'F' => 18.7109375,
                     'G' => 13.7109375,
-                    'H' => 18.140625,
-                    'I' => 14.140625,
-                    'J' => 18.5703125,
-                    'K' => 23.85546875,
+                    'H' => 14.140625,
+                    'I' => 23.85546875,
                 ];
 
                 foreach ($widths as $column => $width) {
@@ -68,7 +66,7 @@ class StockExport implements FromView, WithEvents, WithTitle
                     return;
                 }
 
-                $tableRange = 'B2:K' . $lastRow;
+                $tableRange = 'B2:I' . $lastRow;
                 $sheet->getStyle($tableRange)->applyFromArray([
                     'font' => [
                         'name' => 'Calibri',
@@ -90,7 +88,7 @@ class StockExport implements FromView, WithEvents, WithTitle
                     ],
                 ]);
 
-                $sheet->getStyle('B2:K2')->applyFromArray([
+                $sheet->getStyle('B2:I2')->applyFromArray([
                     'font' => [
                         'name' => 'Calibri',
                         'size' => 14,

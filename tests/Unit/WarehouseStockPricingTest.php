@@ -21,13 +21,15 @@ class WarehouseStockPricingTest extends TestCase
         $this->assertSame(566400.0, Currency::toUzs(566400, 2, 11900));
     }
 
-    public function test_totals_are_unit_prices_multiplied_by_stock(): void
+    public function test_markup_uses_unit_prices_and_does_not_depend_on_stock_quantity(): void
     {
-        $stock = 140;
         $costUzs = 89250;
         $saleUzs = 148750;
 
-        $this->assertSame(12495000, $costUzs * $stock);
-        $this->assertSame(20825000, $saleUzs * $stock);
+        $oneItemMarkup = Currency::markupPercent($costUzs, $saleUzs);
+        $manyItemsMarkup = Currency::markupPercent($costUzs * 140, $saleUzs * 140);
+
+        $this->assertEqualsWithDelta(66.666666, $oneItemMarkup, 0.0001);
+        $this->assertEqualsWithDelta($oneItemMarkup, $manyItemsMarkup, 0.0001);
     }
 }

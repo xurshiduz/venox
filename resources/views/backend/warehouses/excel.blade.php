@@ -4,7 +4,7 @@
 <table>
     <tbody>
         <tr>
-            @for($column = 0; $column < 11; $column++)
+            @for($column = 0; $column < 9; $column++)
                 <td></td>
             @endfor
         </tr>
@@ -16,9 +16,7 @@
             <th>O'lchov birligi</th>
             <th>Umumiy qoldiq</th>
             <th>Kirim narxi (UZS)</th>
-            <th>Kirim summasi (UZS)</th>
             <th>Sotuv narxi (UZS)</th>
-            <th>Sotuv summasi (UZS)</th>
             <th>Qancha ustiga qo'yilgani (%)</th>
         </tr>
 
@@ -102,8 +100,6 @@
                 );
 
                 $stock = (float) $item->stock;
-                $checkinTotal = $checkinPrice * $stock;
-                $checkoutTotal = $checkoutPrice * $stock;
                 $markup = App\Models\Currency::markupPercent($checkinPrice, $checkoutPrice);
             @endphp
             <tr>
@@ -114,9 +110,7 @@
                 <td>{{ optional($item->productid->unitid)->name }}</td>
                 <td>{{ $stock }}</td>
                 <td>{{ round($checkinPrice, 2) }}</td>
-                <td>{{ round($checkinTotal, 2) }}</td>
                 <td>{{ round($checkoutPrice, 2) }}</td>
-                <td>{{ round($checkoutTotal, 2) }}</td>
                 <td>{{ $markup !== null ? round($markup, 2) . ' %' : '' }}</td>
             </tr>
         @endforeach
