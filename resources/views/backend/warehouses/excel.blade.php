@@ -59,22 +59,46 @@
                 $checkinRate = (float) ($latestCheckin->currency_type_price
                     ?? optional($latestCheckin->checkid ?? null)->currency_type_price
                     ?? $usdRate);
+                if ($checkinRate <= 1 && $latestCheckin && $latestCheckin->checkid) {
+                    $checkinRate = (float) ($latestCheckin->checkid->currency_type_price ?: $usdRate);
+                }
                 $checkinPrice = App\Models\Currency::toUzs(
                     $checkinRawPrice,
                     $checkinCurrency,
                     $checkinRate
                 );
 
-                $checkoutRawPrice = (float) $item->checkout_price;
-                if ($checkoutRawPrice <= 0) {
-                    $checkoutRawPrice = (float) ($item->productid->price ?? 0);
+                // Sotuv narxi mahsulot kartasidagi bugungi narx/kursdan emas,
+                // aynan oxirgi yakunlangan sotuv qatori va o'sha hujjat kursidan olinadi.
+                $latestCheckout = $item->productid->checkoutdetails()
+                    ->with('checkid')
+                    ->where('warehouse_id', $wareid->id)
+                    ->where('status', 1)
+                    ->where('price', '>', 0)
+                    ->whereHas('checkid', function ($query) {
+                        $query->where('status', 1);
+                    })
+                    ->latest('created_at')
+                    ->latest('id')
+                    ->first();
+
+                $checkoutRawPrice = $latestCheckout
+                    ? (float) $latestCheckout->price
+                    : (float) ($item->checkout_price ?: ($item->productid->price ?? 0));
+                $checkoutCurrency = (int) ($latestCheckout->currency_type
+                    ?? optional($latestCheckout->checkid ?? null)->currency_type
+                    ?? $item->productid->currency_type
+                    ?? 1);
+                $checkoutRate = (float) ($latestCheckout->currency_type_price
+                    ?? optional($latestCheckout->checkid ?? null)->currency_type_price
+                    ?? $usdRate);
+                if ($checkoutRate <= 1 && $latestCheckout && $latestCheckout->checkid) {
+                    $checkoutRate = (float) ($latestCheckout->checkid->currency_type_price ?: $usdRate);
                 }
-                // Mahsulot kartasidagi valyuta turiga qarab UZSga o'tkaziladi.
-                // USD narx kursga ko'payadi, UZS narx o'zgarmaydi.
                 $checkoutPrice = App\Models\Currency::toUzs(
                     $checkoutRawPrice,
-                    (int) ($item->productid->currency_type ?? 2),
-                    $usdRate
+                    $checkoutCurrency,
+                    $checkoutRate
                 );
 
                 $stock = (float) $item->stock;
