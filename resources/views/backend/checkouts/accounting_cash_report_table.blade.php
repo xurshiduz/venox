@@ -1,4 +1,4 @@
-@php $schemeLabels = ['special'=>'Spes','contract'=>'Shartnoma','venox_bonus'=>'Venox bonus']; @endphp
+@php $schemeLabels = [''=>'Belgilanmagan','special'=>'Spes','contract'=>'Shartnoma','venox_bonus'=>'Venox bonus']; @endphp
 <div class="table-responsive"><table class="table table-bordered table-striped align-middle">
 <thead class="table-light"><tr><th>№</th><th>Sana</th><th>Agent</th><th>Tovar</th><th>Klient</th><th>Bonus / bez bonus</th><th>Prihod summa (USD)</th><th>Summa USD</th><th>KPI</th><th>Fiksa agent</th><th>Venox bonus kassa</th><th>Zavod kassa</th></tr></thead>
 <tbody>@forelse($rows as $row)<tr>

@@ -13,7 +13,7 @@ class AccountingCashReportService
         $receipts = CashReceipt::query()
             ->where('status', 1)
             ->whereNotNull('checkout_id')
-            ->whereHas('checkout', fn ($query) => $query->whereNotNull('commission_scheme'))
+            ->whereHas('checkout')
             ->where('date', '<=', $filters['to'])
             ->with(['clientname', 'uname', 'checkout.managerid', 'checkout.supid', 'checkout.details.prodid.unitid'])
             ->orderBy('date')
@@ -46,6 +46,7 @@ class AccountingCashReportService
         $paymentUsd = $this->toUsd((float) $receipt->price, (int) $receipt->currency_type, (float) $receipt->currency_type_price);
         $allocation = $this->allocatePayment($checkout->details, $paymentUsd, $previousUsd);
 
+        $scheme = (string) ($checkout->commission_scheme ?? '');
         $kpiPercent = (float) ($checkout->kpi_percent ?? 0);
         $agentPercent = (float) ($checkout->agent_percent ?? 0);
         $venoxPercent = (float) ($checkout->venox_bonus_percent ?? 0);
@@ -58,8 +59,8 @@ class AccountingCashReportService
             'date' => $receipt->date,
             'agent' => optional($checkout->managerid)->name ?: '—',
             'client' => optional($receipt->clientname)->name ?: optional($checkout->supid)->name ?: '—',
-            'scheme' => (string) $checkout->commission_scheme,
-            'scheme_group' => str_starts_with((string) $checkout->commission_scheme, 'venox_') ? 'venox_bonus' : (string) $checkout->commission_scheme,
+            'scheme' => $scheme,
+            'scheme_group' => str_starts_with($scheme, 'venox_') ? 'venox_bonus' : $scheme,
             'products' => $allocation['products'],
             'product_ids' => $allocation['product_ids'],
             'purchase_cost_usd' => $allocation['purchase_cost_usd'],

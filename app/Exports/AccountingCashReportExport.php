@@ -17,7 +17,7 @@ class AccountingCashReportExport implements FromArray, WithHeadings, ShouldAutoS
 
     public function array(): array
     {
-        $schemeLabels = ['special' => 'Spes', 'contract' => 'Shartnoma', 'venox_bonus' => 'Venox bonus'];
+        $schemeLabels = ['' => 'Belgilanmagan', 'special' => 'Spes', 'contract' => 'Shartnoma', 'venox_bonus' => 'Venox bonus'];
         $data = $this->rows->values()->map(function ($row, $index) use ($schemeLabels) {
             return [
                 $index + 1,
