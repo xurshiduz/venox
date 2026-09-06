@@ -403,14 +403,13 @@
 
                                     @php
                                         $commissionOptions = [
-                                            'special' => 'Spes — KPI 0% · Agent 8% · Venox 0%',
-                                            'contract' => 'Shartnoma — KPI 0% · Agent 8% · Venox 5%',
-                                            'venox_10' => 'Venox bonus 10% — KPI 5% · Agent 8%',
-                                            'venox_15' => 'Venox bonus 15% — KPI 5% · Agent 8%',
-                                            'venox_20' => 'Venox bonus 20% — KPI 5% · Agent 8%',
-                                            'venox_25' => 'Venox bonus 25% — KPI 5% · Agent 8%',
+                                            'special' => 'Spes',
+                                            'contract' => 'Shartnoma',
+                                            'venox_bonus' => 'Venox bonus',
                                         ];
-                                        $commissionSelected = $item->commission_scheme;
+                                        $commissionSelected = str_starts_with((string) $item->commission_scheme, 'venox_')
+                                            ? 'venox_bonus'
+                                            : $item->commission_scheme;
                                         $factoryPercent = 100
                                             - (float) ($item->kpi_percent ?? 0)
                                             - (float) ($item->agent_percent ?? 0)
@@ -419,7 +418,7 @@
                                     <div class="card border mt-3 commission-card">
                                         <div class="card-inner py-3">
                                             <div class="row gy-2 align-items-end">
-                                                <div class="col-lg-5 col-md-6">
+                                                <div class="col-lg-3 col-md-6">
                                                     <label class="form-label mb-1">KPI va bonus hisoblash turi</label>
                                                     <select class="form-select commission-scheme" data-id="{{ $item->id }}">
                                                         <option value="">Tanlanmagan</option>
@@ -428,11 +427,21 @@
                                                         @endforeach
                                                     </select>
                                                 </div>
-                                                <div class="col-lg-5 col-md-6">
+                                                <div class="col-lg-2 col-md-4">
+                                                    <label class="form-label mb-1">KPI (%)</label>
+                                                    <input type="number" min="0" max="100" step="0.01" class="form-control commission-kpi-input" value="{{ (float) ($item->kpi_percent ?? 0) }}">
+                                                </div>
+                                                <div class="col-lg-2 col-md-4">
+                                                    <label class="form-label mb-1">Agent (%)</label>
+                                                    <input type="number" min="0" max="100" step="0.01" class="form-control commission-agent-input" value="{{ (float) ($item->agent_percent ?? 8) }}">
+                                                </div>
+                                                <div class="col-lg-2 col-md-4">
+                                                    <label class="form-label mb-1">Venox bonus (%)</label>
+                                                    <input type="number" min="0" max="100" step="0.01" class="form-control commission-venox-input" value="{{ (float) ($item->venox_bonus_percent ?? 0) }}">
+                                                </div>
+                                                <div class="col-lg-1 col-md-6">
+                                                    <label class="form-label mb-1">Zavod</label>
                                                     <div class="d-flex flex-wrap commission-summary" style="gap: 8px;">
-                                                        <span class="badge bg-outline-primary">KPI: <b class="commission-kpi">{{ number_format((float) ($item->kpi_percent ?? 0), 0) }}</b>%</span>
-                                                        <span class="badge bg-outline-info">Agent: <b class="commission-agent">{{ number_format((float) ($item->agent_percent ?? 0), 0) }}</b>%</span>
-                                                        <span class="badge bg-outline-warning">Venox: <b class="commission-venox">{{ number_format((float) ($item->venox_bonus_percent ?? 0), 0) }}</b>%</span>
                                                         <span class="badge bg-outline-success">Zavod: <b class="commission-factory">{{ number_format($factoryPercent, 0) }}</b>%</span>
                                                     </div>
                                                 </div>
@@ -729,6 +738,9 @@
         e.preventDefault();
         var btn = $(this);
         var scheme = $('.commission-scheme').val();
+        var kpi = parseFloat($('.commission-kpi-input').val()) || 0;
+        var agent = parseFloat($('.commission-agent-input').val()) || 0;
+        var venox = parseFloat($('.commission-venox-input').val()) || 0;
 
         if (!scheme) {
             alert('KPI va bonus hisoblash turini tanlang.');
@@ -742,15 +754,15 @@
             dataType: 'JSON',
             data: {
                 checkout_id: btn.data('id'),
-                scheme: scheme
+                scheme: scheme,
+                kpi_percent: kpi,
+                agent_percent: agent,
+                venox_bonus_percent: venox
             },
             success: function(data) {
                 if (data.status === 'success') {
-                    $('.commission-kpi').text(data.kpi_percent);
-                    $('.commission-agent').text(data.agent_percent);
-                    $('.commission-venox').text(data.venox_bonus_percent);
                     $('.commission-factory').text(data.factory_percent);
-                    alert('KPI va bonus hisoblash turi saqlandi.');
+                    window.location.href = data.redirect_url;
                 }
             },
             error: function(xhr) {
@@ -763,6 +775,13 @@
                 btn.prop('disabled', false);
             }
         });
+    });
+
+    $('.commission-kpi-input, .commission-agent-input, .commission-venox-input').on('input', function() {
+        var used = (parseFloat($('.commission-kpi-input').val()) || 0)
+            + (parseFloat($('.commission-agent-input').val()) || 0)
+            + (parseFloat($('.commission-venox-input').val()) || 0);
+        $('.commission-factory').text(Math.max(0, 100 - used).toFixed(2).replace(/\.00$/, ''));
     });
     
     $('.bonus_change').change(function() {

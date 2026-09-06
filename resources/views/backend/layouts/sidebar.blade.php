@@ -41,7 +41,7 @@
                     @endhasanyrole
 
                     @hasanyrole('admin|cashier|report')
-                    <li class="nk-menu-item has-sub {{ Request::routeIs('checkouts_day_filter') || Request::routeIs('cash_receipts_index') || Request::routeIs('currencies_index') ? 'active' : '' }}">
+                    <li class="nk-menu-item has-sub {{ Request::routeIs('checkouts_day_filter') || Request::routeIs('cash_receipts_index') || Request::routeIs('currencies_index') || Request::routeIs('accounting_cash_report') ? 'active' : '' }}">
                         <a href="#" class="nk-menu-link nk-menu-toggle">
                             <span class="nk-menu-icon"><em class="icon ni ni-coins"></em></span>
                             <span class="nk-menu-text">{{ trans('backend.menu.cash_receipts_all') }}</span>
@@ -49,6 +49,9 @@
                         <ul class="nk-menu-sub">
                             <li class="nk-menu-item {{ Request::routeIs('accounting_month_report') ? 'active' : '' }}">
                                 <a href="{{ route('accounting_month_report') }}" class="nk-menu-link"><span class="nk-menu-text">Ойлик хисобот (P&L)</span></a>
+                            </li>
+                            <li class="nk-menu-item {{ Request::routeIs('accounting_cash_report') ? 'active' : '' }}">
+                                <a href="{{ route('accounting_cash_report') }}" class="nk-menu-link"><span class="nk-menu-text">Kassa hisoboti</span></a>
                             </li>
                             <li class="nk-menu-item {{ Request::routeIs('checkouts_day_filter') ? 'active' : '' }}">
                                 <a href="{{ route('checkouts_day_filter') }}" class="nk-menu-link"><span class="nk-menu-text">Фильтр по продажам</span></a>

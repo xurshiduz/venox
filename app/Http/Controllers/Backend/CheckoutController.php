@@ -13,6 +13,8 @@ use App\Exports\CheckoutDebt;
 use App\Exports\CheckoutOne;
 use App\Exports\DayExcel;
 use App\Exports\CheckoutMonthExport;
+use App\Exports\AccountingCashReportExport;
+use App\Services\AccountingCashReportService;
 
 use App\Models\CashExpenditure;
 use App\Models\InventoryDetail;
@@ -40,6 +42,8 @@ use Excel;
 use Auth;
 use Str;
 use DB;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
 class CheckoutController extends Controller
 {
@@ -1492,38 +1496,121 @@ class CheckoutController extends Controller
     public function checkout_commission_scheme(Request $request)
     {
         $schemes = [
-            'special' => ['label' => 'Spes', 'kpi' => 0, 'agent' => 8, 'venox' => 0],
-            'contract' => ['label' => 'Shartnoma', 'kpi' => 0, 'agent' => 8, 'venox' => 5],
-            'venox_10' => ['label' => 'Venox bonus 10%', 'kpi' => 5, 'agent' => 8, 'venox' => 10],
-            'venox_15' => ['label' => 'Venox bonus 15%', 'kpi' => 5, 'agent' => 8, 'venox' => 15],
-            'venox_20' => ['label' => 'Venox bonus 20%', 'kpi' => 5, 'agent' => 8, 'venox' => 20],
-            'venox_25' => ['label' => 'Venox bonus 25%', 'kpi' => 5, 'agent' => 8, 'venox' => 25],
+            'special' => 'Spes',
+            'contract' => 'Shartnoma',
+            'venox_bonus' => 'Venox bonus',
         ];
 
         $validated = $request->validate([
             'checkout_id' => ['required', 'integer', 'exists:checkouts,id'],
             'scheme' => ['required', 'string', 'in:' . implode(',', array_keys($schemes))],
+            'kpi_percent' => ['required', 'numeric', 'min:0', 'max:100'],
+            'agent_percent' => ['required', 'numeric', 'min:0', 'max:100'],
+            'venox_bonus_percent' => ['required', 'numeric', 'min:0', 'max:100'],
         ]);
 
+        $totalPercent = (float) $validated['kpi_percent']
+            + (float) $validated['agent_percent']
+            + (float) $validated['venox_bonus_percent'];
+        if ($totalPercent > 100) {
+            return response()->json(['message' => 'KPI, Agent va Venox foizlari jami 100% dan oshmasligi kerak.'], 422);
+        }
+
+        $this->ensureCheckoutCommissionColumns();
         $checkout = Checkout::findOrFail($validated['checkout_id']);
-        $scheme = $schemes[$validated['scheme']];
-        $factoryPercent = 100 - $scheme['kpi'] - $scheme['agent'] - $scheme['venox'];
+        $factoryPercent = 100 - $totalPercent;
 
         $checkout->update([
             'commission_scheme' => $validated['scheme'],
-            'kpi_percent' => $scheme['kpi'],
-            'agent_percent' => $scheme['agent'],
-            'venox_bonus_percent' => $scheme['venox'],
+            'kpi_percent' => $validated['kpi_percent'],
+            'agent_percent' => $validated['agent_percent'],
+            'venox_bonus_percent' => $validated['venox_bonus_percent'],
         ]);
 
         return response()->json([
             'status' => 'success',
-            'label' => $scheme['label'],
-            'kpi_percent' => $scheme['kpi'],
-            'agent_percent' => $scheme['agent'],
-            'venox_bonus_percent' => $scheme['venox'],
+            'label' => $schemes[$validated['scheme']],
+            'kpi_percent' => (float) $validated['kpi_percent'],
+            'agent_percent' => (float) $validated['agent_percent'],
+            'venox_bonus_percent' => (float) $validated['venox_bonus_percent'],
             'factory_percent' => $factoryPercent,
+            'redirect_url' => route('accounting_cash_report'),
         ]);
+    }
+
+    private function ensureCheckoutCommissionColumns(): void
+    {
+        $columns = [
+            'commission_scheme' => fn (Blueprint $table) => $table->string('commission_scheme', 32)->nullable()->after('discount'),
+            'kpi_percent' => fn (Blueprint $table) => $table->decimal('kpi_percent', 5, 2)->default(0)->after('commission_scheme'),
+            'agent_percent' => fn (Blueprint $table) => $table->decimal('agent_percent', 5, 2)->default(0)->after('kpi_percent'),
+            'venox_bonus_percent' => fn (Blueprint $table) => $table->decimal('venox_bonus_percent', 5, 2)->default(0)->after('agent_percent'),
+        ];
+
+        foreach ($columns as $column => $definition) {
+            if (! Schema::hasColumn('checkouts', $column)) {
+                Schema::table('checkouts', $definition);
+            }
+        }
+    }
+
+    public function installCheckoutCommissionColumns()
+    {
+        $this->ensureCheckoutCommissionColumns();
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'Checkout komissiya ustunlari tayyor.',
+        ]);
+    }
+
+    public function accountingCashReport(Request $request)
+    {
+        $this->ensureCheckoutCommissionColumns();
+        $filters = $this->cashReportFilters($request);
+        $allRows = app(AccountingCashReportService::class)->rows($filters);
+        $page = max(1, (int) $request->input('page', 1));
+        $rows = new \Illuminate\Pagination\LengthAwarePaginator(
+            $allRows->forPage($page, 30)->values(), $allRows->count(), 30, $page,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+        $products = Product::whereIn('id', CheckoutDetail::distinct()->pluck('product_id'))->orderBy('name')->get(['id', 'name']);
+        $usdRate = Currency::usdRate();
+        return view('backend.checkouts.accounting_cash_report', compact('rows', 'filters', 'products', 'usdRate'));
+    }
+
+    public function accountingCashReportExcel(Request $request)
+    {
+        $this->ensureCheckoutCommissionColumns();
+        $rows = app(AccountingCashReportService::class)->rows($this->cashReportFilters($request));
+        return Excel::download(new AccountingCashReportExport($rows), 'kassa-hisoboti-'.date('Y-m-d').'.xlsx');
+    }
+
+    public function accountingCashReportPdf(Request $request)
+    {
+        $this->ensureCheckoutCommissionColumns();
+        $filters = $this->cashReportFilters($request);
+        $rows = app(AccountingCashReportService::class)->rows($filters);
+        return view('backend.checkouts.accounting_cash_report_print', compact('rows', 'filters'));
+    }
+
+    private function cashReportFilters(Request $request): array
+    {
+        $monthPattern = '/^\d{4}-(0[1-9]|1[0-2])$/';
+        $defaultMonth = Carbon::now()->format('Y-m');
+        $fromMonth = preg_match($monthPattern, (string) $request->input('from_month')) ? $request->input('from_month') : $defaultMonth;
+        $toMonth = preg_match($monthPattern, (string) $request->input('to_month')) ? $request->input('to_month') : $defaultMonth;
+        if ($fromMonth > $toMonth) {
+            [$fromMonth, $toMonth] = [$toMonth, $fromMonth];
+        }
+        return [
+            'from_month' => $fromMonth,
+            'to_month' => $toMonth,
+            'from' => Carbon::createFromFormat('Y-m', $fromMonth)->startOfMonth()->format('Y-m-d'),
+            'to' => Carbon::createFromFormat('Y-m', $toMonth)->endOfMonth()->format('Y-m-d'),
+            'scheme' => $request->input('scheme'),
+            'product_id' => $request->input('product_id'),
+        ];
     }
     
     public function checkout_reference_change()

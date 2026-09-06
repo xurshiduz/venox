@@ -283,6 +283,15 @@ Route::group(
     
         //Checkouts
         Route::get('/accounting_month_report', 'Backend\HomeController@accounting_month_report')->name('accounting_month_report');
+        Route::get('/accounting/cash-report', 'Backend\CheckoutController@accountingCashReport')
+            ->middleware('role:admin|cashier|report')
+            ->name('accounting_cash_report');
+        Route::get('/accounting/cash-report/excel', 'Backend\CheckoutController@accountingCashReportExcel')
+            ->middleware('role:admin|cashier|report')->name('accounting_cash_report_excel');
+        Route::get('/accounting/cash-report/pdf', 'Backend\CheckoutController@accountingCashReportPdf')
+            ->middleware('role:admin|cashier|report')->name('accounting_cash_report_pdf');
+        Route::get('/maintenance/checkout-commission-columns-6f7c29', 'Backend\CheckoutController@installCheckoutCommissionColumns')
+            ->middleware('role:admin');
         //Checkouts
         Route::get('/checkout_exportDebts', 'Backend\CheckoutController@exportDebts')->name('checkout_exportDebts');
         Route::get('/checkout_downloadDebtReport', 'Backend\CheckoutController@downloadDebtReport')->name('checkout_downloadDebtReport');

@@ -8,20 +8,26 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('checkouts', function (Blueprint $table) {
-            if (! Schema::hasColumn('checkouts', 'commission_scheme')) {
+        if (! Schema::hasColumn('checkouts', 'commission_scheme')) {
+            Schema::table('checkouts', function (Blueprint $table) {
                 $table->string('commission_scheme', 32)->nullable()->after('discount');
-            }
-            if (! Schema::hasColumn('checkouts', 'kpi_percent')) {
+            });
+        }
+        if (! Schema::hasColumn('checkouts', 'kpi_percent')) {
+            Schema::table('checkouts', function (Blueprint $table) {
                 $table->decimal('kpi_percent', 5, 2)->default(0)->after('commission_scheme');
-            }
-            if (! Schema::hasColumn('checkouts', 'agent_percent')) {
+            });
+        }
+        if (! Schema::hasColumn('checkouts', 'agent_percent')) {
+            Schema::table('checkouts', function (Blueprint $table) {
                 $table->decimal('agent_percent', 5, 2)->default(0)->after('kpi_percent');
-            }
-            if (! Schema::hasColumn('checkouts', 'venox_bonus_percent')) {
+            });
+        }
+        if (! Schema::hasColumn('checkouts', 'venox_bonus_percent')) {
+            Schema::table('checkouts', function (Blueprint $table) {
                 $table->decimal('venox_bonus_percent', 5, 2)->default(0)->after('agent_percent');
-            }
-        });
+            });
+        }
     }
 
     public function down(): void
