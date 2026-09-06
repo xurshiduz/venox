@@ -44,7 +44,13 @@ class AccountingCashReportService
     {
         $checkout = $receipt->checkout;
         $paymentUsd = $this->toUsd((float) $receipt->price, (int) $receipt->currency_type, (float) $receipt->currency_type_price);
-        $allocation = $this->allocatePayment($checkout->details, $paymentUsd, $previousUsd);
+        // `checkouts.details` matn ustuni details() relationi bilan bir xil nomda.
+        // Property orqali o'qilsa relation o'rniga NULL/text qaytadi, shu sabab eager-loaded
+        // relationni Eloquent relation storage'dan aniq olamiz.
+        $details = $checkout->relationLoaded('details')
+            ? $checkout->getRelation('details')
+            : $checkout->details()->with('prodid.unitid')->get();
+        $allocation = $this->allocatePayment($details ?? collect(), $paymentUsd, $previousUsd);
 
         $scheme = (string) ($checkout->commission_scheme ?? '');
         $kpiPercent = (float) ($checkout->kpi_percent ?? 0);
