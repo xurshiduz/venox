@@ -87,12 +87,14 @@
                     // Checkout sarlavhasi foydalanuvchi sotuvda tanlagan valyuta va
                     // o'sha kundagi kursni saqlaydi. Eski detail qatorlarida noto'g'ri
                     // currency_type uchragani uchun sarlavha doim birinchi olinadi.
-                    $checkoutPrice = App\Models\Currency::documentAmountToUzs(
+                    $checkoutPrice = App\Models\Currency::saleUnitPriceToUzs(
                         $checkoutRawPrice,
+                        $checkinPrice,
                         optional($latestCheckout->checkid)->currency_type,
                         optional($latestCheckout->checkid)->currency_type_price,
                         $latestCheckout->currency_type,
-                        $latestCheckout->currency_type_price
+                        $latestCheckout->currency_type_price,
+                        $usdRate
                     );
                 } else {
                     $checkoutPrice = App\Models\Currency::toUzs(

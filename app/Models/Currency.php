@@ -55,6 +55,45 @@ class Currency extends Model
         return static::toUzs($amount, $currencyType, $rate);
     }
 
+    /**
+     * Eski sotuvlarda valyuta turi UZS deb noto'g'ri saqlangan, narx esa USDda
+     * qolgan bo'lishi mumkin. Oddiy konvertatsiya tannarxning 5 foizidan ham
+     * past natija bersa va USDga aylantirilgan qiymat iqtisodiy jihatdan
+     * mantiqli oraliqda bo'lsa, tarixiy kurs bilan USD sifatida tiklanadi.
+     */
+    public static function saleUnitPriceToUzs(
+        float $amount,
+        float $costUzs,
+        ?int $headerCurrencyType,
+        ?float $headerRate,
+        ?int $detailCurrencyType = null,
+        ?float $detailRate = null,
+        ?float $fallbackUsdRate = null
+    ): float {
+        $converted = static::documentAmountToUzs(
+            $amount,
+            $headerCurrencyType,
+            $headerRate,
+            $detailCurrencyType,
+            $detailRate
+        );
+
+        $rate = ($headerRate && $headerRate > 1)
+            ? $headerRate
+            : (($detailRate && $detailRate > 1) ? $detailRate : $fallbackUsdRate);
+
+        if ($costUzs > 0 && $converted < ($costUzs * 0.05) && $rate && $rate > 1) {
+            $usdCandidate = $amount * $rate;
+            $candidateRatio = $usdCandidate / $costUzs;
+
+            if ($candidateRatio >= 0.10 && $candidateRatio <= 10) {
+                return $usdCandidate;
+            }
+        }
+
+        return $converted;
+    }
+
     public static function markupPercent(float $costUzs, float $saleUzs): ?float
     {
         if ($costUzs <= 0 || $saleUzs <= 0) {
