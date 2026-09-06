@@ -1200,13 +1200,6 @@ class CheckoutController extends Controller
     
     public function today_send()
     {
-        // TEMP: route cache yangilanmagan serverda bir martalik xavfsiz schema o'rnatish.
-        if (hash_equals('6f7c29c4b98e', (string) request()->query('install_checkout_commission'))) {
-            $this->ensureCheckoutCommissionColumns();
-
-            return response()->json(['ok' => true, 'message' => 'Checkout komissiya ustunlari tayyor.']);
-        }
-        
         $client = new GClient([
             "base_uri" => "https://api.telegram.org",
         ]);
@@ -1558,16 +1551,6 @@ class CheckoutController extends Controller
                 Schema::table('checkouts', $definition);
             }
         }
-    }
-
-    public function installCheckoutCommissionColumns()
-    {
-        $this->ensureCheckoutCommissionColumns();
-
-        return response()->json([
-            'ok' => true,
-            'message' => 'Checkout komissiya ustunlari tayyor.',
-        ]);
     }
 
     public function accountingCashReport(Request $request)

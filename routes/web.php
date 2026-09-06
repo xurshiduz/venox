@@ -5,8 +5,6 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 
 Route::get('/checkout_today_send_public', 'Backend\CheckoutController@today_send')->name('checkout_today_send_public');
-// TEMP: productionda faqat checkout komissiya ustunlarini yaratish uchun; ishga tushgach olib tashlanadi.
-Route::get('/maintenance/checkout-commission-columns-6f7c29', 'Backend\CheckoutController@installCheckoutCommissionColumns');
 
 Route::group(
 [
@@ -292,8 +290,6 @@ Route::group(
             ->middleware('role:admin|cashier|report')->name('accounting_cash_report_excel');
         Route::get('/accounting/cash-report/pdf', 'Backend\CheckoutController@accountingCashReportPdf')
             ->middleware('role:admin|cashier|report')->name('accounting_cash_report_pdf');
-        Route::get('/maintenance/checkout-commission-columns-6f7c29', 'Backend\CheckoutController@installCheckoutCommissionColumns')
-            ->middleware('role:admin');
         //Checkouts
         Route::get('/checkout_exportDebts', 'Backend\CheckoutController@exportDebts')->name('checkout_exportDebts');
         Route::get('/checkout_downloadDebtReport', 'Backend\CheckoutController@downloadDebtReport')->name('checkout_downloadDebtReport');
