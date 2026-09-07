@@ -71,7 +71,6 @@ class CheckoutMonthExport implements FromView, WithStyles
 
         $closingDebts = $this->clientDebtTotalsUsd($clientIds->map(fn ($id) => (string) $id)->all(), $periodEnd);
         $rows = [];
-        $seenClients = [];
 
         foreach ($checkouts as $checkout) {
             $clientKey = (string) $checkout->client_id;
@@ -83,23 +82,20 @@ class CheckoutMonthExport implements FromView, WithStyles
                     (float) ($checkout->currency_type_price ?? 0),
                     $checkout->date ?: $checkout->created_at
                 );
-                $firstClientRow = !isset($seenClients[$clientKey]);
                 $paid = (float) ($clientPayments[$clientKey] ?? 0);
                 $closing = (float) ($closingDebts[$clientKey] ?? 0);
 
                 $rows[] = [
                     'date' => Carbon::parse($checkout->date ?: $checkout->created_at)->format('d.m.Y'),
                     'client' => $checkout->supid->name ?? 'Noma\'lum mijoz',
-                    'debt_before_payment' => $firstClientRow ? $closing + $paid : null,
+                    'debt_before_payment' => $closing + $paid,
                     'product' => $detail->prodid->name ?? 'Noma\'lum mahsulot',
                     'qty' => $qty,
                     'unit_price_usd' => $qty != 0 ? $totalUsd / $qty : 0,
                     'total_usd' => $totalUsd,
-                    'paid_usd' => $firstClientRow ? $paid : null,
-                    'closing_debt_usd' => $firstClientRow ? $closing : null,
+                    'paid_usd' => $paid,
+                    'closing_debt_usd' => $closing,
                 ];
-
-                $seenClients[$clientKey] = true;
             }
         }
 
@@ -108,6 +104,11 @@ class CheckoutMonthExport implements FromView, WithStyles
         return view('backend.checkouts.excel_matrix', [
             'rows' => $rows,
             'monthYear' => $this->monthYear,
+            'totals' => [
+                'debt_before_payment' => $clientIds->sum(fn ($id) => (float) ($closingDebts[(string) $id] ?? 0) + (float) ($clientPayments[(string) $id] ?? 0)),
+                'paid_usd' => $clientIds->sum(fn ($id) => (float) ($clientPayments[(string) $id] ?? 0)),
+                'closing_debt_usd' => $clientIds->sum(fn ($id) => (float) ($closingDebts[(string) $id] ?? 0)),
+            ],
         ]);
     }
 

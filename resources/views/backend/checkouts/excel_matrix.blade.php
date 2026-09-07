@@ -30,12 +30,14 @@
             </tr>
         @endforeach
         <tr>
-            <td colspan="4" style="font-weight:bold; text-align:right;">Жами:</td>
+            <td colspan="2" style="font-weight:bold; text-align:right;">Жами:</td>
+            <td>{{ $totals['debt_before_payment'] }}</td>
+            <td></td>
             <td>{{ count($rows) ? '=SUM(E3:E'.(count($rows) + 2).')' : 0 }}</td>
             <td></td>
             <td>{{ count($rows) ? '=SUM(G3:G'.(count($rows) + 2).')' : 0 }}</td>
-            <td>{{ count($rows) ? '=SUM(H3:H'.(count($rows) + 2).')' : 0 }}</td>
-            <td>{{ count($rows) ? '=SUM(I3:I'.(count($rows) + 2).')' : 0 }}</td>
+            <td>{{ $totals['paid_usd'] }}</td>
+            <td>{{ $totals['closing_debt_usd'] }}</td>
         </tr>
     </tbody>
 </table>
