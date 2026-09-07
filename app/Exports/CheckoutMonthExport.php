@@ -2,25 +2,25 @@
 
 namespace App\Exports;
 
-use App\Models\Checkout;
 use App\Models\CashReceipt;
-use App\Models\Currency;
-use App\Models\Client;
 use App\Models\Checkin;
+use App\Models\Checkout;
+use App\Models\Client;
+use App\Models\Currency;
 use App\Services\AccountingCashReportService;
+use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Maatwebsite\Excel\Concerns\FromView;
 use Maatwebsite\Excel\Concerns\WithStyles;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
-use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
-use Carbon\Carbon;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class CheckoutMonthExport implements FromView, WithStyles
 {
     protected $monthYear;
-    protected $productCount = 0;
-    protected $clientCount = 0;
+    protected $rowCount = 0;
 
     public function __construct($monthYear)
     {
@@ -30,36 +30,30 @@ class CheckoutMonthExport implements FromView, WithStyles
     public function view(): View
     {
         $date = Carbon::parse($this->monthYear);
-        $year = $date->year;
-        $month = $date->month;
-
         $periodStart = $date->copy()->startOfMonth();
         $periodEnd = $date->copy()->endOfMonth();
 
         $checkouts = Checkout::with(['supid', 'checkoutDetails.prodid'])
-            ->whereYear('date', $year) 
-            ->whereMonth('date', $month)
+            ->whereYear('date', $date->year)
+            ->whereMonth('date', $date->month)
+            ->orderBy('date')
+            ->orderBy('id')
             ->get();
 
-        $productsList = []; 
-        $matrixData = [];   
-        
-        $productTotalUsd = [];
-        $clientTotalUsd = [];
-
-        // Kassa kirimlari shu oyning sanasi va mijoz ID-si bo'yicha hisoblanadi.
-        // status=0 bo'lgan (bekor qilingan) to'lovlar hisobotga kiritilmaydi.
-        $payments = CashReceipt::query()
-            ->where('status', 1)
-            ->whereBetween('date', [$periodStart->toDateString(), $periodEnd->toDateString()])
-            ->with('checkout:id,currency_type,currency_type_price')
-            ->get(['id', 'checkout_id', 'client_id', 'price', 'currency_type', 'currency_type_price', 'comment', 'date', 'created_at']);
-
+        $clientIds = $checkouts->pluck('client_id')->filter()->unique()->values();
         $accounting = app(AccountingCashReportService::class);
         $clientPayments = [];
+
+        $payments = CashReceipt::query()
+            ->where('status', 1)
+            ->whereIn('client_id', $clientIds)
+            ->whereBetween('date', [$periodStart->toDateString(), $periodEnd->toDateString()])
+            ->with('checkout:id,currency_type,currency_type_price')
+            ->get();
+
         foreach ($payments as $payment) {
-            $clientKey = (string) $payment->client_id;
-            $paymentUsd = $payment->checkout
+            $key = (string) $payment->client_id;
+            $usd = $payment->checkout
                 ? $accounting->paymentAmountToUsd(
                     (float) $payment->price,
                     (int) $payment->currency_type,
@@ -73,129 +67,60 @@ class CheckoutMonthExport implements FromView, WithStyles
                     (float) ($payment->currency_type_price ?: Currency::usdRateForDate($payment->date ?: $payment->created_at)),
                     (string) $payment->comment
                 );
-            $clientPayments[$clientKey] = ($clientPayments[$clientKey] ?? 0) + $paymentUsd;
+            $clientPayments[$key] = ($clientPayments[$key] ?? 0) + $usd;
         }
 
-        $clientNames = [];
+        $closingDebts = $this->clientDebtTotalsUsd($clientIds->map(fn ($id) => (string) $id)->all(), $periodEnd);
+        $rows = [];
+        $seenClients = [];
+
         foreach ($checkouts as $checkout) {
-            $clientName = $checkout->supid->name ?? 'Noma\'lum mijoz';
-            $clientKey = (string) ($checkout->client_id ?? 'unknown-' . $clientName);
-            $clientNames[$clientKey] = $clientName;
-            
-            // Valyuta tipi va kursi (Agar 1 bo'lsa kursini olamiz, yo'qsa 0)
-            $cType = $checkout->currency_type;
-            $cRate = $checkout->currency_type_price ?? 0;
-
-            if (!isset($matrixData[$clientKey])) {
-                $matrixData[$clientKey] = [];
-                $clientTotalUsd[$clientKey] = 0;
-            }
-
+            $clientKey = (string) $checkout->client_id;
             foreach ($checkout->checkoutDetails as $detail) {
-                $productName = $detail->prodid->name ?? 'Noma\'lum mahsulot';
-                
-                $productsList[$productName] = $productName;
-
-                // 1. Mijoz va tovar kesishmasida MIQDOR (qty)
-                if (!isset($matrixData[$clientKey][$productName])) {
-                    $matrixData[$clientKey][$productName] = 0;
-                }
-                $matrixData[$clientKey][$productName] += $detail->qty;
-
-                // 2. Narxni hisoblash (Asosiy narxni aniqlaymiz)
-                $basePriceTotal = $detail->price_total ?? ($detail->price * $detail->qty);
-
-                $usd = Currency::documentAmountToUsd(
-                    (float) $basePriceTotal,
-                    (int) $cType,
-                    (float) $cRate,
+                $qty = (float) $detail->qty;
+                $totalUsd = Currency::documentAmountToUsd(
+                    (float) ($detail->price_total ?? ((float) $detail->price * $qty)),
+                    (int) $checkout->currency_type,
+                    (float) ($checkout->currency_type_price ?? 0),
                     $checkout->date ?: $checkout->created_at
                 );
+                $firstClientRow = !isset($seenClients[$clientKey]);
+                $paid = (float) ($clientPayments[$clientKey] ?? 0);
+                $closing = (float) ($closingDebts[$clientKey] ?? 0);
 
-                // Qator bo'yicha summa (Mijozning jami So'm va Dollari)
-                $clientTotalUsd[$clientKey] += $usd;
+                $rows[] = [
+                    'date' => Carbon::parse($checkout->date ?: $checkout->created_at)->format('d.m.Y'),
+                    'client' => $checkout->supid->name ?? 'Noma\'lum mijoz',
+                    'debt_before_payment' => $firstClientRow ? $closing + $paid : null,
+                    'product' => $detail->prodid->name ?? 'Noma\'lum mahsulot',
+                    'qty' => $qty,
+                    'unit_price_usd' => $qty != 0 ? $totalUsd / $qty : 0,
+                    'total_usd' => $totalUsd,
+                    'paid_usd' => $firstClientRow ? $paid : null,
+                    'closing_debt_usd' => $firstClientRow ? $closing : null,
+                ];
 
-                // Ustun bo'yicha summa (Tovarning jami So'm va Dollari)
-                if (!isset($productTotalUsd[$productName])) {
-                    $productTotalUsd[$productName] = 0;
-                }
-                $productTotalUsd[$productName] += $usd;
+                $seenClients[$clientKey] = true;
             }
         }
 
-        $clientPaidTotals = [];
-        $clientClosingDebtTotals = $this->clientDebtTotalsUsd(array_keys($matrixData), $periodEnd);
-        $clientTotalDebtBeforePayment = [];
-        foreach (array_keys($matrixData) as $clientKey) {
-            $clientPaidTotals[$clientKey] = (float) ($clientPayments[(string) $clientKey] ?? 0);
-            $clientClosingDebtTotals[$clientKey] = (float) ($clientClosingDebtTotals[(string) $clientKey] ?? 0);
-            $clientTotalDebtBeforePayment[$clientKey] =
-                $clientClosingDebtTotals[$clientKey] + $clientPaidTotals[$clientKey];
-        }
-
-        ksort($productsList);
-        $this->productCount = count($productsList);
-        $this->clientCount = count($matrixData);
-
-        $firstDataRow = 3;
-        $lastDataRow = $firstDataRow + $this->clientCount - 1;
-        $openingDebtColumn = Coordinate::stringFromColumnIndex(3);
-        $salesColumn = Coordinate::stringFromColumnIndex($this->productCount + 4);
-        $paidColumn = Coordinate::stringFromColumnIndex($this->productCount + 5);
-        $closingDebtColumn = Coordinate::stringFromColumnIndex($this->productCount + 6);
-        $productTotalFormulas = [];
-        foreach (array_keys($productsList) as $index => $productName) {
-            $productColumn = Coordinate::stringFromColumnIndex($index + 4);
-            $productTotalFormulas[$productName] = $this->clientCount > 0
-                ? '=SUM(' . $productColumn . $firstDataRow . ':' . $productColumn . $lastDataRow . ')'
-                : 0;
-        }
-        $grandSalesFormula = $this->clientCount > 0
-            ? '=SUM(' . $salesColumn . $firstDataRow . ':' . $salesColumn . $lastDataRow . ')'
-            : 0;
-        $grandPaidFormula = $this->clientCount > 0
-            ? '=SUM(' . $paidColumn . $firstDataRow . ':' . $paidColumn . $lastDataRow . ')'
-            : 0;
-        $grandOpeningDebtFormula = $this->clientCount > 0
-            ? '=SUM(' . $openingDebtColumn . $firstDataRow . ':' . $openingDebtColumn . $lastDataRow . ')'
-            : 0;
-        $grandClosingDebtFormula = $this->clientCount > 0
-            ? '=SUM(' . $closingDebtColumn . $firstDataRow . ':' . $closingDebtColumn . $lastDataRow . ')'
-            : 0;
+        $this->rowCount = count($rows);
 
         return view('backend.checkouts.excel_matrix', [
-            'productsList'    => $productsList,
-            'matrixData'      => $matrixData,
-            'clientNames'     => $clientNames,
-            'productTotalUsd' => $productTotalUsd,
-            'productTotalFormulas' => $productTotalFormulas,
-            'clientTotalUsd'  => $clientTotalUsd,
-            'clientPaidTotals'=> $clientPaidTotals,
-            'clientTotalDebtBeforePayment'=> $clientTotalDebtBeforePayment,
-            'clientClosingDebtTotals'=> $clientClosingDebtTotals,
-            'grandOpeningDebtFormula' => $grandOpeningDebtFormula,
-            'grandClosingDebtFormula' => $grandClosingDebtFormula,
-            'grandSalesFormula' => $grandSalesFormula,
-            'grandPaidFormula' => $grandPaidFormula,
-            'monthYear'       => $this->monthYear
+            'rows' => $rows,
+            'monthYear' => $this->monthYear,
         ]);
     }
 
-    /**
-     * Tanlangan oy oxiridagi mijoz qarzini barcha hujjatlarni USDga keltirib hisoblaydi.
-     */
     private function clientDebtTotalsUsd(array $clientKeys, Carbon $periodEnd): array
     {
         $clientIds = collect($clientKeys)->filter(fn ($id) => ctype_digit((string) $id))->map(fn ($id) => (int) $id)->values();
-
         if ($clientIds->isEmpty()) {
             return [];
         }
 
-        $clients = Client::whereIn('id', $clientIds)->get()->keyBy('id');
         $totals = [];
-
-        foreach ($clients as $client) {
+        foreach (Client::whereIn('id', $clientIds)->get() as $client) {
             $totals[(string) $client->id] = Currency::documentAmountToUsd(
                 (float) ($client->balance ?? 0),
                 (int) ($client->currency_type ?? 2),
@@ -204,56 +129,26 @@ class CheckoutMonthExport implements FromView, WithStyles
             );
         }
 
-        $sales = Checkout::with('alldetails')
-            ->whereIn('client_id', $clientIds)
-            ->whereDate('date', '<=', $periodEnd->toDateString())
-            ->get();
-
-        foreach ($sales as $checkout) {
-            $amount = (float) $checkout->alldetails->sum('total_price');
-            $totals[(string) $checkout->client_id] += Currency::documentAmountToUsd(
-                $amount,
+        foreach (Checkout::with('alldetails')->whereIn('client_id', $clientIds)->whereDate('date', '<=', $periodEnd)->get() as $checkout) {
+            $totals[(string) $checkout->client_id] = ($totals[(string) $checkout->client_id] ?? 0) + Currency::documentAmountToUsd(
+                (float) $checkout->alldetails->sum('total_price'),
                 (int) $checkout->currency_type,
                 (float) $checkout->currency_type_price,
                 $checkout->date ?: $checkout->created_at
             );
         }
 
-        $receipts = CashReceipt::whereIn('client_id', $clientIds)
-            ->where('status', 1)
-            ->whereDate('date', '<=', $periodEnd->toDateString())
-            ->with('checkout:id,currency_type,currency_type_price')
-            ->get();
-
         $accounting = app(AccountingCashReportService::class);
-        foreach ($receipts as $receipt) {
-            $receiptUsd = $receipt->checkout
-                ? $accounting->paymentAmountToUsd(
-                    (float) $receipt->price,
-                    (int) $receipt->currency_type,
-                    (float) $receipt->currency_type_price,
-                    $receipt->checkout->currency_type !== null ? (int) $receipt->checkout->currency_type : null,
-                    $receipt->checkout->currency_type_price !== null ? (float) $receipt->checkout->currency_type_price : null
-                )
-                : $accounting->legacyUnlinkedPaymentToUsd(
-                    (float) $receipt->price,
-                    (int) $receipt->currency_type,
-                    (float) ($receipt->currency_type_price ?: Currency::usdRateForDate($receipt->date ?: $receipt->created_at)),
-                    (string) $receipt->comment
-                );
-            $totals[(string) $receipt->client_id] -= $receiptUsd;
+        foreach (CashReceipt::whereIn('client_id', $clientIds)->where('status', 1)->whereDate('date', '<=', $periodEnd)->with('checkout:id,currency_type,currency_type_price')->get() as $receipt) {
+            $usd = $receipt->checkout
+                ? $accounting->paymentAmountToUsd((float) $receipt->price, (int) $receipt->currency_type, (float) $receipt->currency_type_price, $receipt->checkout->currency_type, $receipt->checkout->currency_type_price)
+                : $accounting->legacyUnlinkedPaymentToUsd((float) $receipt->price, (int) $receipt->currency_type, (float) ($receipt->currency_type_price ?: Currency::usdRateForDate($receipt->date ?: $receipt->created_at)), (string) $receipt->comment);
+            $totals[(string) $receipt->client_id] = ($totals[(string) $receipt->client_id] ?? 0) - $usd;
         }
 
-        $returns = Checkin::with('details')
-            ->whereIn('client_id', $clientIds)
-            ->where('type_id', 4)
-            ->whereDate('date', '<=', $periodEnd->toDateString())
-            ->get();
-
-        foreach ($returns as $return) {
-            $amount = (float) $return->details->sum('total_price');
-            $totals[(string) $return->client_id] -= Currency::documentAmountToUsd(
-                $amount,
+        foreach (Checkin::with('details')->whereIn('client_id', $clientIds)->where('type_id', 4)->whereDate('date', '<=', $periodEnd)->get() as $return) {
+            $totals[(string) $return->client_id] = ($totals[(string) $return->client_id] ?? 0) - Currency::documentAmountToUsd(
+                (float) $return->details->sum('total_price'),
                 (int) $return->currency_type,
                 (float) $return->currency_type_price,
                 $return->date ?: $return->created_at
@@ -265,39 +160,28 @@ class CheckoutMonthExport implements FromView, WithStyles
 
     public function styles(Worksheet $sheet)
     {
-        $highestColumn = $sheet->getHighestColumn();
-        $highestRow = $sheet->getHighestRow(); // Jadvaldagi eng oxirgi qatorni aniqlaymiz
+        $lastRow = max(3, $this->rowCount + 3);
+        $sheet->setShowGridlines(false);
+        $sheet->freezePane('A3');
+        $sheet->setAutoFilter('A2:I' . max(2, $this->rowCount + 2));
+        $sheet->getDefaultRowDimension()->setRowHeight(24);
+        $sheet->getRowDimension(1)->setRowHeight(30);
+        $sheet->getRowDimension(2)->setRowHeight(42);
 
-        // 1. BUTUN jadvalni vertikal bo'yicha markazga joylash
-        $sheet->getStyle('A1:' . $highestColumn . $highestRow)
-              ->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
-
-        // 2. BUTUN jadvalda matn sig'masa pastga tushirish (Wrap Text)
-        $sheet->getStyle('A1:' . $highestColumn . $highestRow)
-              ->getAlignment()->setWrapText(true);
-
-        // 3. Faqat sarlavha (1 va 2-qator)larni gorizontal markazga joylash
-        $sheet->getStyle('A1:' . $highestColumn . '2')
-              ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-
-        $summaryRow = $this->clientCount + 3;
-        $openingDebtColumn = Coordinate::stringFromColumnIndex(3);
-        $salesColumn = Coordinate::stringFromColumnIndex($this->productCount + 4);
-        $paidColumn = Coordinate::stringFromColumnIndex($this->productCount + 5);
-        $closingDebtColumn = Coordinate::stringFromColumnIndex($this->productCount + 6);
-
-        $sheet->getStyle($openingDebtColumn . '3:' . $openingDebtColumn . $summaryRow)
-            ->getNumberFormat()->setFormatCode('$#,##0.00');
-        $sheet->getStyle($salesColumn . '3:' . $paidColumn . $summaryRow)
-            ->getNumberFormat()->setFormatCode('$#,##0.00');
-        $sheet->getStyle($closingDebtColumn . '3:' . $closingDebtColumn . $summaryRow)
-            ->getNumberFormat()->setFormatCode('$#,##0.00');
-
-        if ($this->productCount > 0) {
-            $firstProductColumn = Coordinate::stringFromColumnIndex(4);
-            $lastProductColumn = Coordinate::stringFromColumnIndex($this->productCount + 3);
-            $sheet->getStyle($firstProductColumn . $summaryRow . ':' . $lastProductColumn . $summaryRow)
-                ->getNumberFormat()->setFormatCode('$#,##0.00');
+        foreach (['A' => 13, 'B' => 28, 'C' => 20, 'D' => 52, 'E' => 15, 'F' => 16, 'G' => 18, 'H' => 17, 'I' => 18] as $column => $width) {
+            $sheet->getColumnDimension($column)->setWidth($width);
         }
+
+        $sheet->getStyle('A1:I' . $lastRow)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER)->setWrapText(true);
+        $sheet->getStyle('A2:I2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('A2:I2')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('1F4E78');
+        $sheet->getStyle('A2:I2')->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
+        $sheet->getStyle('A2:I' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('B7C9DD');
+        $sheet->getStyle('A3:A' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('E3:E' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.###');
+        $sheet->getStyle('C3:C' . $lastRow)->getNumberFormat()->setFormatCode('$#,##0.00');
+        $sheet->getStyle('F3:I' . $lastRow)->getNumberFormat()->setFormatCode('$#,##0.00');
+        $sheet->getStyle('A' . $lastRow . ':I' . $lastRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('D9EAF7');
+        $sheet->getStyle('A' . $lastRow . ':I' . $lastRow)->getFont()->setBold(true);
     }
 }
