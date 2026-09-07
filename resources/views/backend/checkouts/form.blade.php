@@ -737,6 +737,7 @@
     $('.apply-commission-btn').click(function(e) {
         e.preventDefault();
         var btn = $(this);
+        var originalButtonHtml = btn.html();
         var scheme = $('.commission-scheme').val();
         var kpi = parseFloat($('.commission-kpi-input').val()) || 0;
         var agent = parseFloat($('.commission-agent-input').val()) || 0;
@@ -762,7 +763,10 @@
             success: function(data) {
                 if (data.status === 'success') {
                     $('.commission-factory').text(data.factory_percent);
-                    window.location.href = data.redirect_url;
+                    btn.html('<i class="fa fa-check"></i> Saqlandi');
+                    setTimeout(function() {
+                        btn.html(originalButtonHtml);
+                    }, 1800);
                 }
             },
             error: function(xhr) {

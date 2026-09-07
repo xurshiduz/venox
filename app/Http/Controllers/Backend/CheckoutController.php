@@ -1533,7 +1533,6 @@ class CheckoutController extends Controller
             'agent_percent' => (float) $validated['agent_percent'],
             'venox_bonus_percent' => (float) $validated['venox_bonus_percent'],
             'factory_percent' => $factoryPercent,
-            'redirect_url' => route('accounting_cash_report'),
         ]);
     }
 
