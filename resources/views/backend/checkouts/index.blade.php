@@ -1,6 +1,45 @@
 @extends('layouts.backend')
 
 @section('content')
+<style>
+    .checkout-note-cell {
+        width: 240px;
+        max-width: 240px;
+        white-space: normal;
+    }
+
+    .checkout-note-preview {
+        display: inline-block;
+        max-width: 190px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+
+    .checkout-note-view {
+        min-width: 30px;
+        padding: 2px 6px;
+        vertical-align: middle;
+    }
+
+    #checkoutNoteText {
+        line-height: 1.65;
+        overflow-wrap: anywhere;
+        white-space: pre-wrap;
+    }
+
+    @media (max-width: 767.98px) {
+        .checkout-note-cell {
+            width: 180px;
+            max-width: 180px;
+        }
+
+        .checkout-note-preview {
+            max-width: 130px;
+        }
+    }
+</style>
 <div class="nk-content ">
     <div class="container-fluid">
         @if(Route::currentRouteName() == 'checkouts_index')
@@ -306,7 +345,22 @@
                                             @endif
                                         @endif
                                        </td>
-                                       <td>{{ $item->reference }}</td>
+                                       <td class="checkout-note-cell">
+                                           @if(filled($item->reference))
+                                               <span class="checkout-note-preview">{{ $item->reference }}</span>
+                                               <span class="checkout-note-full d-none">{{ $item->reference }}</span>
+                                               <button type="button"
+                                                       class="btn btn-sm btn-outline-primary checkout-note-view"
+                                                       data-bs-toggle="modal"
+                                                       data-bs-target="#checkoutNoteModal"
+                                                       title="To'liq ko'rish"
+                                                       aria-label="To'liq ko'rish">
+                                                   <em class="icon ni ni-eye"></em>
+                                               </button>
+                                           @else
+                                               <span>—</span>
+                                           @endif
+                                       </td>
                                        @endhasanyrole
                                        <td style="padding: 2px; font-size: 12px; vertical-align: middle; text-transform: lowercase;" id="tsendsuccess{{ $item->id }}">
                                         @if($item->number_work)
@@ -434,9 +488,32 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="checkoutNoteModal" tabindex="-1" aria-labelledby="checkoutNoteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="checkoutNoteModalLabel">{{ trans('backend.input.comment') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="checkoutNoteText"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @section('script')
+<script>
+    $(document).on('click', '.checkout-note-view', function () {
+        var note = $(this).siblings('.checkout-note-full').text();
+        $('#checkoutNoteText').text(note);
+    });
+</script>
 <script>
     $("#formattedNumberField").on('keyup', function(){
         var n = parseInt($(this).val().replace(/\D/g,''),10);
