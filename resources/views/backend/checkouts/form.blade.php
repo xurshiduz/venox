@@ -410,10 +410,12 @@
                                         $commissionSelected = str_starts_with((string) $item->commission_scheme, 'venox_')
                                             ? 'venox_bonus'
                                             : $item->commission_scheme;
-                                        $factoryPercent = 100
-                                            - (float) ($item->kpi_percent ?? 0)
-                                            - (float) ($item->agent_percent ?? 0)
-                                            - (float) ($item->venox_bonus_percent ?? 0);
+                                        $commissionPercent = (float) ($item->kpi_percent ?? 0)
+                                            + (float) ($item->agent_percent ?? 0)
+                                            + (float) ($item->venox_bonus_percent ?? 0);
+                                        $discountPercent = max(0, min(100, (float) ($item->discount ?? 0)));
+                                        $factoryPercent = (100 - $discountPercent)
+                                            * (100 - $commissionPercent) / 100;
                                     @endphp
                                     <div class="card border mt-3 commission-card">
                                         <div class="card-inner py-3">
@@ -442,7 +444,8 @@
                                                 <div class="col-lg-1 col-md-6">
                                                     <label class="form-label mb-1">Zavod</label>
                                                     <div class="d-flex flex-wrap commission-summary" style="gap: 8px;">
-                                                        <span class="badge bg-outline-success">Zavod: <b class="commission-factory">{{ number_format($factoryPercent, 0) }}</b>%</span>
+                                                        <span class="badge bg-outline-warning">Chegirma: <b class="commission-discount">{{ number_format($discountPercent, 2, '.', '') }}</b>%</span>
+                                                        <span class="badge bg-outline-success" title="Chegirma va bonuslardan keyin, boshlang‘ich narxga nisbatan">Zavod: <b class="commission-factory">{{ number_format($factoryPercent, 2, '.', '') }}</b>%</span>
                                                     </div>
                                                 </div>
                                                 <div class="col-lg-2 col-md-12">
@@ -451,7 +454,7 @@
                                                     </button>
                                                 </div>
                                             </div>
-                                            <small class="text-soft d-block mt-2">Bu foizlar chegirma emas. Ular ushbu nakladnoy uchun saqlanadi va kassa Excel hisobotida ishlatiladi.</small>
+                                            <small class="text-soft d-block mt-2">Zavod ulushi boshlang‘ich narxga nisbatan hisoblanadi: chegirmadan keyingi summa − KPI − Agent − Venox bonus.</small>
                                         </div>
                                     </div>
                                     
@@ -670,6 +673,19 @@
     function customFormatMoney(amount) {
         return Number(amount).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$& ');
     }
+
+    function updateFactoryPercent() {
+        var discount = parseFloat($('.discount').first().val()) || 0;
+        var commission = (parseFloat($('.commission-kpi-input').val()) || 0)
+            + (parseFloat($('.commission-agent-input').val()) || 0)
+            + (parseFloat($('.commission-venox-input').val()) || 0);
+        discount = Math.max(0, Math.min(100, discount));
+        commission = Math.max(0, Math.min(100, commission));
+        var factory = (100 - discount) * (100 - commission) / 100;
+
+        $('.commission-discount').text(discount.toFixed(2).replace(/\.00$/, ''));
+        $('.commission-factory').text(factory.toFixed(2).replace(/\.00$/, ''));
+    }
     
     // 1. Skidka yozilganda faqat preview qilib vizual ko'rsatamiz (ajax ketmaydi)
     $('.discount').on('input', function() {
@@ -681,6 +697,7 @@
     
         // Ikkala inputni sinxronlash (Mobil va PC)
         $('.discount').not(_).val(val);
+        updateFactoryPercent();
     
         var baseTotal1 = parseFloat($('#get_total_price_3').data('base')) || 0;
         var newTotal = baseTotal1 - (baseTotal1 * (val / 100));
@@ -722,6 +739,7 @@
                     });
     
                     $('.discount').val(data.discount);
+                    updateFactoryPercent();
                 }
             },
             error: function(xhr) {
@@ -762,6 +780,7 @@
             },
             success: function(data) {
                 if (data.status === 'success') {
+                    $('.commission-discount').text(data.discount_percent);
                     $('.commission-factory').text(data.factory_percent);
                     btn.html('<i class="fa fa-check"></i> Saqlandi');
                     setTimeout(function() {
@@ -782,10 +801,7 @@
     });
 
     $('.commission-kpi-input, .commission-agent-input, .commission-venox-input').on('input', function() {
-        var used = (parseFloat($('.commission-kpi-input').val()) || 0)
-            + (parseFloat($('.commission-agent-input').val()) || 0)
-            + (parseFloat($('.commission-venox-input').val()) || 0);
-        $('.commission-factory').text(Math.max(0, 100 - used).toFixed(2).replace(/\.00$/, ''));
+        updateFactoryPercent();
     });
     
     $('.bonus_change').change(function() {

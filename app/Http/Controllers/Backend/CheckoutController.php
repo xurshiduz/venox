@@ -1517,7 +1517,10 @@ class CheckoutController extends Controller
 
         $this->ensureCheckoutCommissionColumns();
         $checkout = Checkout::findOrFail($validated['checkout_id']);
-        $factoryPercent = 100 - $totalPercent;
+        // Komissiyalar chegirmadan keyingi real sotuv summasidan ajratiladi.
+        // Zavod ulushini boshlang'ich (chegirmasiz) narxga nisbatan ko'rsatamiz.
+        $discountPercent = max(0, min(100, (float) ($checkout->discount ?? 0)));
+        $factoryPercent = (100 - $discountPercent) * (100 - $totalPercent) / 100;
 
         $checkout->update([
             'commission_scheme' => $validated['scheme'],
@@ -1532,7 +1535,8 @@ class CheckoutController extends Controller
             'kpi_percent' => (float) $validated['kpi_percent'],
             'agent_percent' => (float) $validated['agent_percent'],
             'venox_bonus_percent' => (float) $validated['venox_bonus_percent'],
-            'factory_percent' => $factoryPercent,
+            'discount_percent' => $discountPercent,
+            'factory_percent' => round($factoryPercent, 2),
         ]);
     }
 
