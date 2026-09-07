@@ -98,6 +98,24 @@ class AccountingCashReportServiceTest extends TestCase
         $this->assertEqualsWithDelta(2500, $result, 0.000001);
     }
 
+    public function test_legacy_unlinked_click_amount_is_not_mistaken_for_usd(): void
+    {
+        $service = new AccountingCashReportService();
+
+        $result = $service->legacyUnlinkedPaymentToUsd(600000, 1, 12050, '600 000 Click');
+
+        $this->assertEqualsWithDelta(49.792531, $result, 0.000001);
+    }
+
+    public function test_legacy_unlinked_explicit_usd_amount_stays_in_usd(): void
+    {
+        $service = new AccountingCashReportService();
+
+        $result = $service->legacyUnlinkedPaymentToUsd(15000, 1, 12050, '15 000 $');
+
+        $this->assertEqualsWithDelta(15000, $result, 0.000001);
+    }
+
     private function detail(int $id, int $productId, string $name, float $qty, float $lineTotal, float $unitCost): object
     {
         return (object) [

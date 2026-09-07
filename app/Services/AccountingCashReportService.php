@@ -64,10 +64,11 @@ class AccountingCashReportService
             // Checkoutga biriktirilmagan "qarz uchun" to'lovlar oldin hisobotdan
             // butunlay tushib qolardi. Ularni mijozning eski savdolariga FIFO
             // tartibida taqsimlaymiz; ortgan qismi ham alohida qatorda ko'rinadi.
-            $remainingUsd = $this->toUsd(
+            $remainingUsd = $this->legacyUnlinkedPaymentToUsd(
                 (float) $receipt->price,
                 (int) $receipt->currency_type,
-                (float) $receipt->currency_type_price
+                (float) $receipt->currency_type_price,
+                (string) $receipt->comment
             );
 
             $checkouts = $clientCheckouts
@@ -213,6 +214,36 @@ class AccountingCashReportService
         $rate = ($checkoutRate && $checkoutRate > 1) ? $checkoutRate : $receiptRate;
 
         return $this->toUsd($amount, $currencyType, $rate);
+    }
+
+    /**
+     * Eski, checkoutga biriktirilmagan kassa yozuvlarida valyuta forma orqali
+     * saqlanmagan va DB standarti sabab currency_type=USD bo'lib qolgan.
+     * Masalan, `600 000 Click` yozuvi 600 000 USD emas, 600 000 UZS.
+     *
+     * Aniq `$`/USD belgisi bor yozuvlar USD bo'lib qoladi. Belgisiz summa
+     * hujjatdagi bir dollarlik kursdan ham katta bo'lsa, u legacy UZS summa
+     * sifatida tarixiy kursga bo'linadi. Kichik, avvaldan USDga aylantirib
+     * kiritilgan qarz to'lovlariga tegilmaydi.
+     */
+    public function legacyUnlinkedPaymentToUsd(
+        float $amount,
+        int $currencyType,
+        float $documentRate,
+        string $comment = ''
+    ): float {
+        if ($currencyType !== 1) {
+            return $this->toUsd($amount, $currencyType, $documentRate);
+        }
+
+        $rate = $documentRate > 1 ? $documentRate : Currency::usdRate();
+        $hasExplicitUsdMarker = (bool) preg_match('/\$|\bUSD\b|dollar|dollari|доллар/iu', $comment);
+
+        if (! $hasExplicitUsdMarker && $rate > 1 && $amount >= $rate) {
+            return $amount / $rate;
+        }
+
+        return $amount;
     }
 
     /**
