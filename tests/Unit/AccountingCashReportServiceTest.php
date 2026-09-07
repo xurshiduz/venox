@@ -51,6 +51,25 @@ class AccountingCashReportServiceTest extends TestCase
         $this->assertEqualsWithDelta(2500, array_sum($result), 0.000001);
     }
 
+    public function test_linked_checkout_currency_corrects_legacy_receipt_currency(): void
+    {
+        $service = new AccountingCashReportService();
+
+        // Eski receipt USD deb qolgan, lekin bog'langan savdo UZS va 1 USD = 12 000 UZS.
+        $result = $service->paymentAmountToUsd(72000, 1, 12050, 2, 12000);
+
+        $this->assertEqualsWithDelta(6, $result, 0.000001);
+    }
+
+    public function test_checkout_historical_usd_rate_is_used_for_usd_payment(): void
+    {
+        $service = new AccountingCashReportService();
+
+        $result = $service->paymentAmountToUsd(2500, 2, 1, 1, 11900);
+
+        $this->assertEqualsWithDelta(2500, $result, 0.000001);
+    }
+
     private function detail(int $id, int $productId, string $name, float $qty, float $lineTotal, float $unitCost): object
     {
         return (object) [

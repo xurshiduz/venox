@@ -435,7 +435,7 @@
                                                                 <div class="form-control-wrap">
                                                                     <select class="form-select js-select2" required name="currency_type" data-search="on">
                                                                         @foreach(App\Models\CurrencyType::where('status', 1)->orderBy('id', 'asc')->get() as $currency)
-                                                                        <option value="{{ $currency->id }}">{{ $currency->name }}</option>
+                                                                        <option value="{{ $currency->id }}" @if((int) $item->currency_type === (int) $currency->id) selected @endif>{{ $currency->name }}</option>
                                                                         @endforeach
                                                                     </select>    
                                                                 </div>
@@ -446,7 +446,7 @@
                                                             <div class="form-group">
                                                                 <label class="form-label" for="currency_type_price">Курс валют</label>
                                                                 <div class="form-control-wrap">
-                                                                    <input type="text" class="form-control" required name="currency_type_price" value="{{ number_format(App\Models\Currency::where('type_id', 1)->orderBy('id', 'desc')->first()->price, 2, '.', ' ') }}" data-type="currency" id="currency_type_price" placeholder="Курс валют">
+                                                                    <input type="text" class="form-control" required name="currency_type_price" value="{{ number_format((float) ($item->currency_type_price ?: App\Models\Currency::usdRate()), 2, '.', ' ') }}" data-type="currency" id="currency_type_price" placeholder="Курс валют">
                                                                 </div>
                                                             </div>
                                                         </div>

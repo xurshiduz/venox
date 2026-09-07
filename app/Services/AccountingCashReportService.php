@@ -46,7 +46,17 @@ class AccountingCashReportService
     private function makeRow(CashReceipt $receipt, float $previousUsd): array
     {
         $checkout = $receipt->checkout;
-        $paymentUsd = $this->toUsd((float) $receipt->price, (int) $receipt->currency_type, (float) $receipt->currency_type_price);
+        // To'lov summasi cash_receiptsdan olinadi. Eski to'lovlarda currency_type
+        // formadagi standart USD qiymatida qolib ketgan. Checkout esa summaning
+        // haqiqiy valyutasi va tarixiy kursini saqlaydi, shuning uchun bog'langan
+        // savdolarda aynan hujjat valyutasi ustun hisoblanadi.
+        $paymentUsd = $this->paymentAmountToUsd(
+            (float) $receipt->price,
+            (int) $receipt->currency_type,
+            (float) $receipt->currency_type_price,
+            $checkout->currency_type !== null ? (int) $checkout->currency_type : null,
+            $checkout->currency_type_price !== null ? (float) $checkout->currency_type_price : null
+        );
         // `checkouts.details` matn ustuni details() relationi bilan bir xil nomda.
         // Property orqali o'qilsa relation o'rniga NULL/text qaytadi, shu sabab eager-loaded
         // relationni Eloquent relation storage'dan aniq olamiz.
@@ -96,6 +106,19 @@ class AccountingCashReportService
             'venox' => $venox,
             'factory' => $paymentUsd - $kpi - $agent - $venox,
         ];
+    }
+
+    public function paymentAmountToUsd(
+        float $amount,
+        int $receiptCurrencyType,
+        float $receiptRate,
+        ?int $checkoutCurrencyType,
+        ?float $checkoutRate
+    ): float {
+        $currencyType = $checkoutCurrencyType ?: $receiptCurrencyType;
+        $rate = ($checkoutRate && $checkoutRate > 1) ? $checkoutRate : $receiptRate;
+
+        return $this->toUsd($amount, $currencyType, $rate);
     }
 
     /**
