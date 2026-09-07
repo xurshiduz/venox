@@ -20,6 +20,7 @@ class CheckoutMonthExport implements FromView, WithStyles
 {
     protected $monthYear;
     protected $rowCount = 0;
+    protected $rowLineCounts = [];
 
     public function __construct($monthYear)
     {
@@ -70,10 +71,29 @@ class CheckoutMonthExport implements FromView, WithStyles
         }
 
         $closingDebts = $this->clientDebtTotalsUsd($clientIds->map(fn ($id) => (string) $id)->all(), $periodEnd);
-        $rows = [];
+        $groupedRows = [];
 
         foreach ($checkouts as $checkout) {
             $clientKey = (string) $checkout->client_id;
+            $paid = (float) ($clientPayments[$clientKey] ?? 0);
+            $closing = (float) ($closingDebts[$clientKey] ?? 0);
+
+            if (!isset($groupedRows[$clientKey])) {
+                $groupedRows[$clientKey] = [
+                    'dates' => [],
+                    'client' => $checkout->supid->name ?? 'Noma\'lum mijoz',
+                    'debt_before_payment' => $closing + $paid,
+                    'products' => [],
+                    'quantities' => [],
+                    'unit_prices' => [],
+                    'total_usd' => 0,
+                    'paid_usd' => $paid,
+                    'closing_debt_usd' => $closing,
+                ];
+            }
+
+            $groupedRows[$clientKey]['dates'][] = Carbon::parse($checkout->date ?: $checkout->created_at)->format('d.m.Y');
+
             foreach ($checkout->checkoutDetails as $detail) {
                 $qty = (float) $detail->qty;
                 $totalUsd = Currency::documentAmountToUsd(
@@ -82,24 +102,30 @@ class CheckoutMonthExport implements FromView, WithStyles
                     (float) ($checkout->currency_type_price ?? 0),
                     $checkout->date ?: $checkout->created_at
                 );
-                $paid = (float) ($clientPayments[$clientKey] ?? 0);
-                $closing = (float) ($closingDebts[$clientKey] ?? 0);
 
-                $rows[] = [
-                    'date' => Carbon::parse($checkout->date ?: $checkout->created_at)->format('d.m.Y'),
-                    'client' => $checkout->supid->name ?? 'Noma\'lum mijoz',
-                    'debt_before_payment' => $closing + $paid,
-                    'product' => $detail->prodid->name ?? 'Noma\'lum mahsulot',
-                    'qty' => $qty,
-                    'unit_price_usd' => $qty != 0 ? $totalUsd / $qty : 0,
-                    'total_usd' => $totalUsd,
-                    'paid_usd' => $paid,
-                    'closing_debt_usd' => $closing,
-                ];
+                $groupedRows[$clientKey]['products'][] = $detail->prodid->name ?? 'Noma\'lum mahsulot';
+                $groupedRows[$clientKey]['quantities'][] = $qty;
+                $groupedRows[$clientKey]['unit_prices'][] = $qty != 0 ? $totalUsd / $qty : 0;
+                $groupedRows[$clientKey]['total_usd'] += $totalUsd;
             }
         }
 
+        $rows = collect($groupedRows)->map(function (array $row) {
+            return [
+                'date' => collect($row['dates'])->unique()->implode("\n"),
+                'client' => $row['client'],
+                'debt_before_payment' => $row['debt_before_payment'],
+                'product' => implode("\n", $row['products']),
+                'qty' => collect($row['quantities'])->sum(),
+                'unit_price_usd' => collect($row['unit_prices'])->map(fn ($price) => '$' . number_format($price, 2, '.', ''))->implode("\n"),
+                'total_usd' => $row['total_usd'],
+                'paid_usd' => $row['paid_usd'],
+                'closing_debt_usd' => $row['closing_debt_usd'],
+            ];
+        })->values()->all();
+
         $this->rowCount = count($rows);
+        $this->rowLineCounts = array_map(fn ($row) => max(1, substr_count($row['product'], "\n") + 1), $rows);
 
         return view('backend.checkouts.excel_matrix', [
             'rows' => $rows,
@@ -167,6 +193,10 @@ class CheckoutMonthExport implements FromView, WithStyles
         $sheet->getDefaultRowDimension()->setRowHeight(44);
         $sheet->getRowDimension(1)->setRowHeight(28);
         $sheet->getRowDimension(2)->setRowHeight(48);
+
+        foreach ($this->rowLineCounts as $index => $lineCount) {
+            $sheet->getRowDimension($index + 3)->setRowHeight(max(44, $lineCount * 19));
+        }
 
         foreach (['A' => 13, 'B' => 28, 'C' => 20, 'D' => 52, 'E' => 15, 'F' => 16, 'G' => 18, 'H' => 17, 'I' => 18] as $column => $width) {
             $sheet->getColumnDimension($column)->setWidth($width);
