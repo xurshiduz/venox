@@ -21,6 +21,7 @@ class CheckoutMonthExport implements FromView, WithStyles
     protected $monthYear;
     protected $rowCount = 0;
     protected $rowLineCounts = [];
+    protected $mergeRanges = [];
 
     public function __construct($monthYear)
     {
@@ -110,22 +111,37 @@ class CheckoutMonthExport implements FromView, WithStyles
             }
         }
 
-        $rows = collect($groupedRows)->map(function (array $row) {
-            return [
-                'date' => collect($row['dates'])->unique()->implode("\n"),
-                'client' => $row['client'],
-                'debt_before_payment' => $row['debt_before_payment'],
-                'product' => implode("\n", $row['products']),
-                'qty' => collect($row['quantities'])->map(fn ($qty) => rtrim(rtrim(number_format($qty, 3, '.', ''), '0'), '.'))->implode("\n"),
-                'unit_price_usd' => collect($row['unit_prices'])->map(fn ($price) => '$' . number_format($price, 2, '.', ''))->implode("\n"),
-                'total_usd' => $row['total_usd'],
-                'paid_usd' => $row['paid_usd'],
-                'closing_debt_usd' => $row['closing_debt_usd'],
-            ];
-        })->values()->all();
+        $rows = [];
+        foreach ($groupedRows as $row) {
+            $startRow = count($rows) + 3;
+            foreach ($row['products'] as $index => $product) {
+                $qty = (float) $row['quantities'][$index];
+                $unitPrice = (float) $row['unit_prices'][$index];
+                $first = $index === 0;
+
+                $rows[] = [
+                    'date' => $first ? collect($row['dates'])->unique()->implode("\n") : null,
+                    'client' => $first ? $row['client'] : null,
+                    'debt_before_payment' => $first ? $row['debt_before_payment'] : null,
+                    'product' => $product,
+                    'qty' => $qty,
+                    'unit_price_usd' => $unitPrice,
+                    'total_usd' => $qty * $unitPrice,
+                    'paid_usd' => $first ? $row['paid_usd'] : null,
+                    'closing_debt_usd' => $first ? $row['closing_debt_usd'] : null,
+                ];
+            }
+
+            $endRow = count($rows) + 2;
+            if ($endRow > $startRow) {
+                foreach (['A', 'B', 'C', 'H', 'I'] as $column) {
+                    $this->mergeRanges[] = $column . $startRow . ':' . $column . $endRow;
+                }
+            }
+        }
 
         $this->rowCount = count($rows);
-        $this->rowLineCounts = array_map(fn ($row) => max(1, substr_count($row['product'], "\n") + 1), $rows);
+        $this->rowLineCounts = array_fill(0, $this->rowCount, 1);
 
         return view('backend.checkouts.excel_matrix', [
             'rows' => $rows,
@@ -197,6 +213,10 @@ class CheckoutMonthExport implements FromView, WithStyles
 
         foreach ($this->rowLineCounts as $index => $lineCount) {
             $sheet->getRowDimension($index + 3)->setRowHeight(max(44, $lineCount * 19));
+        }
+
+        foreach ($this->mergeRanges as $range) {
+            $sheet->mergeCells($range);
         }
 
         foreach (['A' => 13, 'B' => 28, 'C' => 20, 'D' => 52, 'E' => 15, 'F' => 16, 'G' => 18, 'H' => 17, 'I' => 18] as $column => $width) {
