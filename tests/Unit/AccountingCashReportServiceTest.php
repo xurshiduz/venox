@@ -51,6 +51,16 @@ class AccountingCashReportServiceTest extends TestCase
         $this->assertEqualsWithDelta(2500, array_sum($result), 0.000001);
     }
 
+    public function test_example_payment_matches_cash_report_formula(): void
+    {
+        $result = (new AccountingCashReportService())->splitPayment(2500, 0, 8, 5);
+
+        $this->assertEqualsWithDelta(0, $result['kpi'], 0.000001);
+        $this->assertEqualsWithDelta(200, $result['agent'], 0.000001);
+        $this->assertEqualsWithDelta(125, $result['venox'], 0.000001);
+        $this->assertEqualsWithDelta(2175, $result['factory'], 0.000001);
+    }
+
     public function test_linked_checkout_currency_corrects_legacy_receipt_currency(): void
     {
         $service = new AccountingCashReportService();

@@ -1560,11 +1560,12 @@ class CheckoutController extends Controller
         $page = max(1, (int) $request->input('page', 1));
         $rows = new \Illuminate\Pagination\LengthAwarePaginator(
             $allRows->forPage($page, 30)->values(), $allRows->count(), 30, $page,
-            ['path' => $request->url(), 'query' => $request->query()]
+            ['path' => $request->url(), 'query' => $request->except('page')]
         );
         $products = Product::whereIn('id', CheckoutDetail::distinct()->pluck('product_id'))->orderBy('name')->get(['id', 'name']);
         $usdRate = Currency::usdRate();
-        return view('backend.checkouts.accounting_cash_report', compact('rows', 'filters', 'products', 'usdRate'));
+        $totals = $allRows;
+        return view('backend.checkouts.accounting_cash_report', compact('rows', 'totals', 'filters', 'products', 'usdRate'));
     }
 
     public function accountingCashReportExcel(Request $request)

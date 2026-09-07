@@ -15,7 +15,12 @@
         <div class="col-md-2"><label class="form-label">Bonus turi</label><select name="scheme" class="form-select"><option value="">Barchasi</option><option value="special" @if($filters['scheme']==='special') selected @endif>Spes</option><option value="contract" @if($filters['scheme']==='contract') selected @endif>Shartnoma</option><option value="venox_bonus" @if($filters['scheme']==='venox_bonus') selected @endif>Venox bonus</option></select></div>
         <div class="col-md-3 d-flex" style="gap:8px"><button class="btn btn-primary flex-grow-1">Ko‘rsatish</button><a href="{{ route('accounting_cash_report') }}" class="btn btn-light">Tozalash</a></div>
     </form>
-    @include('backend.checkouts.accounting_cash_report_table', ['rows' => collect($rows->items()), 'startNumber' => $rows->firstItem() ?: 1])
-    <div class="mt-3">{{ $rows->links() }}</div>
+    @include('backend.checkouts.accounting_cash_report_table', ['rows' => collect($rows->items()), 'totals' => $totals, 'startNumber' => $rows->firstItem() ?: 1])
+    @if($rows->hasPages())
+        <div class="d-flex flex-wrap justify-content-between align-items-center mt-3" style="gap:12px">
+            <div class="text-soft">{{ $rows->firstItem() }}–{{ $rows->lastItem() }} / {{ $rows->total() }} ta yozuv</div>
+            <div>{{ $rows->onEachSide(1)->links('pagination::bootstrap-4') }}</div>
+        </div>
+    @endif
 </div></div></div></div>
 @endsection
