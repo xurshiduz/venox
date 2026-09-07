@@ -51,19 +51,18 @@
                 $checkinRawPrice = $latestCheckin
                     ? (float) $latestCheckin->price
                     : (float) $item->checkin_price;
-                $checkinCurrency = (int) ($latestCheckin->currency_type
-                    ?? optional($latestCheckin->checkid ?? null)->currency_type
-                    ?? 2);
-                $checkinRate = (float) ($latestCheckin->currency_type_price
-                    ?? optional($latestCheckin->checkid ?? null)->currency_type_price
-                    ?? $usdRate);
-                if ($checkinRate <= 1 && $latestCheckin && $latestCheckin->checkid) {
-                    $checkinRate = (float) ($latestCheckin->checkid->currency_type_price ?: $usdRate);
-                }
-                $checkinPrice = App\Models\Currency::toUzs(
+                // Valyuta hujjat sarlavhasida tanlanadi. Eski detail qatorlarida
+                // noto'g'ri standart qiymat bo'lishi mumkin, shu sabab header ustun.
+                $checkinDocument = $latestCheckin->checkid ?? null;
+                $checkinFallbackRate = App\Models\Currency::usdRateForDate(
+                    optional($checkinDocument)->date ?? optional($latestCheckin)->created_at
+                );
+                $checkinPrice = App\Models\Currency::documentAmountToUzs(
                     $checkinRawPrice,
-                    $checkinCurrency,
-                    $checkinRate
+                    optional($checkinDocument)->currency_type,
+                    optional($checkinDocument)->currency_type_price ?: $checkinFallbackRate,
+                    $latestCheckin->currency_type ?? null,
+                    $latestCheckin->currency_type_price ?? null
                 );
 
                 // Sotuv narxi mahsulot kartasidagi bugungi narx/kursdan emas,
@@ -84,23 +83,53 @@
                     ? (float) $latestCheckout->price
                     : (float) ($item->checkout_price ?: ($item->productid->price ?? 0));
                 if ($latestCheckout) {
+                    $checkoutDocument = $latestCheckout->checkid;
+                    $checkoutFallbackRate = App\Models\Currency::usdRateForDate(
+                        optional($checkoutDocument)->date ?? $latestCheckout->created_at
+                    );
                     // Checkout sarlavhasi foydalanuvchi sotuvda tanlagan valyuta va
                     // o'sha kundagi kursni saqlaydi. Eski detail qatorlarida noto'g'ri
                     // currency_type uchragani uchun sarlavha doim birinchi olinadi.
                     $checkoutPrice = App\Models\Currency::saleUnitPriceToUzs(
                         $checkoutRawPrice,
                         $checkinPrice,
-                        optional($latestCheckout->checkid)->currency_type,
-                        optional($latestCheckout->checkid)->currency_type_price,
+                        optional($checkoutDocument)->currency_type,
+                        optional($checkoutDocument)->currency_type_price ?: $checkoutFallbackRate,
                         $latestCheckout->currency_type,
                         $latestCheckout->currency_type_price,
-                        $usdRate
+                        $checkoutFallbackRate
                     );
                 } else {
                     $checkoutPrice = App\Models\Currency::toUzs(
                         $checkoutRawPrice,
                         (int) ($item->productid->currency_type ?? 1),
                         $usdRate
+                    );
+                }
+
+                // Ikkala valyuta belgisi ham tarixda noto'g'ri UZS bo'lib qolgan
+                // kirimlarni faqat iqtisodiy jihatdan mantiqli bo'lsa USDdan tiklaydi.
+                $checkinPrice = App\Models\Currency::purchaseUnitPriceToUzs(
+                    $checkinRawPrice,
+                    $checkoutPrice,
+                    optional($checkinDocument)->currency_type,
+                    optional($checkinDocument)->currency_type_price ?: $checkinFallbackRate,
+                    $latestCheckin->currency_type ?? null,
+                    $latestCheckin->currency_type_price ?? null,
+                    $checkinFallbackRate
+                );
+
+                // Kirim tiklangach, sotuvning legacy USD tekshiruvini yakuniy
+                // kirim narxiga nisbatan yana bir marta aniq hisoblaymiz.
+                if ($latestCheckout) {
+                    $checkoutPrice = App\Models\Currency::saleUnitPriceToUzs(
+                        $checkoutRawPrice,
+                        $checkinPrice,
+                        optional($checkoutDocument)->currency_type,
+                        optional($checkoutDocument)->currency_type_price ?: $checkoutFallbackRate,
+                        $latestCheckout->currency_type,
+                        $latestCheckout->currency_type_price,
+                        $checkoutFallbackRate
                     );
                 }
 

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
   
 class Currency extends Model
 {
@@ -18,6 +19,31 @@ class Currency extends Model
         $rate = (float) static::where('type_id', 1)->latest('id')->value('price');
 
         return $rate > 0 ? $rate : 1;
+    }
+
+    /**
+     * Hujjat sanasida amalda bo'lgan USD -> UZS kursi.
+     * Hujjatning o'zida kurs saqlanmagan eski yozuvlar uchungina ishlatiladi.
+     */
+    public static function usdRateForDate($date): float
+    {
+        if (empty($date)) {
+            return static::usdRate();
+        }
+
+        try {
+            $endOfDay = Carbon::parse($date)->endOfDay();
+        } catch (\Throwable $exception) {
+            return static::usdRate();
+        }
+
+        $rate = (float) static::where('type_id', 1)
+            ->where('created_at', '<=', $endOfDay)
+            ->latest('created_at')
+            ->latest('id')
+            ->value('price');
+
+        return $rate > 0 ? $rate : static::usdRate();
     }
 
     /**
@@ -85,6 +111,43 @@ class Currency extends Model
         if ($costUzs > 0 && $converted < ($costUzs * 0.05) && $rate && $rate > 1) {
             $usdCandidate = $amount * $rate;
             $candidateRatio = $usdCandidate / $costUzs;
+
+            if ($candidateRatio >= 0.10 && $candidateRatio <= 10) {
+                return $usdCandidate;
+            }
+        }
+
+        return $converted;
+    }
+
+    /**
+     * Eski kirimlarda narx USDda qolib, valyuta UZS deb saqlangan yozuvni
+     * sotuvning UZS narxi bilan xavfsiz solishtirib tiklaydi.
+     */
+    public static function purchaseUnitPriceToUzs(
+        float $amount,
+        float $saleUzs,
+        ?int $headerCurrencyType,
+        ?float $headerRate,
+        ?int $detailCurrencyType = null,
+        ?float $detailRate = null,
+        ?float $fallbackUsdRate = null
+    ): float {
+        $converted = static::documentAmountToUzs(
+            $amount,
+            $headerCurrencyType,
+            $headerRate,
+            $detailCurrencyType,
+            $detailRate
+        );
+
+        $rate = ($headerRate && $headerRate > 1)
+            ? $headerRate
+            : (($detailRate && $detailRate > 1) ? $detailRate : $fallbackUsdRate);
+
+        if ($saleUzs > 0 && $converted < ($saleUzs * 0.05) && $rate && $rate > 1) {
+            $usdCandidate = $amount * $rate;
+            $candidateRatio = $saleUzs / $usdCandidate;
 
             if ($candidateRatio >= 0.10 && $candidateRatio <= 10) {
                 return $usdCandidate;

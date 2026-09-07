@@ -51,6 +51,22 @@ class WarehouseStockPricingTest extends TestCase
         $this->assertEqualsWithDelta(-1.2, Currency::markupPercent(89250, $saleUzs), 0.0001);
     }
 
+    public function test_legacy_usd_purchase_price_is_recovered_when_currency_flags_are_wrong(): void
+    {
+        $costUzs = Currency::purchaseUnitPriceToUzs(42, 571200, 2, 1, 2, 1, 11900);
+
+        $this->assertSame(499800.0, $costUzs);
+        $this->assertEqualsWithDelta(14.285714, Currency::markupPercent($costUzs, 571200), 0.0001);
+    }
+
+    public function test_real_uzs_purchase_price_is_not_converted(): void
+    {
+        $costUzs = Currency::purchaseUnitPriceToUzs(78000, 130900, 2, 1, 2, 1, 11900);
+
+        $this->assertSame(78000.0, $costUzs);
+        $this->assertEqualsWithDelta(67.820512, Currency::markupPercent($costUzs, 130900), 0.0001);
+    }
+
     public function test_markup_uses_unit_prices_and_does_not_depend_on_stock_quantity(): void
     {
         $costUzs = 89250;
