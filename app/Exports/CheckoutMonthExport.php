@@ -116,7 +116,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                 'client' => $row['client'],
                 'debt_before_payment' => $row['debt_before_payment'],
                 'product' => implode("\n", $row['products']),
-                'qty' => collect($row['quantities'])->sum(),
+                'qty' => collect($row['quantities'])->map(fn ($qty) => rtrim(rtrim(number_format($qty, 3, '.', ''), '0'), '.'))->implode("\n"),
                 'unit_price_usd' => collect($row['unit_prices'])->map(fn ($price) => '$' . number_format($price, 2, '.', ''))->implode("\n"),
                 'total_usd' => $row['total_usd'],
                 'paid_usd' => $row['paid_usd'],
@@ -132,6 +132,7 @@ class CheckoutMonthExport implements FromView, WithStyles
             'monthYear' => $this->monthYear,
             'totals' => [
                 'debt_before_payment' => $clientIds->sum(fn ($id) => (float) ($closingDebts[(string) $id] ?? 0) + (float) ($clientPayments[(string) $id] ?? 0)),
+                'qty' => collect($groupedRows)->sum(fn ($row) => collect($row['quantities'])->sum()),
                 'paid_usd' => $clientIds->sum(fn ($id) => (float) ($clientPayments[(string) $id] ?? 0)),
                 'closing_debt_usd' => $clientIds->sum(fn ($id) => (float) ($closingDebts[(string) $id] ?? 0)),
             ],
@@ -202,11 +203,13 @@ class CheckoutMonthExport implements FromView, WithStyles
             $sheet->getColumnDimension($column)->setWidth($width);
         }
 
-        $sheet->getStyle('A1:I' . $lastRow)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER)->setWrapText(true);
+        $sheet->getStyle('A1:I' . $lastRow)->getAlignment()
+            ->setVertical(Alignment::VERTICAL_CENTER)
+            ->setHorizontal(Alignment::HORIZONTAL_CENTER)
+            ->setWrapText(true);
         $sheet->getStyle('A2:I2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         $sheet->getStyle('A2:I2')->getFont()->setBold(true)->getColor()->setRGB('000000');
         $sheet->getStyle('A2:I' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('C9C9C9');
-        $sheet->getStyle('A3:A' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         $sheet->getStyle('E3:E' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.###');
         $sheet->getStyle('C3:C' . $lastRow)->getNumberFormat()->setFormatCode('$#,##0.00');
         $sheet->getStyle('F3:I' . $lastRow)->getNumberFormat()->setFormatCode('$#,##0.00');
