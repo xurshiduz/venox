@@ -124,10 +124,15 @@ class CheckoutMonthExport implements FromView, WithStyles
         }
 
         $clientPaidTotals = [];
-        $clientDebtTotals = $this->clientDebtTotalsUsd(array_keys($matrixData), $periodEnd);
+        $clientOpeningDebtTotals = $this->clientDebtTotalsUsd(
+            array_keys($matrixData),
+            $periodStart->copy()->subDay()->endOfDay()
+        );
+        $clientClosingDebtTotals = $this->clientDebtTotalsUsd(array_keys($matrixData), $periodEnd);
         foreach (array_keys($matrixData) as $clientKey) {
             $clientPaidTotals[$clientKey] = (float) ($clientPayments[(string) $clientKey] ?? 0);
-            $clientDebtTotals[$clientKey] = (float) ($clientDebtTotals[(string) $clientKey] ?? 0);
+            $clientOpeningDebtTotals[$clientKey] = (float) ($clientOpeningDebtTotals[(string) $clientKey] ?? 0);
+            $clientClosingDebtTotals[$clientKey] = (float) ($clientClosingDebtTotals[(string) $clientKey] ?? 0);
         }
 
         ksort($productsList);
@@ -136,9 +141,10 @@ class CheckoutMonthExport implements FromView, WithStyles
 
         $firstDataRow = 3;
         $lastDataRow = $firstDataRow + $this->clientCount - 1;
-        $debtColumn = Coordinate::stringFromColumnIndex(3);
+        $openingDebtColumn = Coordinate::stringFromColumnIndex(3);
         $salesColumn = Coordinate::stringFromColumnIndex($this->productCount + 4);
         $paidColumn = Coordinate::stringFromColumnIndex($this->productCount + 5);
+        $closingDebtColumn = Coordinate::stringFromColumnIndex($this->productCount + 6);
         $productTotalFormulas = [];
         foreach (array_keys($productsList) as $index => $productName) {
             $productColumn = Coordinate::stringFromColumnIndex($index + 4);
@@ -152,8 +158,11 @@ class CheckoutMonthExport implements FromView, WithStyles
         $grandPaidFormula = $this->clientCount > 0
             ? '=SUM(' . $paidColumn . $firstDataRow . ':' . $paidColumn . $lastDataRow . ')'
             : 0;
-        $grandDebtFormula = $this->clientCount > 0
-            ? '=SUM(' . $debtColumn . $firstDataRow . ':' . $debtColumn . $lastDataRow . ')'
+        $grandOpeningDebtFormula = $this->clientCount > 0
+            ? '=SUM(' . $openingDebtColumn . $firstDataRow . ':' . $openingDebtColumn . $lastDataRow . ')'
+            : 0;
+        $grandClosingDebtFormula = $this->clientCount > 0
+            ? '=SUM(' . $closingDebtColumn . $firstDataRow . ':' . $closingDebtColumn . $lastDataRow . ')'
             : 0;
 
         return view('backend.checkouts.excel_matrix', [
@@ -164,8 +173,10 @@ class CheckoutMonthExport implements FromView, WithStyles
             'productTotalFormulas' => $productTotalFormulas,
             'clientTotalUsd'  => $clientTotalUsd,
             'clientPaidTotals'=> $clientPaidTotals,
-            'clientDebtTotals'=> $clientDebtTotals,
-            'grandDebtFormula' => $grandDebtFormula,
+            'clientOpeningDebtTotals'=> $clientOpeningDebtTotals,
+            'clientClosingDebtTotals'=> $clientClosingDebtTotals,
+            'grandOpeningDebtFormula' => $grandOpeningDebtFormula,
+            'grandClosingDebtFormula' => $grandClosingDebtFormula,
             'grandSalesFormula' => $grandSalesFormula,
             'grandPaidFormula' => $grandPaidFormula,
             'monthYear'       => $this->monthYear
@@ -272,13 +283,16 @@ class CheckoutMonthExport implements FromView, WithStyles
               ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
         $summaryRow = $this->clientCount + 3;
-        $debtColumn = Coordinate::stringFromColumnIndex(3);
+        $openingDebtColumn = Coordinate::stringFromColumnIndex(3);
         $salesColumn = Coordinate::stringFromColumnIndex($this->productCount + 4);
         $paidColumn = Coordinate::stringFromColumnIndex($this->productCount + 5);
+        $closingDebtColumn = Coordinate::stringFromColumnIndex($this->productCount + 6);
 
-        $sheet->getStyle($debtColumn . '3:' . $debtColumn . $summaryRow)
+        $sheet->getStyle($openingDebtColumn . '3:' . $openingDebtColumn . $summaryRow)
             ->getNumberFormat()->setFormatCode('$#,##0.00');
         $sheet->getStyle($salesColumn . '3:' . $paidColumn . $summaryRow)
+            ->getNumberFormat()->setFormatCode('$#,##0.00');
+        $sheet->getStyle($closingDebtColumn . '3:' . $closingDebtColumn . $summaryRow)
             ->getNumberFormat()->setFormatCode('$#,##0.00');
 
         if ($this->productCount > 0) {
