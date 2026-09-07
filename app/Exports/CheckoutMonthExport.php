@@ -14,7 +14,6 @@ use Maatwebsite\Excel\Concerns\FromView;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
-use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class CheckoutMonthExport implements FromView, WithStyles
@@ -164,9 +163,9 @@ class CheckoutMonthExport implements FromView, WithStyles
         $sheet->setShowGridlines(false);
         $sheet->freezePane('A3');
         $sheet->setAutoFilter('A2:I' . max(2, $this->rowCount + 2));
-        $sheet->getDefaultRowDimension()->setRowHeight(24);
-        $sheet->getRowDimension(1)->setRowHeight(30);
-        $sheet->getRowDimension(2)->setRowHeight(42);
+        $sheet->getDefaultRowDimension()->setRowHeight(44);
+        $sheet->getRowDimension(1)->setRowHeight(28);
+        $sheet->getRowDimension(2)->setRowHeight(48);
 
         foreach (['A' => 13, 'B' => 28, 'C' => 20, 'D' => 52, 'E' => 15, 'F' => 16, 'G' => 18, 'H' => 17, 'I' => 18] as $column => $width) {
             $sheet->getColumnDimension($column)->setWidth($width);
@@ -174,14 +173,12 @@ class CheckoutMonthExport implements FromView, WithStyles
 
         $sheet->getStyle('A1:I' . $lastRow)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER)->setWrapText(true);
         $sheet->getStyle('A2:I2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-        $sheet->getStyle('A2:I2')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('1F4E78');
-        $sheet->getStyle('A2:I2')->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
-        $sheet->getStyle('A2:I' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('B7C9DD');
+        $sheet->getStyle('A2:I2')->getFont()->setBold(true)->getColor()->setRGB('000000');
+        $sheet->getStyle('A2:I' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('C9C9C9');
         $sheet->getStyle('A3:A' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         $sheet->getStyle('E3:E' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.###');
         $sheet->getStyle('C3:C' . $lastRow)->getNumberFormat()->setFormatCode('$#,##0.00');
         $sheet->getStyle('F3:I' . $lastRow)->getNumberFormat()->setFormatCode('$#,##0.00');
-        $sheet->getStyle('A' . $lastRow . ':I' . $lastRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('D9EAF7');
         $sheet->getStyle('A' . $lastRow . ':I' . $lastRow)->getFont()->setBold(true);
     }
 }
