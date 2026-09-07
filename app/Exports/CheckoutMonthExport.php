@@ -7,6 +7,7 @@ use App\Models\CashReceipt;
 use App\Models\Currency;
 use App\Models\Client;
 use App\Models\Checkin;
+use App\Services\AccountingCashReportService;
 use Illuminate\Contracts\View\View;
 use Maatwebsite\Excel\Concerns\FromView;
 use Maatwebsite\Excel\Concerns\WithStyles;
@@ -51,17 +52,28 @@ class CheckoutMonthExport implements FromView, WithStyles
         $payments = CashReceipt::query()
             ->where('status', 1)
             ->whereBetween('date', [$periodStart->toDateString(), $periodEnd->toDateString()])
-            ->get(['client_id', 'price', 'currency_type', 'currency_type_price', 'date', 'created_at']);
+            ->with('checkout:id,currency_type,currency_type_price')
+            ->get(['id', 'checkout_id', 'client_id', 'price', 'currency_type', 'currency_type_price', 'comment', 'date', 'created_at']);
 
+        $accounting = app(AccountingCashReportService::class);
         $clientPayments = [];
         foreach ($payments as $payment) {
             $clientKey = (string) $payment->client_id;
-            $clientPayments[$clientKey] = ($clientPayments[$clientKey] ?? 0) + Currency::documentAmountToUsd(
-                (float) $payment->price,
-                (int) $payment->currency_type,
-                (float) $payment->currency_type_price,
-                $payment->date ?: $payment->created_at
-            );
+            $paymentUsd = $payment->checkout
+                ? $accounting->paymentAmountToUsd(
+                    (float) $payment->price,
+                    (int) $payment->currency_type,
+                    (float) $payment->currency_type_price,
+                    $payment->checkout->currency_type !== null ? (int) $payment->checkout->currency_type : null,
+                    $payment->checkout->currency_type_price !== null ? (float) $payment->checkout->currency_type_price : null
+                )
+                : $accounting->legacyUnlinkedPaymentToUsd(
+                    (float) $payment->price,
+                    (int) $payment->currency_type,
+                    (float) ($payment->currency_type_price ?: Currency::usdRateForDate($payment->date ?: $payment->created_at)),
+                    (string) $payment->comment
+                );
+            $clientPayments[$clientKey] = ($clientPayments[$clientKey] ?? 0) + $paymentUsd;
         }
 
         $clientNames = [];
@@ -201,15 +213,26 @@ class CheckoutMonthExport implements FromView, WithStyles
         $receipts = CashReceipt::whereIn('client_id', $clientIds)
             ->where('status', 1)
             ->whereDate('date', '<=', $periodEnd->toDateString())
+            ->with('checkout:id,currency_type,currency_type_price')
             ->get();
 
+        $accounting = app(AccountingCashReportService::class);
         foreach ($receipts as $receipt) {
-            $totals[(string) $receipt->client_id] -= Currency::documentAmountToUsd(
-                (float) $receipt->price,
-                (int) $receipt->currency_type,
-                (float) $receipt->currency_type_price,
-                $receipt->date ?: $receipt->created_at
-            );
+            $receiptUsd = $receipt->checkout
+                ? $accounting->paymentAmountToUsd(
+                    (float) $receipt->price,
+                    (int) $receipt->currency_type,
+                    (float) $receipt->currency_type_price,
+                    $receipt->checkout->currency_type !== null ? (int) $receipt->checkout->currency_type : null,
+                    $receipt->checkout->currency_type_price !== null ? (float) $receipt->checkout->currency_type_price : null
+                )
+                : $accounting->legacyUnlinkedPaymentToUsd(
+                    (float) $receipt->price,
+                    (int) $receipt->currency_type,
+                    (float) ($receipt->currency_type_price ?: Currency::usdRateForDate($receipt->date ?: $receipt->created_at)),
+                    (string) $receipt->comment
+                );
+            $totals[(string) $receipt->client_id] -= $receiptUsd;
         }
 
         $returns = Checkin::with('details')
