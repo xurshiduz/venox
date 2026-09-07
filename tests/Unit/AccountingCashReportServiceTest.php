@@ -116,6 +116,65 @@ class AccountingCashReportServiceTest extends TestCase
         $this->assertEqualsWithDelta(15000, $result, 0.000001);
     }
 
+    public function test_fifo_parts_of_one_cash_receipt_are_combined_into_one_report_row(): void
+    {
+        $parts = collect([
+            $this->reportRow(220, 'A-1', 'Spes', 1000, 0, 80, 50, 870, [
+                ['id' => 10, 'name' => 'Tovar A', 'qty' => 40, 'unit' => 'dona'],
+            ]),
+            $this->reportRow(220, 'A-2', 'Spes', 1500, 0, 120, 75, 1305, [
+                ['id' => 10, 'name' => 'Tovar A', 'qty' => 60, 'unit' => 'dona'],
+                ['id' => 20, 'name' => 'Tovar B', 'qty' => 10, 'unit' => 'dona'],
+            ]),
+        ]);
+
+        $row = (new AccountingCashReportService())->combineReceiptRows($parts);
+
+        $this->assertSame(220, $row['receipt_id']);
+        $this->assertSame('A-1, A-2', $row['checkout_code']);
+        $this->assertSame('Spes', $row['scheme']);
+        $this->assertEqualsWithDelta(2500, $row['payment_usd'], 0.000001);
+        $this->assertEqualsWithDelta(200, $row['agent_amount'], 0.000001);
+        $this->assertEqualsWithDelta(125, $row['venox'], 0.000001);
+        $this->assertEqualsWithDelta(2175, $row['factory'], 0.000001);
+        $this->assertEqualsWithDelta(100, $row['products'][0]['qty'], 0.000001);
+        $this->assertSame([10, 20], $row['product_ids']);
+    }
+
+    private function reportRow(
+        int $receiptId,
+        string $checkoutCode,
+        string $scheme,
+        float $payment,
+        float $kpi,
+        float $agent,
+        float $venox,
+        float $factory,
+        array $products
+    ): array {
+        return [
+            'receipt_id' => $receiptId,
+            'checkout_code' => $checkoutCode,
+            'date' => '2026-07-08',
+            'agent' => 'Akbar',
+            'client' => 'Temur',
+            'scheme' => $scheme,
+            'scheme_group' => 'special',
+            'products' => $products,
+            'product_ids' => collect($products)->pluck('id')->all(),
+            'purchase_cost_usd' => 100,
+            'unallocated_usd' => 0,
+            'payment_usd' => $payment,
+            'kpi_percent' => 0,
+            'agent_percent' => 8,
+            'venox_percent' => 5,
+            'kpi' => $kpi,
+            'agent_amount' => $agent,
+            'venox' => $venox,
+            'factory' => $factory,
+        ];
+    }
+
     private function detail(int $id, int $productId, string $name, float $qty, float $lineTotal, float $unitCost): object
     {
         return (object) [

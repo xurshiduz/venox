@@ -75,6 +75,8 @@ class AccountingCashReportService
                 ->get($receipt->client_id, collect())
                 ->filter(fn (Checkout $checkout) => (string) $checkout->date <= (string) $receipt->date);
 
+            $receiptRows = collect();
+
             foreach ($checkouts as $checkout) {
                 if ($remainingUsd <= 0.000001) {
                     break;
@@ -86,13 +88,19 @@ class AccountingCashReportService
                     continue;
                 }
                 $allocatedUsd = min($remainingUsd, $unpaidUsd);
-                $rows->push($this->makeRow($receipt, $checkout, $allocatedUsd, $previousUsd));
+                $receiptRows->push($this->makeRow($receipt, $checkout, $allocatedUsd, $previousUsd));
                 $paidBefore[$checkoutId] = $previousUsd + $allocatedUsd;
                 $remainingUsd -= $allocatedUsd;
             }
 
             if ($remainingUsd > 0.000001) {
-                $rows->push($this->makeUnallocatedRow($receipt, $remainingUsd));
+                $receiptRows->push($this->makeUnallocatedRow($receipt, $remainingUsd));
+            }
+
+            if ($receiptRows->isNotEmpty()) {
+                // Ichki FIFO taqsimoti hisob-kitob uchun saqlanadi, lekin hisobotda
+                // har bir kassa kirimi aynan bitta qator bo'lib ko'rinishi kerak.
+                $rows->push($this->combineReceiptRows($receiptRows));
             }
         }
 
@@ -187,6 +195,58 @@ class AccountingCashReportService
             'venox' => 0.0,
             'factory' => $paymentUsd,
         ];
+    }
+
+    /**
+     * Bitta cash receipt bir nechta eski savdoni qoplasa ham uni hisobotda
+     * bo'lib yubormaydi. Mahsulot va xarajatlar jamlanadi, komissiya summalari
+     * esa har bir ichki FIFO bo'lagi bo'yicha hisoblangan holicha qo'shiladi.
+     */
+    public function combineReceiptRows(Collection $parts): array
+    {
+        $first = $parts->first();
+        $paymentUsd = (float) $parts->sum('payment_usd');
+        $products = collect($parts->pluck('products')->flatten(1))
+            ->groupBy(fn (array $product) => implode(':', [
+                (int) ($product['id'] ?? 0),
+                (string) ($product['name'] ?? ''),
+                (string) ($product['unit'] ?? ''),
+            ]))
+            ->map(function (Collection $group): array {
+                $product = $group->first();
+                $product['qty'] = (float) $group->sum('qty');
+
+                return $product;
+            })
+            ->values()
+            ->all();
+
+        $schemes = $parts->pluck('scheme')->filter()->unique()->values();
+        $schemeGroups = $parts->pluck('scheme_group')->filter()->unique()->values();
+        $agents = $parts->pluck('agent')->filter(fn ($agent) => $agent && $agent !== '—')->unique()->values();
+        $checkoutCodes = $parts->pluck('checkout_code')->filter()->unique()->values();
+        $kpi = (float) $parts->sum('kpi');
+        $agentAmount = (float) $parts->sum('agent_amount');
+        $venox = (float) $parts->sum('venox');
+
+        return array_merge($first, [
+            'checkout_code' => $checkoutCodes->implode(', ') ?: null,
+            'agent' => $agents->implode(', ') ?: ($first['agent'] ?? '—'),
+            'scheme' => $schemes->count() > 1 ? 'Aralash' : (string) ($schemes->first() ?? ''),
+            'scheme_group' => $schemeGroups->count() > 1 ? 'mixed' : (string) ($schemeGroups->first() ?? ''),
+            'products' => $products,
+            'product_ids' => collect($products)->pluck('id')->map(fn ($id) => (int) $id)->unique()->values()->all(),
+            'purchase_cost_usd' => (float) $parts->sum('purchase_cost_usd'),
+            'unallocated_usd' => (float) $parts->sum('unallocated_usd'),
+            'payment_usd' => $paymentUsd,
+            'kpi_percent' => $paymentUsd > 0 ? $kpi * 100 / $paymentUsd : 0.0,
+            'agent_percent' => $paymentUsd > 0 ? $agentAmount * 100 / $paymentUsd : 0.0,
+            'venox_percent' => $paymentUsd > 0 ? $venox * 100 / $paymentUsd : 0.0,
+            'kpi' => $kpi,
+            'agent_amount' => $agentAmount,
+            'venox' => $venox,
+            'factory' => (float) $parts->sum('factory'),
+        ]);
     }
 
     public function splitPayment(float $paymentUsd, float $kpiPercent, float $agentPercent, float $venoxPercent): array
