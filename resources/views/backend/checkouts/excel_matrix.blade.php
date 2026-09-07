@@ -1,7 +1,7 @@
 <table>
     <thead>
         <tr>
-            <th colspan="{{ count($productsList) + 3 }}" style="font-weight: bold; font-size: 14px; height: 35px;">
+            <th colspan="{{ count($productsList) + 4 }}" style="font-weight: bold; font-size: 14px; height: 35px;">
                 {{ $monthYear }} oyi uchun hisobot
             </th>
         </tr>
@@ -17,14 +17,15 @@
             
             {{-- Umumiy narx ustuni enini biroz kattalashtirdik, ikkala valyuta sig'ishi uchun --}}
             <th style="font-weight: bold; border: 1px solid #000000; background-color: #cccccc;">Umumiy narx</th>
+            <th style="font-weight: bold; border: 1px solid #000000; background-color: #b4c6e7;">Shu oyda to'lagan summa (USD)</th>
         </tr>
     </thead>
     <tbody>
         @php $i = 1; @endphp
-        @foreach($matrixData as $clientName => $products)
+        @foreach($matrixData as $clientKey => $products)
             <tr>
                 <td style="border: 1px solid #000000; text-align: center;">{{ $i++ }}</td>
-                <td style="border: 1px solid #000000;">{{ $clientName }}</td>
+                <td style="border: 1px solid #000000;">{{ $clientNames[$clientKey] ?? 'Noma\'lum mijoz' }}</td>
                 
                 @foreach($productsList as $product)
                     <td style="border: 1px solid #000000; text-align: center;">
@@ -34,10 +35,13 @@
                 
                 {{-- Ushbu mijoz bo'yicha JAMI SO'M va DOLLAR --}}
                 <td style="border: 1px solid #000000; font-weight: bold; text-align: right; background-color: #f2f2f2;">
-                    {{ number_format($clientTotalUzs[$clientName] ?? 0, 0, '.', ' ') }} Сум
-                    @if(!empty($clientTotalUsd[$clientName]))
-                        <br>({{ number_format($clientTotalUsd[$clientName], 0, '.', ' ') }} $)
+                    {{ number_format($clientTotalUzs[$clientKey] ?? 0, 0, '.', ' ') }} Сум
+                    @if(!empty($clientTotalUsd[$clientKey]))
+                        <br>({{ number_format($clientTotalUsd[$clientKey], 0, '.', ' ') }} $)
                     @endif
+                </td>
+                <td style="border: 1px solid #000000; font-weight: bold; text-align: right; background-color: #eaf0f8;">
+                    {{ number_format($clientPaidTotals[$clientKey] ?? 0, 2, '.', ' ') }} $
                 </td>
             </tr>
         @endforeach
@@ -64,6 +68,9 @@
                 @if($grandTotalUsd > 0)
                     <br>({{ number_format($grandTotalUsd, 0, '.', ' ') }} $)
                 @endif
+            </td>
+            <td style="border: 1px solid #000000; font-weight: bold; background-color: #b4c6e7; text-align: right; font-size: 14px;">
+                {{ number_format($grandTotalPaid, 2, '.', ' ') }} $
             </td>
         </tr>
     </tbody>
