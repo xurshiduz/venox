@@ -65,6 +65,28 @@ class Currency extends Model
     }
 
     /**
+     * Berilgan summani USDga o'tkazadi.
+     * currency_type: 1 = USD, 2 = UZS.
+     * UZS hujjatlarida hujjatda saqlangan kurs bo'lmasa, o'sha sanadagi kurs olinadi.
+     */
+    public static function documentAmountToUsd(
+        float $amount,
+        ?int $currencyType,
+        ?float $documentRate = null,
+        $documentDate = null
+    ): float {
+        if ($currencyType === 1) {
+            return $amount;
+        }
+
+        $rate = ($documentRate && $documentRate > 1)
+            ? $documentRate
+            : static::usdRateForDate($documentDate);
+
+        return $rate > 1 ? $amount / $rate : 0;
+    }
+
+    /**
      * Hujjat qatori va sarlavhasida valyuta bir-biriga zid bo'lsa, sarlavha ustun.
      * Sotuvda tanlangan valyuta/kurs checkout sarlavhasida tarixiy holatda saqlanadi.
      */

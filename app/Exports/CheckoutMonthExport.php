@@ -4,16 +4,20 @@ namespace App\Exports;
 
 use App\Models\Checkout;
 use App\Models\CashReceipt;
+use App\Models\Currency;
 use Illuminate\Contracts\View\View;
 use Maatwebsite\Excel\Concerns\FromView;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use Carbon\Carbon;
 
 class CheckoutMonthExport implements FromView, WithStyles
 {
     protected $monthYear;
+    protected $productCount = 0;
+    protected $clientCount = 0;
 
     public function __construct($monthYear)
     {
@@ -37,28 +41,28 @@ class CheckoutMonthExport implements FromView, WithStyles
         $productsList = []; 
         $matrixData = [];   
         
-        // Summalar uchun So'm va Dollar o'zgaruvchilari
-        $productTotalUzs = []; 
-        $productTotalUsd = []; 
-        
-        $clientTotalUzs = [];  
-        $clientTotalUsd = [];  
-        
-        $grandTotalUzs = 0;          
-        $grandTotalUsd = 0;          
+        $productTotalUsd = [];
+        $clientTotalUsd = [];
 
         // Kassa kirimlari shu oyning sanasi va mijoz ID-si bo'yicha hisoblanadi.
         // status=0 bo'lgan (bekor qilingan) to'lovlar hisobotga kiritilmaydi.
-        $clientPayments = CashReceipt::query()
+        $payments = CashReceipt::query()
             ->where('status', 1)
             ->whereBetween('date', [$periodStart->toDateString(), $periodEnd->toDateString()])
-            ->selectRaw('client_id, SUM(price) as total_paid')
-            ->groupBy('client_id')
-            ->pluck('total_paid', 'client_id');
+            ->get(['client_id', 'price', 'currency_type', 'currency_type_price', 'date', 'created_at']);
+
+        $clientPayments = [];
+        foreach ($payments as $payment) {
+            $clientKey = (string) $payment->client_id;
+            $clientPayments[$clientKey] = ($clientPayments[$clientKey] ?? 0) + Currency::documentAmountToUsd(
+                (float) $payment->price,
+                (int) $payment->currency_type,
+                (float) $payment->currency_type_price,
+                $payment->date ?: $payment->created_at
+            );
+        }
 
         $clientNames = [];
-        $grandTotalPaid = 0;
-
         foreach ($checkouts as $checkout) {
             $clientName = $checkout->supid->name ?? 'Noma\'lum mijoz';
             $clientKey = (string) ($checkout->client_id ?? 'unknown-' . $clientName);
@@ -70,7 +74,6 @@ class CheckoutMonthExport implements FromView, WithStyles
 
             if (!isset($matrixData[$clientKey])) {
                 $matrixData[$clientKey] = [];
-                $clientTotalUzs[$clientKey] = 0;
                 $clientTotalUsd[$clientKey] = 0;
             }
 
@@ -88,56 +91,53 @@ class CheckoutMonthExport implements FromView, WithStyles
                 // 2. Narxni hisoblash (Asosiy narxni aniqlaymiz)
                 $basePriceTotal = $detail->price_total ?? ($detail->price * $detail->qty);
 
-                $uzs = 0;
-                $usd = 0;
-
-                if ($cType == 1) {
-                    // Agar valyuta $ (Dollar) bo'lsa
-                    $usd = $basePriceTotal;
-                    $uzs = $basePriceTotal * $cRate; // Kursga ko'paytirib So'mga aylantiramiz
-                } else {
-                    // Agar valyuta So'm bo'lsa (yoki boshqa)
-                    $uzs = $basePriceTotal;
-                }
+                $usd = Currency::documentAmountToUsd(
+                    (float) $basePriceTotal,
+                    (int) $cType,
+                    (float) $cRate,
+                    $checkout->date ?: $checkout->created_at
+                );
 
                 // Qator bo'yicha summa (Mijozning jami So'm va Dollari)
-                $clientTotalUzs[$clientKey] += $uzs;
                 $clientTotalUsd[$clientKey] += $usd;
 
                 // Ustun bo'yicha summa (Tovarning jami So'm va Dollari)
-                if (!isset($productTotalUzs[$productName])) {
-                    $productTotalUzs[$productName] = 0;
+                if (!isset($productTotalUsd[$productName])) {
                     $productTotalUsd[$productName] = 0;
                 }
-                $productTotalUzs[$productName] += $uzs;
                 $productTotalUsd[$productName] += $usd;
-
-                // Umumiy jami summa
-                $grandTotalUzs += $uzs;
-                $grandTotalUsd += $usd;
             }
         }
 
         $clientPaidTotals = [];
         foreach (array_keys($matrixData) as $clientKey) {
-            $clientPaidTotals[$clientKey] = (float) ($clientPayments[$clientKey] ?? 0);
-            $grandTotalPaid += $clientPaidTotals[$clientKey];
+            $clientPaidTotals[$clientKey] = (float) ($clientPayments[(string) $clientKey] ?? 0);
         }
 
         ksort($productsList);
+        $this->productCount = count($productsList);
+        $this->clientCount = count($matrixData);
+
+        $firstDataRow = 3;
+        $lastDataRow = $firstDataRow + $this->clientCount - 1;
+        $salesColumn = Coordinate::stringFromColumnIndex($this->productCount + 3);
+        $paidColumn = Coordinate::stringFromColumnIndex($this->productCount + 4);
+        $grandSalesFormula = $this->clientCount > 0
+            ? '=SUM(' . $salesColumn . $firstDataRow . ':' . $salesColumn . $lastDataRow . ')'
+            : 0;
+        $grandPaidFormula = $this->clientCount > 0
+            ? '=SUM(' . $paidColumn . $firstDataRow . ':' . $paidColumn . $lastDataRow . ')'
+            : 0;
 
         return view('backend.checkouts.excel_matrix', [
             'productsList'    => $productsList,
             'matrixData'      => $matrixData,
             'clientNames'     => $clientNames,
-            'productTotalUzs' => $productTotalUzs,
             'productTotalUsd' => $productTotalUsd,
-            'clientTotalUzs'  => $clientTotalUzs,
             'clientTotalUsd'  => $clientTotalUsd,
-            'grandTotalUzs'   => $grandTotalUzs,
-            'grandTotalUsd'   => $grandTotalUsd,
             'clientPaidTotals'=> $clientPaidTotals,
-            'grandTotalPaid'  => $grandTotalPaid,
+            'grandSalesFormula' => $grandSalesFormula,
+            'grandPaidFormula' => $grandPaidFormula,
             'monthYear'       => $this->monthYear
         ]);
     }
@@ -158,5 +158,19 @@ class CheckoutMonthExport implements FromView, WithStyles
         // 3. Faqat sarlavha (1 va 2-qator)larni gorizontal markazga joylash
         $sheet->getStyle('A1:' . $highestColumn . '2')
               ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $summaryRow = $this->clientCount + 3;
+        $salesColumn = Coordinate::stringFromColumnIndex($this->productCount + 3);
+        $paidColumn = Coordinate::stringFromColumnIndex($this->productCount + 4);
+
+        $sheet->getStyle($salesColumn . '3:' . $paidColumn . $summaryRow)
+            ->getNumberFormat()->setFormatCode('$#,##0.00');
+
+        if ($this->productCount > 0) {
+            $firstProductColumn = Coordinate::stringFromColumnIndex(3);
+            $lastProductColumn = Coordinate::stringFromColumnIndex($this->productCount + 2);
+            $sheet->getStyle($firstProductColumn . $summaryRow . ':' . $lastProductColumn . $summaryRow)
+                ->getNumberFormat()->setFormatCode('$#,##0.00');
+        }
     }
 }

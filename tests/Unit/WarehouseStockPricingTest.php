@@ -78,4 +78,14 @@ class WarehouseStockPricingTest extends TestCase
         $this->assertEqualsWithDelta(66.666666, $oneItemMarkup, 0.0001);
         $this->assertEqualsWithDelta($oneItemMarkup, $manyItemsMarkup, 0.0001);
     }
+
+    public function test_monthly_report_keeps_usd_document_amount_unchanged(): void
+    {
+        $this->assertSame(2500.0, Currency::documentAmountToUsd(2500, 1, 11800));
+    }
+
+    public function test_monthly_report_converts_uzs_document_amount_with_its_saved_rate(): void
+    {
+        $this->assertSame(100.0, Currency::documentAmountToUsd(1180000, 2, 11800));
+    }
 }
