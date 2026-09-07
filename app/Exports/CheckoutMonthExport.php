@@ -5,6 +5,8 @@ namespace App\Exports;
 use App\Models\Checkout;
 use App\Models\CashReceipt;
 use App\Models\Currency;
+use App\Models\Client;
+use App\Models\Checkin;
 use Illuminate\Contracts\View\View;
 use Maatwebsite\Excel\Concerns\FromView;
 use Maatwebsite\Excel\Concerns\WithStyles;
@@ -110,8 +112,10 @@ class CheckoutMonthExport implements FromView, WithStyles
         }
 
         $clientPaidTotals = [];
+        $clientDebtTotals = $this->clientDebtTotalsUsd(array_keys($matrixData), $periodEnd);
         foreach (array_keys($matrixData) as $clientKey) {
             $clientPaidTotals[$clientKey] = (float) ($clientPayments[(string) $clientKey] ?? 0);
+            $clientDebtTotals[$clientKey] = (float) ($clientDebtTotals[(string) $clientKey] ?? 0);
         }
 
         ksort($productsList);
@@ -120,11 +124,12 @@ class CheckoutMonthExport implements FromView, WithStyles
 
         $firstDataRow = 3;
         $lastDataRow = $firstDataRow + $this->clientCount - 1;
-        $salesColumn = Coordinate::stringFromColumnIndex($this->productCount + 3);
-        $paidColumn = Coordinate::stringFromColumnIndex($this->productCount + 4);
+        $debtColumn = Coordinate::stringFromColumnIndex(3);
+        $salesColumn = Coordinate::stringFromColumnIndex($this->productCount + 4);
+        $paidColumn = Coordinate::stringFromColumnIndex($this->productCount + 5);
         $productTotalFormulas = [];
         foreach (array_keys($productsList) as $index => $productName) {
-            $productColumn = Coordinate::stringFromColumnIndex($index + 3);
+            $productColumn = Coordinate::stringFromColumnIndex($index + 4);
             $productTotalFormulas[$productName] = $this->clientCount > 0
                 ? '=SUM(' . $productColumn . $firstDataRow . ':' . $productColumn . $lastDataRow . ')'
                 : 0;
@@ -135,6 +140,9 @@ class CheckoutMonthExport implements FromView, WithStyles
         $grandPaidFormula = $this->clientCount > 0
             ? '=SUM(' . $paidColumn . $firstDataRow . ':' . $paidColumn . $lastDataRow . ')'
             : 0;
+        $grandDebtFormula = $this->clientCount > 0
+            ? '=SUM(' . $debtColumn . $firstDataRow . ':' . $debtColumn . $lastDataRow . ')'
+            : 0;
 
         return view('backend.checkouts.excel_matrix', [
             'productsList'    => $productsList,
@@ -144,10 +152,83 @@ class CheckoutMonthExport implements FromView, WithStyles
             'productTotalFormulas' => $productTotalFormulas,
             'clientTotalUsd'  => $clientTotalUsd,
             'clientPaidTotals'=> $clientPaidTotals,
+            'clientDebtTotals'=> $clientDebtTotals,
+            'grandDebtFormula' => $grandDebtFormula,
             'grandSalesFormula' => $grandSalesFormula,
             'grandPaidFormula' => $grandPaidFormula,
             'monthYear'       => $this->monthYear
         ]);
+    }
+
+    /**
+     * Tanlangan oy oxiridagi mijoz qarzini barcha hujjatlarni USDga keltirib hisoblaydi.
+     */
+    private function clientDebtTotalsUsd(array $clientKeys, Carbon $periodEnd): array
+    {
+        $clientIds = collect($clientKeys)->filter(fn ($id) => ctype_digit((string) $id))->map(fn ($id) => (int) $id)->values();
+
+        if ($clientIds->isEmpty()) {
+            return [];
+        }
+
+        $clients = Client::whereIn('id', $clientIds)->get()->keyBy('id');
+        $totals = [];
+
+        foreach ($clients as $client) {
+            $totals[(string) $client->id] = Currency::documentAmountToUsd(
+                (float) ($client->balance ?? 0),
+                (int) ($client->currency_type ?? 2),
+                (float) ($client->currency_type_price ?? 0),
+                $client->created_at
+            );
+        }
+
+        $sales = Checkout::with('alldetails')
+            ->whereIn('client_id', $clientIds)
+            ->whereDate('date', '<=', $periodEnd->toDateString())
+            ->get();
+
+        foreach ($sales as $checkout) {
+            $amount = (float) $checkout->alldetails->sum('total_price');
+            $totals[(string) $checkout->client_id] += Currency::documentAmountToUsd(
+                $amount,
+                (int) $checkout->currency_type,
+                (float) $checkout->currency_type_price,
+                $checkout->date ?: $checkout->created_at
+            );
+        }
+
+        $receipts = CashReceipt::whereIn('client_id', $clientIds)
+            ->where('status', 1)
+            ->whereDate('date', '<=', $periodEnd->toDateString())
+            ->get();
+
+        foreach ($receipts as $receipt) {
+            $totals[(string) $receipt->client_id] -= Currency::documentAmountToUsd(
+                (float) $receipt->price,
+                (int) $receipt->currency_type,
+                (float) $receipt->currency_type_price,
+                $receipt->date ?: $receipt->created_at
+            );
+        }
+
+        $returns = Checkin::with('details')
+            ->whereIn('client_id', $clientIds)
+            ->where('type_id', 4)
+            ->whereDate('date', '<=', $periodEnd->toDateString())
+            ->get();
+
+        foreach ($returns as $return) {
+            $amount = (float) $return->details->sum('total_price');
+            $totals[(string) $return->client_id] -= Currency::documentAmountToUsd(
+                $amount,
+                (int) $return->currency_type,
+                (float) $return->currency_type_price,
+                $return->date ?: $return->created_at
+            );
+        }
+
+        return $totals;
     }
 
     public function styles(Worksheet $sheet)
@@ -168,15 +249,18 @@ class CheckoutMonthExport implements FromView, WithStyles
               ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
         $summaryRow = $this->clientCount + 3;
-        $salesColumn = Coordinate::stringFromColumnIndex($this->productCount + 3);
-        $paidColumn = Coordinate::stringFromColumnIndex($this->productCount + 4);
+        $debtColumn = Coordinate::stringFromColumnIndex(3);
+        $salesColumn = Coordinate::stringFromColumnIndex($this->productCount + 4);
+        $paidColumn = Coordinate::stringFromColumnIndex($this->productCount + 5);
 
+        $sheet->getStyle($debtColumn . '3:' . $debtColumn . $summaryRow)
+            ->getNumberFormat()->setFormatCode('$#,##0.00');
         $sheet->getStyle($salesColumn . '3:' . $paidColumn . $summaryRow)
             ->getNumberFormat()->setFormatCode('$#,##0.00');
 
         if ($this->productCount > 0) {
-            $firstProductColumn = Coordinate::stringFromColumnIndex(3);
-            $lastProductColumn = Coordinate::stringFromColumnIndex($this->productCount + 2);
+            $firstProductColumn = Coordinate::stringFromColumnIndex(4);
+            $lastProductColumn = Coordinate::stringFromColumnIndex($this->productCount + 3);
             $sheet->getStyle($firstProductColumn . $summaryRow . ':' . $lastProductColumn . $summaryRow)
                 ->getNumberFormat()->setFormatCode('$#,##0.00');
         }
