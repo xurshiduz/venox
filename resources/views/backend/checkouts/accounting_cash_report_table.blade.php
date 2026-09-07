@@ -17,6 +17,8 @@
                     $rowProducts = collect($row['products']);
                     $previewProducts = $rowProducts->take(2);
                     $productModalId = 'cash-products-' . ($row['receipt_id'] ?? $loop->index) . '-' . $loop->index;
+                    $checkoutCodes = collect(explode(',', (string) ($row['checkout_code'] ?? '')))->map(fn ($code) => trim($code))->filter()->values();
+                    $checkoutModalId = 'cash-checkouts-' . ($row['receipt_id'] ?? $loop->index) . '-' . $loop->index;
                 @endphp
                 <tr>
                     <td>{{ $startNumber + $loop->index }}</td>
@@ -49,11 +51,10 @@
                     <td>{{ number_format($row['venox'], 2, '.', ' ') }} <small>({{ $row['venox_percent'] }}%)</small></td>
                     <td>{{ number_format($row['factory'], 2, '.', ' ') }}</td>
                     <td>
-                        @if($row['checkout_code'])
-                            <a class="btn btn-sm {{ empty($row['scheme']) ? 'btn-warning' : 'btn-outline-primary' }}"
-                               href="{{ route('checkout_form', ['id' => $row['checkout_code'], 'page' => 1]) }}">
-                                {{ empty($row['scheme']) ? 'Foizlarni kiritish' : 'Tahrirlash' }}
-                            </a>
+                        @if($checkoutCodes->count() === 1)
+                            <a class="btn btn-sm btn-warning" href="{{ route('checkout_form', ['id' => $checkoutCodes->first(), 'page' => 1]) }}">Foizlarni kiritish</a>
+                        @elseif($checkoutCodes->count() > 1)
+                            <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#{{ $checkoutModalId }}">Prodajani tanlash</button>
                         @else
                             <span class="text-muted">Savdo topilmadi</span>
                         @endif
@@ -84,6 +85,8 @@
     @php
         $rowProducts = collect($row['products']);
         $productModalId = 'cash-products-' . ($row['receipt_id'] ?? $loop->index) . '-' . $loop->index;
+        $checkoutCodes = collect(explode(',', (string) ($row['checkout_code'] ?? '')))->map(fn ($code) => trim($code))->filter()->values();
+        $checkoutModalId = 'cash-checkouts-' . ($row['receipt_id'] ?? $loop->index) . '-' . $loop->index;
     @endphp
     @if($rowProducts->isNotEmpty())
         <div class="modal fade" tabindex="-1" id="{{ $productModalId }}">
@@ -117,4 +120,25 @@
             </div>
         </div>
     @endif
+
+    @if($checkoutCodes->count() > 1)
+        <div class="modal fade" tabindex="-1" id="{{ $checkoutModalId }}">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div><h5 class="modal-title mb-1">Prodajani tanlang</h5><div class="text-soft">Bu to‘lov bir nechta prodajaga taqsimlangan</div></div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Yopish"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="d-grid" style="gap:8px">
+                            @foreach($checkoutCodes as $checkoutCode)
+                                <a class="btn btn-outline-primary text-start" href="{{ route('checkout_form', ['id' => $checkoutCode, 'page' => 1]) }}">Prodaja: {{ $checkoutCode }}</a>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
 @endforeach
