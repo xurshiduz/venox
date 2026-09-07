@@ -8,7 +8,7 @@
         <tr>
             <th style="font-weight: bold; border: 1px solid #000000; background-color: #cccccc;">T/r</th>
             <th style="font-weight: bold; border: 1px solid #000000; background-color: #cccccc;">Mijoz nomi \ Mahsulotlar</th>
-            <th style="font-weight: bold; border: 1px solid #000000; background-color: #f4b183;">Oy boshidagi qarzi (USD)</th>
+            <th style="font-weight: bold; border: 1px solid #000000; background-color: #f4b183;">To'lovdan oldingi umumiy qarzi (USD)</th>
             
             @foreach($productsList as $product)
                 <th style="font-weight: bold; border: 1px solid #000000; background-color: #cccccc;">
@@ -28,7 +28,7 @@
                 <td style="border: 1px solid #000000; text-align: center;">{{ $i++ }}</td>
                 <td style="border: 1px solid #000000;">{{ $clientNames[$clientKey] ?? 'Noma\'lum mijoz' }}</td>
                 <td style="border: 1px solid #000000; font-weight: bold; text-align: right; background-color: #fce4d6;">
-                    {{ (float) ($clientOpeningDebtTotals[$clientKey] ?? 0) }}
+                    {{ (float) ($clientTotalDebtBeforePayment[$clientKey] ?? 0) }}
                 </td>
                 
                 @foreach($productsList as $product)

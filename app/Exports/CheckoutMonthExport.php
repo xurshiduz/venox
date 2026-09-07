@@ -124,15 +124,13 @@ class CheckoutMonthExport implements FromView, WithStyles
         }
 
         $clientPaidTotals = [];
-        $clientOpeningDebtTotals = $this->clientDebtTotalsUsd(
-            array_keys($matrixData),
-            $periodStart->copy()->subDay()->endOfDay()
-        );
         $clientClosingDebtTotals = $this->clientDebtTotalsUsd(array_keys($matrixData), $periodEnd);
+        $clientTotalDebtBeforePayment = [];
         foreach (array_keys($matrixData) as $clientKey) {
             $clientPaidTotals[$clientKey] = (float) ($clientPayments[(string) $clientKey] ?? 0);
-            $clientOpeningDebtTotals[$clientKey] = (float) ($clientOpeningDebtTotals[(string) $clientKey] ?? 0);
             $clientClosingDebtTotals[$clientKey] = (float) ($clientClosingDebtTotals[(string) $clientKey] ?? 0);
+            $clientTotalDebtBeforePayment[$clientKey] =
+                $clientClosingDebtTotals[$clientKey] + $clientPaidTotals[$clientKey];
         }
 
         ksort($productsList);
@@ -173,7 +171,7 @@ class CheckoutMonthExport implements FromView, WithStyles
             'productTotalFormulas' => $productTotalFormulas,
             'clientTotalUsd'  => $clientTotalUsd,
             'clientPaidTotals'=> $clientPaidTotals,
-            'clientOpeningDebtTotals'=> $clientOpeningDebtTotals,
+            'clientTotalDebtBeforePayment'=> $clientTotalDebtBeforePayment,
             'clientClosingDebtTotals'=> $clientClosingDebtTotals,
             'grandOpeningDebtFormula' => $grandOpeningDebtFormula,
             'grandClosingDebtFormula' => $grandClosingDebtFormula,
