@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\CashReceipt;
 use App\Models\CheckinDetail;
+use App\Models\Checkout;
 use App\Models\Currency;
 use Illuminate\Support\Collection;
 
@@ -15,21 +16,86 @@ class AccountingCashReportService
     {
         $receipts = CashReceipt::query()
             ->where('status', 1)
-            ->whereNotNull('checkout_id')
-            ->whereHas('checkout')
             ->where('date', '<=', $filters['to'])
             ->with(['clientname', 'uname', 'checkout.managerid', 'checkout.supid', 'checkout.details.prodid.unitid', 'checkout.details.checkid'])
             ->orderBy('date')
             ->orderBy('id')
             ->get();
 
+        $unlinkedClientIds = $receipts
+            ->whereNull('checkout_id')
+            ->pluck('client_id')
+            ->filter()
+            ->unique()
+            ->values();
+        $clientCheckouts = $unlinkedClientIds->isEmpty()
+            ? collect()
+            : Checkout::query()
+                ->where('status', 1)
+                ->where('checkout_tip_id', 1)
+                ->where('type_id', 1)
+                ->whereIn('client_id', $unlinkedClientIds)
+                ->whereDate('date', '<=', $filters['to'])
+                ->with(['managerid', 'supid', 'details.prodid.unitid', 'details.checkid'])
+                ->orderBy('date')
+                ->orderBy('id')
+                ->get()
+                ->groupBy('client_id');
+
         $paidBefore = [];
-        return $receipts->map(function (CashReceipt $receipt) use (&$paidBefore) {
-            $checkoutId = (int) $receipt->checkout_id;
-            $row = $this->makeRow($receipt, $paidBefore[$checkoutId] ?? 0);
-            $paidBefore[$checkoutId] = ($paidBefore[$checkoutId] ?? 0) + $row['payment_usd'];
-            return $row;
-        })->filter(function (array $row) use ($filters) {
+        $rows = collect();
+
+        foreach ($receipts as $receipt) {
+            if ($receipt->checkout) {
+                $checkout = $receipt->checkout;
+                $checkoutId = (int) $checkout->id;
+                $paymentUsd = $this->paymentAmountToUsd(
+                    (float) $receipt->price,
+                    (int) $receipt->currency_type,
+                    (float) $receipt->currency_type_price,
+                    $checkout->currency_type !== null ? (int) $checkout->currency_type : null,
+                    $checkout->currency_type_price !== null ? (float) $checkout->currency_type_price : null
+                );
+                $rows->push($this->makeRow($receipt, $checkout, $paymentUsd, $paidBefore[$checkoutId] ?? 0));
+                $paidBefore[$checkoutId] = ($paidBefore[$checkoutId] ?? 0) + $paymentUsd;
+                continue;
+            }
+
+            // Checkoutga biriktirilmagan "qarz uchun" to'lovlar oldin hisobotdan
+            // butunlay tushib qolardi. Ularni mijozning eski savdolariga FIFO
+            // tartibida taqsimlaymiz; ortgan qismi ham alohida qatorda ko'rinadi.
+            $remainingUsd = $this->toUsd(
+                (float) $receipt->price,
+                (int) $receipt->currency_type,
+                (float) $receipt->currency_type_price
+            );
+
+            $checkouts = $clientCheckouts
+                ->get($receipt->client_id, collect())
+                ->filter(fn (Checkout $checkout) => (string) $checkout->date <= (string) $receipt->date);
+
+            foreach ($checkouts as $checkout) {
+                if ($remainingUsd <= 0.000001) {
+                    break;
+                }
+                $checkoutId = (int) $checkout->id;
+                $previousUsd = $paidBefore[$checkoutId] ?? 0;
+                $unpaidUsd = max(0, $this->checkoutTotalUsd($checkout) - $previousUsd);
+                if ($unpaidUsd <= 0.000001) {
+                    continue;
+                }
+                $allocatedUsd = min($remainingUsd, $unpaidUsd);
+                $rows->push($this->makeRow($receipt, $checkout, $allocatedUsd, $previousUsd));
+                $paidBefore[$checkoutId] = $previousUsd + $allocatedUsd;
+                $remainingUsd -= $allocatedUsd;
+            }
+
+            if ($remainingUsd > 0.000001) {
+                $rows->push($this->makeUnallocatedRow($receipt, $remainingUsd));
+            }
+        }
+
+        return $rows->filter(function (array $row) use ($filters) {
             if ($row['date'] < $filters['from'] || $row['date'] > $filters['to']) {
                 return false;
             }
@@ -43,20 +109,8 @@ class AccountingCashReportService
         })->values();
     }
 
-    private function makeRow(CashReceipt $receipt, float $previousUsd): array
+    private function makeRow(CashReceipt $receipt, Checkout $checkout, float $paymentUsd, float $previousUsd): array
     {
-        $checkout = $receipt->checkout;
-        // To'lov summasi cash_receiptsdan olinadi. Eski to'lovlarda currency_type
-        // formadagi standart USD qiymatida qolib ketgan. Checkout esa summaning
-        // haqiqiy valyutasi va tarixiy kursini saqlaydi, shuning uchun bog'langan
-        // savdolarda aynan hujjat valyutasi ustun hisoblanadi.
-        $paymentUsd = $this->paymentAmountToUsd(
-            (float) $receipt->price,
-            (int) $receipt->currency_type,
-            (float) $receipt->currency_type_price,
-            $checkout->currency_type !== null ? (int) $checkout->currency_type : null,
-            $checkout->currency_type_price !== null ? (float) $checkout->currency_type_price : null
-        );
         // `checkouts.details` matn ustuni details() relationi bilan bir xil nomda.
         // Property orqali o'qilsa relation o'rniga NULL/text qaytadi, shu sabab eager-loaded
         // relationni Eloquent relation storage'dan aniq olamiz.
@@ -91,6 +145,46 @@ class AccountingCashReportService
             'agent_amount' => $shares['agent'],
             'venox' => $shares['venox'],
             'factory' => $shares['factory'],
+        ];
+    }
+
+    private function checkoutTotalUsd(Checkout $checkout): float
+    {
+        $details = $checkout->relationLoaded('details')
+            ? $checkout->getRelation('details')
+            : $checkout->details()->get();
+
+        return (float) $details->sum(function ($detail) {
+            return $this->toUsd(
+                (float) $detail->total_price,
+                (int) $detail->currency_type,
+                (float) $detail->currency_type_price
+            );
+        });
+    }
+
+    private function makeUnallocatedRow(CashReceipt $receipt, float $paymentUsd): array
+    {
+        return [
+            'receipt_id' => $receipt->id,
+            'checkout_code' => null,
+            'date' => $receipt->date,
+            'agent' => optional($receipt->uname)->name ?: '—',
+            'client' => optional($receipt->clientname)->name ?: '—',
+            'scheme' => '',
+            'scheme_group' => '',
+            'products' => [],
+            'product_ids' => [],
+            'purchase_cost_usd' => 0.0,
+            'unallocated_usd' => $paymentUsd,
+            'payment_usd' => $paymentUsd,
+            'kpi_percent' => 0.0,
+            'agent_percent' => 0.0,
+            'venox_percent' => 0.0,
+            'kpi' => 0.0,
+            'agent_amount' => 0.0,
+            'venox' => 0.0,
+            'factory' => $paymentUsd,
         ];
     }
 

@@ -70,6 +70,24 @@ class AccountingCashReportServiceTest extends TestCase
         $this->assertEqualsWithDelta(2500, $result, 0.000001);
     }
 
+    public function test_unlinked_usd_receipt_is_not_divided_by_the_exchange_rate(): void
+    {
+        $service = new AccountingCashReportService();
+
+        $result = $service->paymentAmountToUsd(2500, 1, 11800, null, null);
+
+        $this->assertEqualsWithDelta(2500, $result, 0.000001);
+    }
+
+    public function test_unlinked_uzs_receipt_is_converted_to_usd(): void
+    {
+        $service = new AccountingCashReportService();
+
+        $result = $service->paymentAmountToUsd(29500000, 2, 11800, null, null);
+
+        $this->assertEqualsWithDelta(2500, $result, 0.000001);
+    }
+
     private function detail(int $id, int $productId, string $name, float $qty, float $lineTotal, float $unitCost): object
     {
         return (object) [

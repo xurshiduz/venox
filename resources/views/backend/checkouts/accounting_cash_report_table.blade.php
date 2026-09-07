@@ -8,7 +8,7 @@
 <td>{{ number_format($row['purchase_cost_usd'],2,'.',' ') }}</td><td><b>{{ number_format($row['payment_usd'],2,'.',' ') }}</b></td>
 <td>{{ number_format($row['kpi'],2,'.',' ') }} <small>({{ $row['kpi_percent'] }}%)</small></td><td>{{ number_format($row['agent_amount'],2,'.',' ') }} <small>({{ $row['agent_percent'] }}%)</small></td>
 <td>{{ number_format($row['venox'],2,'.',' ') }} <small>({{ $row['venox_percent'] }}%)</small></td><td>{{ number_format($row['factory'],2,'.',' ') }}</td>
-<td><a class="btn btn-sm {{ empty($row['scheme']) ? 'btn-warning' : 'btn-outline-primary' }}" href="{{ route('checkout_form', ['id' => $row['checkout_code'], 'page' => 1]) }}">{{ empty($row['scheme']) ? 'Foizlarni kiritish' : 'Tahrirlash' }}</a></td>
+<td>@if($row['checkout_code'])<a class="btn btn-sm {{ empty($row['scheme']) ? 'btn-warning' : 'btn-outline-primary' }}" href="{{ route('checkout_form', ['id' => $row['checkout_code'], 'page' => 1]) }}">{{ empty($row['scheme']) ? 'Foizlarni kiritish' : 'Tahrirlash' }}</a>@else<span class="text-muted">Savdo topilmadi</span>@endif</td>
 </tr>@empty<tr><td colspan="13" class="text-center py-5 text-soft">Tanlangan filtr bo‘yicha ma’lumot yo‘q.</td></tr>@endforelse</tbody>
 @if($rows->isNotEmpty())<tfoot class="table-light"><tr class="fw-bold"><td colspan="6" class="text-end">Jami:</td><td>{{ number_format($rows->sum('purchase_cost_usd'),2,'.',' ') }}</td><td>{{ number_format($rows->sum('payment_usd'),2,'.',' ') }}</td><td>{{ number_format($rows->sum('kpi'),2,'.',' ') }}</td><td>{{ number_format($rows->sum('agent_amount'),2,'.',' ') }}</td><td>{{ number_format($rows->sum('venox'),2,'.',' ') }}</td><td>{{ number_format($rows->sum('factory'),2,'.',' ') }}</td><td></td></tr></tfoot>@endif
 </table></div>
