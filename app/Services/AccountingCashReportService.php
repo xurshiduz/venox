@@ -3,11 +3,14 @@
 namespace App\Services;
 
 use App\Models\CashReceipt;
+use App\Models\CheckinDetail;
 use App\Models\Currency;
 use Illuminate\Support\Collection;
 
 class AccountingCashReportService
 {
+    private array $legacyCostCache = [];
+
     public function rows(array $filters): Collection
     {
         $receipts = CashReceipt::query()
@@ -15,7 +18,7 @@ class AccountingCashReportService
             ->whereNotNull('checkout_id')
             ->whereHas('checkout')
             ->where('date', '<=', $filters['to'])
-            ->with(['clientname', 'uname', 'checkout.managerid', 'checkout.supid', 'checkout.details.prodid.unitid'])
+            ->with(['clientname', 'uname', 'checkout.managerid', 'checkout.supid', 'checkout.details.prodid.unitid', 'checkout.details.checkid'])
             ->orderBy('date')
             ->orderBy('id')
             ->get();
@@ -62,6 +65,7 @@ class AccountingCashReportService
 
         return [
             'receipt_id' => $receipt->id,
+            'checkout_code' => $checkout->code,
             'date' => $receipt->date,
             'agent' => optional($checkout->managerid)->name ?: '—',
             'client' => optional($receipt->clientname)->name ?: optional($checkout->supid)->name ?: '—',
@@ -108,7 +112,7 @@ class AccountingCashReportService
             $coveredUsd = min($remaining, $availableLineUsd);
             $coveredQty = $qty * ($coveredUsd / $lineUsd);
             if ($coveredQty > 0) {
-                $unitCostUsd = $this->toUsd((float) $detail->tan_price, (int) $detail->currency_type, (float) $detail->currency_type_price);
+                $unitCostUsd = $this->detailUnitCostUsd($detail);
                 $purchaseCostUsd += $coveredQty * $unitCostUsd;
                 $productIds[] = (int) $detail->product_id;
                 $products[] = [
@@ -130,6 +134,58 @@ class AccountingCashReportService
             'purchase_cost_usd' => $purchaseCostUsd,
             'unallocated_usd' => max(0, $remaining),
         ];
+    }
+
+    /**
+     * Yangi savdolarda tannarx checkout detailda saqlanadi. Eski savdolarda u
+     * bo'sh/0 qolgan bo'lsa, aynan shu omborga savdo sanasigacha qilingan eng
+     * oxirgi faol kirimning bir dona narxi va hujjat kursidan foydalaniladi.
+     */
+    private function detailUnitCostUsd($detail): float
+    {
+        $storedCost = (float) $detail->tan_price;
+        if ($storedCost > 0) {
+            return $this->toUsd(
+                $storedCost,
+                (int) $detail->currency_type,
+                (float) $detail->currency_type_price
+            );
+        }
+
+        $checkout = $detail->checkid ?? null;
+        $date = optional($checkout)->date;
+        $key = implode(':', [(int) $detail->product_id, (int) $detail->warehouse_id, (string) $date]);
+
+        if (array_key_exists($key, $this->legacyCostCache)) {
+            return $this->legacyCostCache[$key];
+        }
+
+        $query = CheckinDetail::query()
+            ->with('checkid')
+            ->whereHas('checkid', function ($query) {
+                $query->where('status', 1);
+            })
+            ->where('product_id', $detail->product_id)
+            ->where('status', 1)
+            ->where('price', '>', 0);
+
+        if ($detail->warehouse_id) {
+            $query->where('warehouse_id', $detail->warehouse_id);
+        }
+        if ($date) {
+            $query->whereDate('created_at', '<=', $date);
+        }
+
+        $checkin = $query->latest('created_at')->latest('id')->first();
+        if (! $checkin) {
+            return $this->legacyCostCache[$key] = 0.0;
+        }
+
+        return $this->legacyCostCache[$key] = $this->toUsd(
+            (float) $checkin->price,
+            (int) optional($checkin->checkid)->currency_type,
+            (float) optional($checkin->checkid)->currency_type_price
+        );
     }
 
     private function toUsd(float $amount, int $currencyType, float $documentRate): float
