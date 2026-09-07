@@ -59,9 +59,7 @@ class AccountingCashReportService
         $kpiPercent = (float) ($checkout->kpi_percent ?? 0);
         $agentPercent = (float) ($checkout->agent_percent ?? 0);
         $venoxPercent = (float) ($checkout->venox_bonus_percent ?? 0);
-        $kpi = $paymentUsd * $kpiPercent / 100;
-        $agent = $paymentUsd * $agentPercent / 100;
-        $venox = $paymentUsd * $venoxPercent / 100;
+        $shares = $this->splitPayment($paymentUsd, $kpiPercent, $agentPercent, $venoxPercent);
 
         return [
             'receipt_id' => $receipt->id,
@@ -79,8 +77,22 @@ class AccountingCashReportService
             'kpi_percent' => $kpiPercent,
             'agent_percent' => $agentPercent,
             'venox_percent' => $venoxPercent,
+            'kpi' => $shares['kpi'],
+            'agent_amount' => $shares['agent'],
+            'venox' => $shares['venox'],
+            'factory' => $shares['factory'],
+        ];
+    }
+
+    public function splitPayment(float $paymentUsd, float $kpiPercent, float $agentPercent, float $venoxPercent): array
+    {
+        $kpi = $paymentUsd * $kpiPercent / 100;
+        $agent = $paymentUsd * $agentPercent / 100;
+        $venox = $paymentUsd * $venoxPercent / 100;
+
+        return [
             'kpi' => $kpi,
-            'agent_amount' => $agent,
+            'agent' => $agent,
             'venox' => $venox,
             'factory' => $paymentUsd - $kpi - $agent - $venox,
         ];
@@ -137,23 +149,21 @@ class AccountingCashReportService
     }
 
     /**
-     * Yangi savdolarda tannarx checkout detailda saqlanadi. Eski savdolarda u
-     * bo'sh/0 qolgan bo'lsa, aynan shu omborga savdo sanasigacha qilingan eng
-     * oxirgi faol kirimning bir dona narxi va hujjat kursidan foydalaniladi.
+     * Tannarxning asosiy manbasi — /checkins dagi haqiqiy kirim. Aynan shu
+     * mahsulot va omborga savdo sanasigacha qilingan eng oxirgi faol oddiy
+     * kirimning bir dona narxi hamda o'sha hujjat kursidan foydalaniladi.
+     * Faqat mos kirim topilmasa checkoutda saqlangan eski tannarx zaxira bo'ladi.
      */
     private function detailUnitCostUsd($detail): float
     {
-        $storedCost = (float) $detail->tan_price;
-        if ($storedCost > 0) {
-            return $this->toUsd(
-                $storedCost,
-                (int) $detail->currency_type,
-                (float) $detail->currency_type_price
-            );
-        }
-
         $checkout = $detail->checkid ?? null;
         $date = optional($checkout)->date;
+        if (! $checkout) {
+            $storedCost = (float) $detail->tan_price;
+            return $storedCost > 0
+                ? $this->toUsd($storedCost, (int) $detail->currency_type, (float) $detail->currency_type_price)
+                : 0.0;
+        }
         $key = implode(':', [(int) $detail->product_id, (int) $detail->warehouse_id, (string) $date]);
 
         if (array_key_exists($key, $this->legacyCostCache)) {
@@ -163,28 +173,41 @@ class AccountingCashReportService
         $query = CheckinDetail::query()
             ->with('checkid')
             ->whereHas('checkid', function ($query) {
-                $query->where('status', 1);
+                $query->where('status', 1)->where('type_id', 1);
             })
-            ->where('product_id', $detail->product_id)
-            ->where('status', 1)
-            ->where('price', '>', 0);
+            ->where('checkin_details.product_id', $detail->product_id)
+            ->where('checkin_details.status', 1)
+            ->where('checkin_details.price', '>', 0);
 
         if ($detail->warehouse_id) {
-            $query->where('warehouse_id', $detail->warehouse_id);
+            $query->where('checkin_details.warehouse_id', $detail->warehouse_id);
         }
         if ($date) {
-            $query->whereDate('created_at', '<=', $date);
+            $query->whereHas('checkid', function ($query) use ($date) {
+                $query->whereDate('date', '<=', $date);
+            });
         }
 
-        $checkin = $query->latest('created_at')->latest('id')->first();
+        $checkin = $query
+            ->join('checkins', 'checkins.id', '=', 'checkin_details.checkin_id')
+            ->select('checkin_details.*')
+            ->orderByDesc('checkins.date')
+            ->orderByDesc('checkin_details.id')
+            ->first();
         if (! $checkin) {
-            return $this->legacyCostCache[$key] = 0.0;
+            $storedCost = (float) $detail->tan_price;
+            return $this->legacyCostCache[$key] = $storedCost > 0
+                ? $this->toUsd($storedCost, (int) $detail->currency_type, (float) $detail->currency_type_price)
+                : 0.0;
         }
+
+        $currencyType = (int) ($checkin->currency_type ?: optional($checkin->checkid)->currency_type);
+        $currencyRate = (float) ($checkin->currency_type_price ?: optional($checkin->checkid)->currency_type_price);
 
         return $this->legacyCostCache[$key] = $this->toUsd(
             (float) $checkin->price,
-            (int) optional($checkin->checkid)->currency_type,
-            (float) optional($checkin->checkid)->currency_type_price
+            $currencyType,
+            $currencyRate
         );
     }
 

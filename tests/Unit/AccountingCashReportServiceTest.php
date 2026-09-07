@@ -40,6 +40,17 @@ class AccountingCashReportServiceTest extends TestCase
         $this->assertEqualsWithDelta(25, $result['unallocated_usd'], 0.000001);
     }
 
+    public function test_commission_shares_and_factory_remainder_are_calculated_from_payment(): void
+    {
+        $result = (new AccountingCashReportService())->splitPayment(2500, 5, 8, 25);
+
+        $this->assertEqualsWithDelta(125, $result['kpi'], 0.000001);
+        $this->assertEqualsWithDelta(200, $result['agent'], 0.000001);
+        $this->assertEqualsWithDelta(625, $result['venox'], 0.000001);
+        $this->assertEqualsWithDelta(1550, $result['factory'], 0.000001);
+        $this->assertEqualsWithDelta(2500, array_sum($result), 0.000001);
+    }
+
     private function detail(int $id, int $productId, string $name, float $qty, float $lineTotal, float $unitCost): object
     {
         return (object) [
