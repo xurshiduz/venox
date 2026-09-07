@@ -100,9 +100,17 @@
                         $checkoutFallbackRate
                     );
                 } else {
-                    $checkoutPrice = App\Models\Currency::toUzs(
+                    // Ayrim eski mahsulotlarda ombor uchun oxirgi checkout qatori
+                    // topilmaydi, mahsulot kartasidagi narx esa USD bo'lsa ham
+                    // currency_type UZS bo'lib qolgan. Bunday holatda ham kirim
+                    // tannarxiga nisbatan xavfsiz tekshiruv bilan USDni tiklaymiz.
+                    $checkoutPrice = App\Models\Currency::saleUnitPriceToUzs(
                         $checkoutRawPrice,
+                        $checkinPrice,
                         (int) ($item->productid->currency_type ?? 1),
+                        $usdRate,
+                        null,
+                        null,
                         $usdRate
                     );
                 }

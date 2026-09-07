@@ -51,6 +51,14 @@ class WarehouseStockPricingTest extends TestCase
         $this->assertEqualsWithDelta(-1.2, Currency::markupPercent(89250, $saleUzs), 0.0001);
     }
 
+    public function test_legacy_catalog_usd_price_is_recovered_when_no_checkout_row_exists(): void
+    {
+        $saleUzs = Currency::saleUnitPriceToUzs(23.50, 184000, 2, 11900, null, null, 11900);
+
+        $this->assertSame(279650.0, $saleUzs);
+        $this->assertEqualsWithDelta(51.983695, Currency::markupPercent(184000, $saleUzs), 0.0001);
+    }
+
     public function test_legacy_usd_purchase_price_is_recovered_when_currency_flags_are_wrong(): void
     {
         $costUzs = Currency::purchaseUnitPriceToUzs(42, 571200, 2, 1, 2, 1, 11900);
