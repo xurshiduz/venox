@@ -48,7 +48,7 @@
             
             @foreach($productsList as $product)
                 <td style="border: 1px solid #000000; font-weight: bold; background-color: #d9edf7; text-align: right;">
-                    {{ (float) ($productTotalUsd[$product] ?? 0) }}
+                    {{ $productTotalFormulas[$product] ?? 0 }}
                 </td>
             @endforeach
             

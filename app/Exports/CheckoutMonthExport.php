@@ -122,6 +122,13 @@ class CheckoutMonthExport implements FromView, WithStyles
         $lastDataRow = $firstDataRow + $this->clientCount - 1;
         $salesColumn = Coordinate::stringFromColumnIndex($this->productCount + 3);
         $paidColumn = Coordinate::stringFromColumnIndex($this->productCount + 4);
+        $productTotalFormulas = [];
+        foreach (array_keys($productsList) as $index => $productName) {
+            $productColumn = Coordinate::stringFromColumnIndex($index + 3);
+            $productTotalFormulas[$productName] = $this->clientCount > 0
+                ? '=SUM(' . $productColumn . $firstDataRow . ':' . $productColumn . $lastDataRow . ')'
+                : 0;
+        }
         $grandSalesFormula = $this->clientCount > 0
             ? '=SUM(' . $salesColumn . $firstDataRow . ':' . $salesColumn . $lastDataRow . ')'
             : 0;
@@ -134,6 +141,7 @@ class CheckoutMonthExport implements FromView, WithStyles
             'matrixData'      => $matrixData,
             'clientNames'     => $clientNames,
             'productTotalUsd' => $productTotalUsd,
+            'productTotalFormulas' => $productTotalFormulas,
             'clientTotalUsd'  => $clientTotalUsd,
             'clientPaidTotals'=> $clientPaidTotals,
             'grandSalesFormula' => $grandSalesFormula,
