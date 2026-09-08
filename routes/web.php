@@ -4,19 +4,6 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 
-Route::get('/_maintenance/contract-bonus-migrate-9f62a47e1c874cebad5a', function () {
-    Artisan::call('migrate', [
-        '--path' => 'database/migrations/2026_09_08_120000_create_contract_bonus_transactions_table.php',
-        '--force' => true,
-    ]);
-
-    return response()->json([
-        'ok' => true,
-        'message' => 'Contract bonus migration completed.',
-        'output' => trim(Artisan::output()),
-    ]);
-});
-
 Route::get('/checkout_today_send_public', 'Backend\CheckoutController@today_send')->name('checkout_today_send_public');
 
 Route::group(
