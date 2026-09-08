@@ -6,6 +6,7 @@ use App\Models\CashReceipt;
 use App\Models\Checkin;
 use App\Models\Checkout;
 use App\Models\Client;
+use App\Models\ContractBonusTransaction;
 use App\Models\Currency;
 use App\Services\AccountingCashReportService;
 use Carbon\Carbon;
@@ -73,6 +74,15 @@ class CheckoutMonthExport implements FromView, WithStyles
         }
 
         $closingDebts = $this->clientDebtTotalsUsd($clientIds->map(fn ($id) => (string) $id)->all(), $periodEnd);
+        $clientBonusExpenses = ContractBonusTransaction::query()
+            ->where('status', true)
+            ->where('direction', 'debit')
+            ->whereIn('client_id', $clientIds)
+            ->whereDate('transaction_date', '>=', $periodStart->toDateString())
+            ->whereDate('transaction_date', '<=', $periodEnd->toDateString())
+            ->selectRaw('client_id, SUM(amount_usd) as total_amount')
+            ->groupBy('client_id')
+            ->pluck('total_amount', 'client_id');
         $groupedRows = [];
 
         foreach ($checkouts as $checkout) {
@@ -91,6 +101,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'total_usd' => 0,
                     'paid_usd' => $paid,
                     'closing_debt_usd' => $closing,
+                    'bonus_expense_usd' => (float) ($clientBonusExpenses[$clientKey] ?? 0),
                 ];
             }
 
@@ -130,12 +141,13 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'total_usd' => $qty * $unitPrice,
                     'paid_usd' => $first ? $row['paid_usd'] : null,
                     'closing_debt_usd' => $first ? $row['closing_debt_usd'] : null,
+                    'bonus_expense_usd' => $first ? $row['bonus_expense_usd'] : null,
                 ];
             }
 
             $endRow = count($rows) + 2;
             if ($endRow > $startRow) {
-                foreach (['A', 'B', 'C', 'H', 'I'] as $column) {
+                foreach (['A', 'B', 'C', 'H', 'I', 'J'] as $column) {
                     $this->mergeRanges[] = $column . $startRow . ':' . $column . $endRow;
                 }
             }
@@ -152,6 +164,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                 'qty' => collect($groupedRows)->sum(fn ($row) => collect($row['quantities'])->sum()),
                 'paid_usd' => $clientIds->sum(fn ($id) => (float) ($clientPayments[(string) $id] ?? 0)),
                 'closing_debt_usd' => $clientIds->sum(fn ($id) => (float) ($closingDebts[(string) $id] ?? 0)),
+                'bonus_expense_usd' => $clientIds->sum(fn ($id) => (float) ($clientBonusExpenses[(string) $id] ?? 0)),
             ],
         ]);
     }
@@ -207,7 +220,7 @@ class CheckoutMonthExport implements FromView, WithStyles
         $lastRow = max(3, $this->rowCount + 3);
         $sheet->setShowGridlines(false);
         $sheet->freezePane('A3');
-        $sheet->setAutoFilter('A2:I' . max(2, $this->rowCount + 2));
+        $sheet->setAutoFilter('A2:J' . max(2, $this->rowCount + 2));
         $sheet->getDefaultRowDimension()->setRowHeight(44);
         $sheet->getRowDimension(1)->setRowHeight(28);
         $sheet->getRowDimension(2)->setRowHeight(48);
@@ -220,20 +233,20 @@ class CheckoutMonthExport implements FromView, WithStyles
             $sheet->mergeCells($range);
         }
 
-        foreach (['A' => 13, 'B' => 28, 'C' => 20, 'D' => 52, 'E' => 15, 'F' => 16, 'G' => 18, 'H' => 17, 'I' => 18] as $column => $width) {
+        foreach (['A' => 13, 'B' => 28, 'C' => 20, 'D' => 52, 'E' => 15, 'F' => 16, 'G' => 18, 'H' => 17, 'I' => 18, 'J' => 22] as $column => $width) {
             $sheet->getColumnDimension($column)->setWidth($width);
         }
 
-        $sheet->getStyle('A1:I' . $lastRow)->getAlignment()
+        $sheet->getStyle('A1:J' . $lastRow)->getAlignment()
             ->setVertical(Alignment::VERTICAL_CENTER)
             ->setHorizontal(Alignment::HORIZONTAL_CENTER)
             ->setWrapText(true);
-        $sheet->getStyle('A2:I2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-        $sheet->getStyle('A2:I2')->getFont()->setBold(true)->getColor()->setRGB('000000');
-        $sheet->getStyle('A2:I' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('C9C9C9');
+        $sheet->getStyle('A2:J2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('A2:J2')->getFont()->setBold(true)->getColor()->setRGB('000000');
+        $sheet->getStyle('A2:J' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('C9C9C9');
         $sheet->getStyle('E3:E' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.###');
-        $sheet->getStyle('C3:C' . $lastRow)->getNumberFormat()->setFormatCode('$#,##0.00');
-        $sheet->getStyle('F3:I' . $lastRow)->getNumberFormat()->setFormatCode('$#,##0.00');
-        $sheet->getStyle('A' . $lastRow . ':I' . $lastRow)->getFont()->setBold(true);
+        $sheet->getStyle('C3:C' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
+        $sheet->getStyle('F3:J' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
+        $sheet->getStyle('A' . $lastRow . ':J' . $lastRow)->getFont()->setBold(true);
     }
 }

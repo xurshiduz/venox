@@ -1,18 +1,19 @@
 <table>
     <thead>
         <tr>
-            <th colspan="9" style="font-weight:bold; font-size:14px; text-align:left;">{{ $periodLabel }} оралиғидаги мижозлар ҳисоботи</th>
+            <th colspan="10" style="font-weight:bold; font-size:14px; text-align:left;">{{ $periodLabel }} оралиғидаги мижозлар ҳисоботи (USD)</th>
         </tr>
         <tr>
             <th>Сана</th>
             <th>Мижоз номи</th>
-            <th>Умумий қарзи ($)</th>
+            <th>Умумий қарзи</th>
             <th>Товар Тўлиқ Номи ва Ҳажми</th>
             <th>Миқдори (шт/л)</th>
-            <th>Нархи ($)</th>
-            <th>Жами Сумма ($)</th>
-            <th>Тўланган ($)</th>
-            <th>Қолдиқ Қарз ($)</th>
+            <th>Нархи</th>
+            <th>Жами Сумма</th>
+            <th>Тўланган</th>
+            <th>Қолдиқ Қарз</th>
+            <th>Мижоз учун сарфланган бонус</th>
         </tr>
     </thead>
     <tbody>
@@ -27,6 +28,7 @@
                 <td>{{ $row['total_usd'] }}</td>
                 <td>{{ $row['paid_usd'] }}</td>
                 <td>{{ $row['closing_debt_usd'] }}</td>
+                <td>{{ $row['bonus_expense_usd'] }}</td>
             </tr>
         @endforeach
         <tr>
@@ -38,6 +40,7 @@
             <td>{{ count($rows) ? '=SUM(G3:G'.(count($rows) + 2).')' : 0 }}</td>
             <td>{{ $totals['paid_usd'] }}</td>
             <td>{{ $totals['closing_debt_usd'] }}</td>
+            <td>{{ $totals['bonus_expense_usd'] }}</td>
         </tr>
     </tbody>
 </table>
