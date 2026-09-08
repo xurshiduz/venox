@@ -16,11 +16,17 @@ class ContractBonusController extends Controller
         $service->syncAccruals();
         $search = trim((string) $request->input('search'));
         $clients = Client::query()
-            ->where(function ($query) {
-                $query->whereHas('checkouts', fn ($checkoutQuery) => $checkoutQuery->where('commission_scheme', 'contract'))
-                    ->orWhereHas('contractBonusTransactions', fn ($bonusQuery) => $bonusQuery->where('status', true));
+            ->when($search !== '', function ($query) use ($search) {
+                // Eski savdolarda komissiya turi saqlanmagan bo'lishi mumkin.
+                // Shu sabab qidiruvda mijozni nomi bo'yicha bevosita topamiz.
+                $query->where('name', 'like', "%{$search}%");
+            }, function ($query) {
+                $query->where(function ($eligibleQuery) {
+                    $eligibleQuery
+                        ->whereHas('checkouts', fn ($checkoutQuery) => $checkoutQuery->where('commission_scheme', 'contract'))
+                        ->orWhereHas('contractBonusTransactions', fn ($bonusQuery) => $bonusQuery->where('status', true));
+                });
             })
-            ->when($search, fn ($query) => $query->where('name', 'like', "%{$search}%"))
             ->withSum(['contractBonusTransactions as contract_credit_usd' => fn ($query) => $query->where('status', true)->where('direction', 'credit')], 'amount_usd')
             ->withSum(['contractBonusTransactions as contract_debit_usd' => fn ($query) => $query->where('status', true)->where('direction', 'debit')], 'amount_usd')
             ->orderBy('name')
