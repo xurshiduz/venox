@@ -5,7 +5,7 @@
         <div class="card card-bordered">
             <div class="card-inner">
                 <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
-                    <div><h5 class="title mb-1">Shartnoma jamg‘armasi</h5><div class="text-soft">Mijozlar bo‘yicha yig‘ilgan bonus, ishlatilgan summa va qoldiq.</div></div>
+                    <div><h5 class="title mb-1">Shartnoma jamg‘armasi</h5><div class="text-soft">Barcha Shartnoma mijozlari: yig‘ilgan bonus, ishlatilgan summa va qoldiq.</div></div>
                     <form method="get" class="d-flex" style="gap:8px">
                         <input class="form-control" name="search" value="{{ $search }}" placeholder="Mijoz nomi bo‘yicha qidirish">
                         <button class="btn btn-primary">Qidirish</button>
@@ -26,7 +26,7 @@
                                 <td><a class="btn btn-sm btn-primary" href="{{ route('contract_bonuses.show', $client) }}">Ko‘rish / ishlatish</a></td>
                             </tr>
                         @empty
-                            <tr><td colspan="7" class="text-center text-soft py-4">Shartnoma bonusi mavjud mijoz topilmadi.</td></tr>
+                            <tr><td colspan="7" class="text-center text-soft py-4">Shartnoma mijozlari topilmadi.</td></tr>
                         @endforelse
                         </tbody>
                     </table>

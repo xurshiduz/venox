@@ -16,7 +16,10 @@ class ContractBonusController extends Controller
         $service->syncAccruals();
         $search = trim((string) $request->input('search'));
         $clients = Client::query()
-            ->whereHas('contractBonusTransactions', fn ($query) => $query->where('status', true))
+            ->where(function ($query) {
+                $query->whereHas('checkouts', fn ($checkoutQuery) => $checkoutQuery->where('commission_scheme', 'contract'))
+                    ->orWhereHas('contractBonusTransactions', fn ($bonusQuery) => $bonusQuery->where('status', true));
+            })
             ->when($search, fn ($query) => $query->where('name', 'like', "%{$search}%"))
             ->withSum(['contractBonusTransactions as contract_credit_usd' => fn ($query) => $query->where('status', true)->where('direction', 'credit')], 'amount_usd')
             ->withSum(['contractBonusTransactions as contract_debit_usd' => fn ($query) => $query->where('status', true)->where('direction', 'debit')], 'amount_usd')
