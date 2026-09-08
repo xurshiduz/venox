@@ -14,17 +14,24 @@
                                 <div class="preview-block">
                                     <form method="POST" action="{{ route('checkouts_month_filter_post') }}">
                                         @csrf
-                                        <div class="row gy-4">
-                                            <div class="col-sm-6 col-md-4">
+                                        <div class="row gy-4 align-items-end">
+                                            <div class="col-sm-6 col-md-3">
                                                 <div class="form-group">
-                                                    <label class="form-label">Yil va Oyni tanlang</label>
+                                                    <label class="form-label">Boshlanish sanasi</label>
                                                     <div class="form-control-wrap">
-                                                        <input type="month" name="month_year" class="form-control" required value="{{ date('Y-m') }}">
+                                                        <input type="date" name="start_date" class="form-control" required value="{{ old('start_date', now()->startOfMonth()->format('Y-m-d')) }}">
                                                     </div>
                                                 </div>
                                             </div>
-                                            
-                                            <div class="col-12 mt-4">
+                                            <div class="col-sm-6 col-md-3">
+                                                <div class="form-group">
+                                                    <label class="form-label">Tugash sanasi</label>
+                                                    <div class="form-control-wrap">
+                                                        <input type="date" name="end_date" class="form-control" required value="{{ old('end_date', now()->format('Y-m-d')) }}">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-sm-6 col-md-3">
                                                 <button class="btn btn-primary" type="submit">
                                                     <em class="icon ni ni-file-xls"></em> 
                                                     <span>Excel yuklab olish</span>

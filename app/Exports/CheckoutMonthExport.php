@@ -18,25 +18,26 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class CheckoutMonthExport implements FromView, WithStyles
 {
-    protected $monthYear;
+    protected $startDate;
+    protected $endDate;
     protected $rowCount = 0;
     protected $rowLineCounts = [];
     protected $mergeRanges = [];
 
-    public function __construct($monthYear)
+    public function __construct($startDate, $endDate)
     {
-        $this->monthYear = $monthYear;
+        $this->startDate = $startDate;
+        $this->endDate = $endDate;
     }
 
     public function view(): View
     {
-        $date = Carbon::parse($this->monthYear);
-        $periodStart = $date->copy()->startOfMonth();
-        $periodEnd = $date->copy()->endOfMonth();
+        $periodStart = Carbon::parse($this->startDate)->startOfDay();
+        $periodEnd = Carbon::parse($this->endDate)->endOfDay();
 
         $checkouts = Checkout::with(['supid', 'checkoutDetails.prodid'])
-            ->whereYear('date', $date->year)
-            ->whereMonth('date', $date->month)
+            ->whereDate('date', '>=', $periodStart->toDateString())
+            ->whereDate('date', '<=', $periodEnd->toDateString())
             ->orderBy('date')
             ->orderBy('id')
             ->get();
@@ -145,7 +146,7 @@ class CheckoutMonthExport implements FromView, WithStyles
 
         return view('backend.checkouts.excel_matrix', [
             'rows' => $rows,
-            'monthYear' => $this->monthYear,
+            'periodLabel' => $periodStart->format('d.m.Y') . ' — ' . $periodEnd->format('d.m.Y'),
             'totals' => [
                 'debt_before_payment' => $clientIds->sum(fn ($id) => (float) ($closingDebts[(string) $id] ?? 0) + (float) ($clientPayments[(string) $id] ?? 0)),
                 'qty' => collect($groupedRows)->sum(fn ($row) => collect($row['quantities'])->sum()),

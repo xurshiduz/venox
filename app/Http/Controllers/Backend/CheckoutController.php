@@ -2368,15 +2368,17 @@ class CheckoutController extends Controller
 
     public function month_filter_post(Request $request)
     {
-        $request->validate([
-            'month_year' => 'required'
+        $validated = $request->validate([
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date',
         ]);
 
-        $monthYear = $request->month_year; // Masalan: "2026-08"
+        $startDate = Carbon::parse($validated['start_date'])->toDateString();
+        $endDate = Carbon::parse($validated['end_date'])->toDateString();
 
         return Excel::download(
-            new CheckoutMonthExport($monthYear), 
-            'Mijozlar_hisoboti_' . $monthYear . '.xlsx'
+            new CheckoutMonthExport($startDate, $endDate),
+            'Mijozlar_hisoboti_' . $startDate . '_' . $endDate . '.xlsx'
         );
     }
 

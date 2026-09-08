@@ -1,7 +1,7 @@
 <table>
     <thead>
         <tr>
-            <th colspan="9" style="font-weight:bold; font-size:14px; text-align:left;">{{ $monthYear }} ойи учун мижозлар ҳисоботи</th>
+            <th colspan="9" style="font-weight:bold; font-size:14px; text-align:left;">{{ $periodLabel }} оралиғидаги мижозлар ҳисоботи</th>
         </tr>
         <tr>
             <th>Сана</th>
