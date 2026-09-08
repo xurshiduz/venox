@@ -55,12 +55,15 @@
                                             <div class="form-group">
                                                 <label class="form-label">{{ trans('backend.input.seller') }}</label>
                                                 <div class="form-control-wrap">
-                                                    <select class="form-select js-select2" name="manager_id" required data-search="on">
-                                                        <option>{{ trans('backend.table.in_select_men') }}</option>
+                                                    <select class="form-select js-select2 @error('manager_id') is-invalid @enderror" name="manager_id" required data-search="on" aria-describedby="manager_id_error">
+                                                        <option value="" disabled {{ old('manager_id', $item ? $item->manager_id : null) ? '' : 'selected' }}>{{ trans('backend.table.in_select_men') }}</option>
                                                         @foreach($managers as $manager)
-                                                        <option @if($item && $item->manager_id == $manager->id) selected @endif value="{{ $manager->id }}">{{ $manager->name }}</option>
+                                                        <option @if((string) old('manager_id', $item ? $item->manager_id : null) === (string) $manager->id) selected @endif value="{{ $manager->id }}">{{ $manager->name }}</option>
                                                         @endforeach
                                                     </select>
+                                                    @error('manager_id')
+                                                        <div id="manager_id_error" class="invalid-feedback d-block mt-1">{{ $message }}</div>
+                                                    @enderror
                                                 </div>
                                             </div>
                                         </div>

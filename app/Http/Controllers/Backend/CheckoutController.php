@@ -1737,6 +1737,15 @@ class CheckoutController extends Controller
     
     public function save(Request $request, $id = null)
     {
+        if (Auth::user()->hasAnyRole('admin|select_manager')) {
+            $request->validate([
+                'manager_id' => ['required', 'exists:users,id'],
+            ], [
+                'manager_id.required' => 'Menejerni tanlang.',
+                'manager_id.exists' => 'Tanlangan menejer topilmadi. Qaytadan tanlang.',
+            ]);
+        }
+
         // 1. Qidirilayotgan qiymatni aniqlash
         $chprid = $request->product_id ?: $request->modal_product;
         
