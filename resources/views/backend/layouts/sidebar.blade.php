@@ -53,6 +53,9 @@
                             <li class="nk-menu-item {{ Request::routeIs('accounting_cash_report') ? 'active' : '' }}">
                                 <a href="{{ route('accounting_cash_report') }}" class="nk-menu-link"><span class="nk-menu-text">Kassa hisoboti</span></a>
                             </li>
+                            <li class="nk-menu-item {{ Request::routeIs('contract_bonuses.*') ? 'active' : '' }}">
+                                <a href="{{ route('contract_bonuses.index') }}" class="nk-menu-link"><span class="nk-menu-text">Shartnoma jamg‘armasi</span></a>
+                            </li>
                             <li class="nk-menu-item {{ Request::routeIs('checkouts_day_filter') ? 'active' : '' }}">
                                 <a href="{{ route('checkouts_day_filter') }}" class="nk-menu-link"><span class="nk-menu-text">Фильтр по продажам</span></a>
                             </li>

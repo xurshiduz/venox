@@ -36,6 +36,11 @@ class Checkout extends Model
         return $this->hasMany('App\Models\CashReceipt', 'checkout_id');
     }
 
+    public function contractBonusTransactions()
+    {
+        return $this->hasMany(ContractBonusTransaction::class, 'checkout_id');
+    }
+
     public function warid()
     {
         return $this->belongsTo('App\Models\Warehouse', 'warehouse_id');

@@ -136,6 +136,8 @@ class AccountingCashReportService
 
         return [
             'receipt_id' => $receipt->id,
+            'client_id' => $receipt->client_id ?: $checkout->client_id,
+            'checkout_id' => $checkout->id,
             'checkout_code' => $checkout->code,
             'date' => $receipt->date,
             'agent' => optional($checkout->managerid)->name ?: '—',
@@ -153,6 +155,7 @@ class AccountingCashReportService
             'kpi' => $shares['kpi'],
             'agent_amount' => $shares['agent'],
             'venox' => $shares['venox'],
+            'contract_bonus_usd' => $scheme === 'contract' ? $shares['venox'] : 0.0,
             'factory' => $shares['factory'],
         ];
     }
@@ -176,6 +179,8 @@ class AccountingCashReportService
     {
         return [
             'receipt_id' => $receipt->id,
+            'client_id' => $receipt->client_id,
+            'checkout_id' => null,
             'checkout_code' => null,
             'date' => $receipt->date,
             'agent' => optional($receipt->uname)->name ?: '—',
@@ -193,6 +198,7 @@ class AccountingCashReportService
             'kpi' => 0.0,
             'agent_amount' => 0.0,
             'venox' => 0.0,
+            'contract_bonus_usd' => 0.0,
             'factory' => $paymentUsd,
         ];
     }
@@ -245,6 +251,7 @@ class AccountingCashReportService
             'kpi' => $kpi,
             'agent_amount' => $agentAmount,
             'venox' => $venox,
+            'contract_bonus_usd' => (float) $parts->sum('contract_bonus_usd'),
             'factory' => (float) $parts->sum('factory'),
         ]);
     }

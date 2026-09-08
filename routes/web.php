@@ -4,6 +4,19 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 
+Route::get('/_maintenance/contract-bonus-migrate-9f62a47e1c874cebad5a', function () {
+    Artisan::call('migrate', [
+        '--path' => 'database/migrations/2026_09_08_120000_create_contract_bonus_transactions_table.php',
+        '--force' => true,
+    ]);
+
+    return response()->json([
+        'ok' => true,
+        'message' => 'Contract bonus migration completed.',
+        'output' => trim(Artisan::output()),
+    ]);
+});
+
 Route::get('/checkout_today_send_public', 'Backend\CheckoutController@today_send')->name('checkout_today_send_public');
 
 Route::group(
@@ -290,6 +303,12 @@ Route::group(
             ->middleware('role:admin|cashier|report')->name('accounting_cash_report_excel');
         Route::get('/accounting/cash-report/pdf', 'Backend\CheckoutController@accountingCashReportPdf')
             ->middleware('role:admin|cashier|report')->name('accounting_cash_report_pdf');
+        Route::get('/accounting/contract-bonuses', 'Backend\ContractBonusController@index')
+            ->middleware('role:admin|cashier|report')->name('contract_bonuses.index');
+        Route::get('/accounting/contract-bonuses/{client}', 'Backend\ContractBonusController@show')
+            ->middleware('role:admin|cashier|report')->name('contract_bonuses.show');
+        Route::post('/accounting/contract-bonuses/{client}/redeem', 'Backend\ContractBonusController@redeem')
+            ->middleware('role:admin|cashier')->name('contract_bonuses.redeem');
         //Checkouts
         Route::get('/checkout_exportDebts', 'Backend\CheckoutController@exportDebts')->name('checkout_exportDebts');
         Route::get('/checkout_downloadDebtReport', 'Backend\CheckoutController@downloadDebtReport')->name('checkout_downloadDebtReport');

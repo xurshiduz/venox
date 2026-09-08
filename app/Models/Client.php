@@ -30,6 +30,11 @@ class Client extends Model
     {
         return $this->hasMany('App\Models\CashReceipt', 'client_id');
     }
+
+    public function contractBonusTransactions()
+    {
+        return $this->hasMany(ContractBonusTransaction::class, 'client_id');
+    }
     
     public function activeDebts()
     {
