@@ -49,7 +49,9 @@
                     ->first();
 
                 $checkinRawPrice = $latestCheckin
-                    ? (float) $latestCheckin->price
+                    ? (((float) $latestCheckin->qty > 0 && (float) $latestCheckin->total_price > 0)
+                        ? (float) $latestCheckin->total_price / (float) $latestCheckin->qty
+                        : (float) $latestCheckin->price)
                     : (float) $item->checkin_price;
                 // Valyuta hujjat sarlavhasida tanlanadi. Eski detail qatorlarida
                 // noto'g'ri standart qiymat bo'lishi mumkin, shu sabab header ustun.
@@ -57,19 +59,10 @@
                 $checkinFallbackRate = App\Models\Currency::usdRateForDate(
                     optional($checkinDocument)->date ?? optional($latestCheckin)->created_at
                 );
-                $checkinPrice = App\Models\Currency::documentAmountToUzs(
-                    $checkinRawPrice,
-                    optional($checkinDocument)->currency_type,
-                    optional($checkinDocument)->currency_type_price ?: $checkinFallbackRate,
-                    optional($latestCheckin)->currency_type,
-                    optional($latestCheckin)->currency_type_price
-                );
-
                 // Sotuv narxi faqat USDda rasmiylashtirilgan, yakunlangan sotuvdan olinadi.
                 // UZS sotuvlar bu hisobotga aralashmaydi.
                 $latestCheckout = $item->productid->checkoutdetails()
                     ->with('checkid')
-                    ->where('warehouse_id', $wareid->id)
                     ->where('status', 1)
                     ->where('price', '>', 0)
                     ->whereHas('checkid', function ($query) {
@@ -80,7 +73,11 @@
                     ->latest('id')
                     ->first();
 
-                $checkoutRawPrice = $latestCheckout ? (float) $latestCheckout->price : 0;
+                $checkoutRawPrice = $latestCheckout
+                    ? (((float) $latestCheckout->qty > 0 && (float) $latestCheckout->total_price > 0)
+                        ? (float) $latestCheckout->total_price / (float) $latestCheckout->qty
+                        : (float) $latestCheckout->price)
+                    : 0;
                 if ($latestCheckout) {
                     $checkoutDocument = $latestCheckout->checkid;
                     $checkoutFallbackRate = App\Models\Currency::usdRateForDate(
