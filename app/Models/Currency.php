@@ -188,6 +188,61 @@ class Currency extends Model
         return (($saleUzs - $costUzs) / $costUzs) * 100;
     }
 
+    /**
+     * Legacy hujjatlarda valyuta belgisi teskarisiga saqlangan bo'lishi mumkin.
+     * Faqat joriy natija mutlaqo mantiqsiz bo'lsa, xom narxlarning UZS/USD
+     * variantlarini tarixiy kurslarda solishtirib, eng yaqin iqtisodiy juftlikni
+     * qaytaradi. Oddiy (mantiqli) narxlarga umuman tegmaydi.
+     */
+    public static function reconcileLegacyUnitPrices(
+        float $rawCost,
+        float $rawSale,
+        float $costUzs,
+        float $saleUzs,
+        ?float $costRate,
+        ?float $saleRate
+    ): array {
+        $markup = static::markupPercent($costUzs, $saleUzs);
+
+        if ($markup === null || ($markup > -90 && $markup < 1000)) {
+            return [$costUzs, $saleUzs];
+        }
+
+        $costRate = $costRate && $costRate > 1 ? $costRate : static::usdRate();
+        $saleRate = $saleRate && $saleRate > 1 ? $saleRate : static::usdRate();
+        $costCandidates = array_unique([$costUzs, $rawCost, $rawCost * $costRate]);
+        $saleCandidates = array_unique([$saleUzs, $rawSale, $rawSale * $saleRate]);
+        $best = null;
+
+        foreach ($costCandidates as $candidateCost) {
+            foreach ($saleCandidates as $candidateSale) {
+                if ($candidateCost <= 0 || $candidateSale <= 0) {
+                    continue;
+                }
+
+                $ratio = $candidateSale / $candidateCost;
+                if ($ratio < 0.50 || $ratio > 5.0) {
+                    continue;
+                }
+
+                // Ombor savdosida odatiy sotuv/tannarx nisbati 1.25 atrofida.
+                // Logarifmik masofa katta va kichik narxlarni teng baholaydi.
+                $score = abs(log($ratio / 1.25));
+                if ($best === null || $score < $best['score']) {
+                    $best = [
+                        'cost' => (float) $candidateCost,
+                        'sale' => (float) $candidateSale,
+                        'score' => $score,
+                    ];
+                }
+            }
+        }
+
+        return $best
+            ? [$best['cost'], $best['sale']]
+            : [$costUzs, $saleUzs];
+    }
+
     public function products()
     {
         return $this->hasMany('App\Models\Product', 'category_id');

@@ -87,6 +87,53 @@ class WarehouseStockPricingTest extends TestCase
         $this->assertEqualsWithDelta($oneItemMarkup, $manyItemsMarkup, 0.0001);
     }
 
+    public function test_legacy_uzs_cost_and_usd_sale_are_reconciled_together(): void
+    {
+        [$cost, $sale] = Currency::reconcileLegacyUnitPrices(
+            15600,
+            2.10,
+            185640000,
+            2.10,
+            11900,
+            11900
+        );
+
+        $this->assertSame(15600.0, $cost);
+        $this->assertSame(24990.0, $sale);
+        $this->assertEqualsWithDelta(60.192307, Currency::markupPercent($cost, $sale), 0.0001);
+    }
+
+    public function test_legacy_usd_cost_and_uzs_sale_are_reconciled_together(): void
+    {
+        [$cost, $sale] = Currency::reconcileLegacyUnitPrices(
+            42,
+            571200,
+            42,
+            571200,
+            11900,
+            11900
+        );
+
+        $this->assertSame(499800.0, $cost);
+        $this->assertSame(571200.0, $sale);
+        $this->assertEqualsWithDelta(14.285714, Currency::markupPercent($cost, $sale), 0.0001);
+    }
+
+    public function test_reconciliation_does_not_change_normal_prices(): void
+    {
+        [$cost, $sale] = Currency::reconcileLegacyUnitPrices(
+            391000,
+            590000,
+            391000,
+            590000,
+            11900,
+            11900
+        );
+
+        $this->assertSame(391000.0, $cost);
+        $this->assertSame(590000.0, $sale);
+    }
+
     public function test_monthly_report_keeps_usd_document_amount_unchanged(): void
     {
         $this->assertSame(2500.0, Currency::documentAmountToUsd(2500, 1, 11800));

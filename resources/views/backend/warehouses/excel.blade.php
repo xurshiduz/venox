@@ -53,7 +53,7 @@
                     : (float) $item->checkin_price;
                 // Valyuta hujjat sarlavhasida tanlanadi. Eski detail qatorlarida
                 // noto'g'ri standart qiymat bo'lishi mumkin, shu sabab header ustun.
-                $checkinDocument = $latestCheckin->checkid ?? null;
+                $checkinDocument = optional($latestCheckin)->checkid;
                 $checkinFallbackRate = App\Models\Currency::usdRateForDate(
                     optional($checkinDocument)->date ?? optional($latestCheckin)->created_at
                 );
@@ -61,8 +61,8 @@
                     $checkinRawPrice,
                     optional($checkinDocument)->currency_type,
                     optional($checkinDocument)->currency_type_price ?: $checkinFallbackRate,
-                    $latestCheckin->currency_type ?? null,
-                    $latestCheckin->currency_type_price ?? null
+                    optional($latestCheckin)->currency_type,
+                    optional($latestCheckin)->currency_type_price
                 );
 
                 // Sotuv narxi mahsulot kartasidagi bugungi narx/kursdan emas,
@@ -140,6 +140,18 @@
                         $checkoutFallbackRate
                     );
                 }
+
+                // Eski bazada ba'zan kirim yoki sotuv valyutasi teskarisiga
+                // yozilgan. Natija -90% yoki juda katta bo'lsagina ikkala narx
+                // tarixiy kurslari bilan birgalikda xavfsiz qayta tekshiriladi.
+                [$checkinPrice, $checkoutPrice] = App\Models\Currency::reconcileLegacyUnitPrices(
+                    $checkinRawPrice,
+                    $checkoutRawPrice,
+                    $checkinPrice,
+                    $checkoutPrice,
+                    $checkinFallbackRate,
+                    $latestCheckout ? $checkoutFallbackRate : $usdRate
+                );
 
                 $stock = (float) $item->stock;
                 $markup = App\Models\Currency::markupPercent($checkinPrice, $checkoutPrice);
