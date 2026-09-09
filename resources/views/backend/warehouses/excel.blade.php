@@ -78,30 +78,55 @@
                         ? (float) $latestCheckout->total_price / (float) $latestCheckout->qty
                         : (float) $latestCheckout->price)
                     : 0;
-                if ($latestCheckout) {
-                    $checkoutDocument = $latestCheckout->checkid;
-                    $checkoutFallbackRate = App\Models\Currency::usdRateForDate(
-                        optional($checkoutDocument)->date ?? $latestCheckout->created_at
-                    );
-                    $checkoutPrice = App\Models\Currency::documentAmountToUzs(
-                        $checkoutRawPrice,
-                        optional($checkoutDocument)->currency_type,
-                        optional($checkoutDocument)->currency_type_price ?: $checkoutFallbackRate,
-                        $latestCheckout->currency_type,
-                        $latestCheckout->currency_type_price
-                    );
-                } else {
-                    $checkoutPrice = 0;
-                }
-
-                // Kirim narxi faqat kirim hujjatining valyutasi va o'sha
-                // hujjatda saqlangan tarixiy kurs asosida UZSga o'tkaziladi.
+                // Kirim narxini avval hujjat sanasidagi kurs bilan UZSga o'tkazamiz.
                 $checkinPrice = App\Models\Currency::documentAmountToUzs(
                     $checkinRawPrice,
                     optional($checkinDocument)->currency_type,
                     optional($checkinDocument)->currency_type_price ?: $checkinFallbackRate,
                     $latestCheckin->currency_type ?? null,
                     $latestCheckin->currency_type_price ?? null
+                );
+
+                if ($latestCheckout) {
+                    $checkoutDocument = $latestCheckout->checkid;
+                    $checkoutFallbackRate = App\Models\Currency::usdRateForDate(
+                        optional($checkoutDocument)->date ?? $latestCheckout->created_at
+                    );
+                    $checkoutPrice = App\Models\Currency::saleUnitPriceToUzs(
+                        $checkoutRawPrice,
+                        $checkinPrice,
+                        optional($checkoutDocument)->currency_type,
+                        optional($checkoutDocument)->currency_type_price ?: $checkoutFallbackRate,
+                        $latestCheckout->currency_type,
+                        $latestCheckout->currency_type_price,
+                        $checkoutFallbackRate
+                    );
+                } else {
+                    $checkoutPrice = 0;
+                    $checkoutFallbackRate = App\Models\Currency::usdRate();
+                }
+
+                // Eski kirimda USD narxi UZS deb belgilangan bo'lsa, sotuv narxiga
+                // nisbatan tarixiy kurs bilan xavfsiz tiklanadi.
+                $checkinPrice = App\Models\Currency::purchaseUnitPriceToUzs(
+                    $checkinRawPrice,
+                    $checkoutPrice,
+                    optional($checkinDocument)->currency_type,
+                    optional($checkinDocument)->currency_type_price ?: $checkinFallbackRate,
+                    $latestCheckin->currency_type ?? null,
+                    $latestCheckin->currency_type_price ?? null,
+                    $checkinFallbackRate
+                );
+
+                // Faqat -99% kabi mutlaqo noreal eski yozuvlarda USD/UZS
+                // variantlaridan iqtisodiy jihatdan eng mantiqlisi tanlanadi.
+                [$checkinPrice, $checkoutPrice] = App\Models\Currency::reconcileLegacyUnitPrices(
+                    $checkinRawPrice,
+                    $checkoutRawPrice,
+                    $checkinPrice,
+                    $checkoutPrice,
+                    $checkinFallbackRate,
+                    $checkoutFallbackRate
                 );
 
                 $stock = (float) $item->stock;

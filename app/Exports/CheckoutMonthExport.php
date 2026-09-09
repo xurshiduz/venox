@@ -135,10 +135,13 @@ class CheckoutMonthExport implements FromView, WithStyles
             foreach ($checkout->checkoutDetails as $detail) {
                 $qty = (float) $detail->qty;
                 $checkoutDate = Carbon::parse($checkout->date ?: $checkout->created_at)->endOfDay();
+                $rawSaleTotal = (float) ($detail->total_price ?? ((float) $detail->price * $qty));
+                $rawSaleUnit = $qty != 0 ? $rawSaleTotal / $qty : 0;
+                $saleRate = (float) ($checkout->currency_type_price ?: Currency::usdRateForDate($checkout->date ?: $checkout->created_at));
                 $totalUsd = Currency::documentAmountToUsd(
-                    (float) ($detail->total_price ?? ((float) $detail->price * $qty)),
+                    $rawSaleTotal,
                     (int) $checkout->currency_type,
-                    (float) ($checkout->currency_type_price ?? 0),
+                    $saleRate,
                     $checkout->date ?: $checkout->created_at
                 );
                 $unitPriceUsd = $qty != 0 ? $totalUsd / $qty : 0;
@@ -160,23 +163,62 @@ class CheckoutMonthExport implements FromView, WithStyles
                     ->first();
 
                 $factoryPriceUsd = 0;
+                $factoryPriceUzs = 0;
+                $rawCheckinUnit = 0;
+                $checkinRate = Currency::usdRateForDate($checkout->date ?: $checkout->created_at);
                 if ($latestCheckin) {
                     $checkin = $latestCheckin->checkid;
                     $checkinQty = (float) $latestCheckin->qty;
                     $checkinUnitPrice = $checkinQty > 0 && (float) $latestCheckin->total_price > 0
                         ? (float) $latestCheckin->total_price / $checkinQty
                         : (float) $latestCheckin->price;
-                    $factoryPriceUsd = Currency::documentAmountToUsd(
-                        $checkinUnitPrice,
+                    $rawCheckinUnit = $checkinUnitPrice;
+                    $checkinRate = (float) (optional($checkin)->currency_type_price ?: Currency::usdRateForDate(optional($checkin)->date ?? $latestCheckin->created_at));
+                    $factoryPriceUzs = Currency::documentAmountToUzs(
+                        $rawCheckinUnit,
                         (int) (optional($checkin)->currency_type ?? $latestCheckin->currency_type ?? 2),
-                        (float) (optional($checkin)->currency_type_price ?? $latestCheckin->currency_type_price ?? 0),
-                        optional($checkin)->date ?? $latestCheckin->created_at
+                        $checkinRate,
+                        $latestCheckin->currency_type,
+                        $latestCheckin->currency_type_price
                     );
                 }
 
-                $markupPercent = $factoryPriceUsd > 0
-                    ? (($unitPriceUsd - $factoryPriceUsd) / $factoryPriceUsd) * 100
-                    : null;
+                $salePriceUzs = Currency::saleUnitPriceToUzs(
+                    $rawSaleUnit,
+                    $factoryPriceUzs,
+                    $checkout->currency_type,
+                    $saleRate,
+                    $detail->currency_type,
+                    $detail->currency_type_price,
+                    $saleRate
+                );
+
+                if ($latestCheckin) {
+                    $factoryPriceUzs = Currency::purchaseUnitPriceToUzs(
+                        $rawCheckinUnit,
+                        $salePriceUzs,
+                        optional($checkin)->currency_type,
+                        $checkinRate,
+                        $latestCheckin->currency_type,
+                        $latestCheckin->currency_type_price,
+                        $checkinRate
+                    );
+                    [$factoryPriceUzs, $salePriceUzs] = Currency::reconcileLegacyUnitPrices(
+                        $rawCheckinUnit,
+                        $rawSaleUnit,
+                        $factoryPriceUzs,
+                        $salePriceUzs,
+                        $checkinRate,
+                        $saleRate
+                    );
+                }
+
+                // Eksport USDda, ammo foiz avval ikkala narx UZSga
+                // tenglashtirilgandan keyin hisoblanadi.
+                $unitPriceUsd = $saleRate > 1 ? $salePriceUzs / $saleRate : 0;
+                $totalUsd = $unitPriceUsd * $qty;
+                $factoryPriceUsd = $saleRate > 1 ? $factoryPriceUzs / $saleRate : 0;
+                $markupPercent = Currency::markupPercent($factoryPriceUzs, $salePriceUzs);
 
                 $groupedRows[$clientKey]['products'][] = $detail->prodid->name ?? 'Noma\'lum mahsulot';
                 $groupedRows[$clientKey]['quantities'][] = $qty;
