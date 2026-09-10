@@ -30,7 +30,10 @@ class StockExport implements FromView, WithEvents, WithTitle
 
     public function title(): string
     {
-        return 'Лист1';
+        $warehouseName = (string) Warehouse::where('code', $this->id)->value('name');
+        $warehouseName = preg_replace('/[\\[\\]\\*\\?\\:\\/\\\\]/u', '-', $warehouseName);
+
+        return mb_substr(trim($warehouseName) ?: 'Ombor', 0, 31);
     }
 
     public function registerEvents(): array
@@ -56,7 +59,7 @@ class StockExport implements FromView, WithEvents, WithTitle
                     $sheet->getColumnDimension($column)->setWidth($width);
                 }
 
-                $sheet->getRowDimension(1)->setRowHeight(15.75);
+                $sheet->getRowDimension(1)->setRowHeight(30);
                 $sheet->getRowDimension(2)->setRowHeight(72);
                 for ($row = 3; $row <= $lastRow; $row++) {
                     $sheet->getRowDimension($row)->setRowHeight(33);
@@ -65,6 +68,19 @@ class StockExport implements FromView, WithEvents, WithTitle
                 if ($lastRow < 2) {
                     return;
                 }
+
+                $sheet->mergeCells('B1:I1');
+                $sheet->getStyle('B1:I1')->applyFromArray([
+                    'font' => [
+                        'name' => 'Calibri',
+                        'size' => 16,
+                        'bold' => true,
+                    ],
+                    'alignment' => [
+                        'horizontal' => Alignment::HORIZONTAL_CENTER,
+                        'vertical' => Alignment::VERTICAL_CENTER,
+                    ],
+                ]);
 
                 $tableRange = 'B2:I' . $lastRow;
                 $sheet->getStyle($tableRange)->applyFromArray([

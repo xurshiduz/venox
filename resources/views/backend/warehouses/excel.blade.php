@@ -4,9 +4,8 @@
 <table>
     <tbody>
         <tr>
-            @for($column = 0; $column < 9; $column++)
-                <td></td>
-            @endfor
+            <td></td>
+            <th colspan="8">Ombor qoldig'i: {{ $wareid->name }}</th>
         </tr>
         <tr>
             <td></td>

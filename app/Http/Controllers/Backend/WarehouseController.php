@@ -120,8 +120,10 @@ class WarehouseController extends Controller
     public function warehouse_stock(Request $request, $id)
     { 
         $usdRate = Currency::usdRate();
+        $warehouse = Warehouse::where('code', $id)->firstOrFail();
+        $fileName = 'ombor-qoldigi-' . (Str::slug($warehouse->name) ?: 'ombor') . '-' . now()->format('Y-m-d') . '.xlsx';
 
-        return Excel::download(new StockExport($id, $usdRate), 'export- ' . $id . '.xlsx');
+        return Excel::download(new StockExport($id, $usdRate), $fileName);
     }
     
     public function warehouse_stock_param($id, $take, $pag)
@@ -131,14 +133,17 @@ class WarehouseController extends Controller
     
     public function warehouse_stock_input(Request $request)
     { 
-        $wareid = Warehouse::where('code', $request->id)->first()->name;
+        $warehouse = Warehouse::where('code', $request->id)->firstOrFail();
+        $wareid = $warehouse->name;
         
         $id = $request->id;
         $take = $request->take;
         $pag = $request->pag;
         $usdRate = Currency::usdRate();
 
-        return Excel::download(new StockExportParam($id, $take, $pag, $usdRate), 'filter- ' . $wareid . '-' . $take . '-' . $pag . '.xlsx');
+        $fileName = 'ombor-qoldigi-' . (Str::slug($wareid) ?: 'ombor') . '-qism-' . $take . '-' . $pag . '.xlsx';
+
+        return Excel::download(new StockExportParam($id, $take, $pag, $usdRate), $fileName);
     }
 
     public function warehouse_stock_refresh($id)
