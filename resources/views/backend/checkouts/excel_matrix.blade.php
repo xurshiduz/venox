@@ -1,11 +1,13 @@
 <table>
     <thead>
         <tr>
-            <th colspan="12" style="font-weight:bold; font-size:14px; text-align:left;">{{ $periodLabel }} оралиғидаги мижозлар ҳисоботи (USD)</th>
+            <th colspan="14" style="font-weight:bold; font-size:14px; text-align:left;">{{ $periodLabel }} оралиғидаги мижозлар ҳисоботи (USD)</th>
         </tr>
         <tr>
             <th>Сана</th>
             <th>Мижоз номи</th>
+            <th>Мижоз телефони</th>
+            <th>Сотган агент</th>
             <th>Умумий қарзи</th>
             <th>Товар Тўлиқ Номи ва Ҳажми</th>
             <th>Миқдори (шт/л)</th>
@@ -23,6 +25,8 @@
             <tr>
                 <td>{!! nl2br(e($row['date'])) !!}</td>
                 <td>{{ $row['client'] }}</td>
+                <td>{{ $row['client_phone'] }}</td>
+                <td>{{ $row['agent'] }}</td>
                 <td>{{ $row['debt_before_payment'] }}</td>
                 <td>{!! nl2br(e($row['product'])) !!}</td>
                 <td>{!! nl2br(e($row['qty'])) !!}</td>
@@ -36,14 +40,14 @@
             </tr>
         @endforeach
         <tr>
-            <td colspan="2" style="font-weight:bold; text-align:right;">Жами:</td>
+            <td colspan="4" style="font-weight:bold; text-align:right;">Жами:</td>
             <td>{{ $totals['debt_before_payment'] }}</td>
             <td></td>
             <td>{{ $totals['qty'] }}</td>
             <td></td>
             <td></td>
             <td></td>
-            <td>{{ count($rows) ? '=SUM(I3:I'.(count($rows) + 2).')' : 0 }}</td>
+            <td>{{ count($rows) ? '=SUM(K3:K'.(count($rows) + 2).')' : 0 }}</td>
             <td>{{ $totals['paid_usd'] }}</td>
             <td>{{ $totals['closing_debt_usd'] }}</td>
             <td>{{ $totals['bonus_expense_usd'] }}</td>

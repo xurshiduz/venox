@@ -41,7 +41,7 @@ class CheckoutMonthExport implements FromView, WithStyles
         $periodStart = Carbon::parse($this->startDate)->startOfDay();
         $periodEnd = Carbon::parse($this->endDate)->endOfDay();
 
-        $checkouts = Checkout::with(['supid', 'checkoutDetails.prodid'])
+        $checkouts = Checkout::with(['supid', 'managerid', 'checkoutDetails.prodid'])
             ->whereDate('date', '>=', $periodStart->toDateString())
             ->whereDate('date', '<=', $periodEnd->toDateString())
             ->orderBy('date')
@@ -117,8 +117,10 @@ class CheckoutMonthExport implements FromView, WithStyles
                 $groupedRows[$clientKey] = [
                     'dates' => [],
                     'client' => $checkout->supid->name ?? 'Noma\'lum mijoz',
+                    'client_phone' => $checkout->supid->phone ?? null,
                     'debt_before_payment' => $closing + $paid,
                     'products' => [],
+                    'agents' => [],
                     'quantities' => [],
                     'unit_prices' => [],
                     'factory_prices' => [],
@@ -221,6 +223,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                 $markupPercent = Currency::markupPercent($factoryPriceUzs, $salePriceUzs);
 
                 $groupedRows[$clientKey]['products'][] = $detail->prodid->name ?? 'Noma\'lum mahsulot';
+                $groupedRows[$clientKey]['agents'][] = $checkout->managerid->name ?? '—';
                 $groupedRows[$clientKey]['quantities'][] = $qty;
                 $groupedRows[$clientKey]['unit_prices'][] = $unitPriceUsd;
                 $groupedRows[$clientKey]['factory_prices'][] = $factoryPriceUsd;
@@ -241,6 +244,8 @@ class CheckoutMonthExport implements FromView, WithStyles
                 $rows[] = [
                     'date' => $first ? collect($row['dates'])->unique()->implode("\n") : null,
                     'client' => $first ? $row['client'] : null,
+                    'client_phone' => $first ? $row['client_phone'] : null,
+                    'agent' => $row['agents'][$index] ?? '—',
                     'debt_before_payment' => $first ? $row['debt_before_payment'] : null,
                     'product' => $product,
                     'qty' => $qty,
@@ -256,7 +261,7 @@ class CheckoutMonthExport implements FromView, WithStyles
 
             $endRow = count($rows) + 2;
             if ($endRow > $startRow) {
-                foreach (['A', 'B', 'C', 'J', 'K', 'L'] as $column) {
+                foreach (['A', 'B', 'C', 'E', 'L', 'M', 'N'] as $column) {
                     $this->mergeRanges[] = $column . $startRow . ':' . $column . $endRow;
                 }
             }
@@ -329,7 +334,7 @@ class CheckoutMonthExport implements FromView, WithStyles
         $lastRow = max(3, $this->rowCount + 3);
         $sheet->setShowGridlines(false);
         $sheet->freezePane('A3');
-        $sheet->setAutoFilter('A2:L' . max(2, $this->rowCount + 2));
+        $sheet->setAutoFilter('A2:N' . max(2, $this->rowCount + 2));
         $sheet->getDefaultRowDimension()->setRowHeight(44);
         $sheet->getRowDimension(1)->setRowHeight(28);
         $sheet->getRowDimension(2)->setRowHeight(48);
@@ -342,22 +347,22 @@ class CheckoutMonthExport implements FromView, WithStyles
             $sheet->mergeCells($range);
         }
 
-        foreach (['A' => 13, 'B' => 28, 'C' => 20, 'D' => 52, 'E' => 15, 'F' => 16, 'G' => 16, 'H' => 20, 'I' => 18, 'J' => 17, 'K' => 18, 'L' => 22] as $column => $width) {
+        foreach (['A' => 13, 'B' => 28, 'C' => 19, 'D' => 24, 'E' => 20, 'F' => 52, 'G' => 15, 'H' => 16, 'I' => 16, 'J' => 20, 'K' => 18, 'L' => 17, 'M' => 18, 'N' => 22] as $column => $width) {
             $sheet->getColumnDimension($column)->setWidth($width);
         }
 
-        $sheet->getStyle('A1:L' . $lastRow)->getAlignment()
+        $sheet->getStyle('A1:N' . $lastRow)->getAlignment()
             ->setVertical(Alignment::VERTICAL_CENTER)
             ->setHorizontal(Alignment::HORIZONTAL_CENTER)
             ->setWrapText(true);
-        $sheet->getStyle('A2:L2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-        $sheet->getStyle('A2:L2')->getFont()->setBold(true)->getColor()->setRGB('000000');
-        $sheet->getStyle('A2:L' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('C9C9C9');
-        $sheet->getStyle('E3:E' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.###');
-        $sheet->getStyle('C3:C' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
-        $sheet->getStyle('F3:G' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
-        $sheet->getStyle('H3:H' . $lastRow)->getNumberFormat()->setFormatCode('0.00%');
-        $sheet->getStyle('I3:L' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
-        $sheet->getStyle('A' . $lastRow . ':L' . $lastRow)->getFont()->setBold(true);
+        $sheet->getStyle('A2:N2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('A2:N2')->getFont()->setBold(true)->getColor()->setRGB('000000');
+        $sheet->getStyle('A2:N' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('C9C9C9');
+        $sheet->getStyle('G3:G' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.###');
+        $sheet->getStyle('E3:E' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
+        $sheet->getStyle('H3:I' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
+        $sheet->getStyle('J3:J' . $lastRow)->getNumberFormat()->setFormatCode('0.00%');
+        $sheet->getStyle('K3:N' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
+        $sheet->getStyle('A' . $lastRow . ':N' . $lastRow)->getFont()->setBold(true);
     }
 }
