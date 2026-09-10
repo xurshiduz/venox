@@ -42,6 +42,7 @@ class CheckoutMonthExport implements FromView, WithStyles
         $periodEnd = Carbon::parse($this->endDate)->endOfDay();
 
         $checkouts = Checkout::with(['supid', 'managerid', 'checkoutDetails.prodid'])
+            ->where('status', 1)
             ->whereDate('date', '>=', $periodStart->toDateString())
             ->whereDate('date', '<=', $periodEnd->toDateString())
             ->orderBy('date')
@@ -57,10 +58,11 @@ class CheckoutMonthExport implements FromView, WithStyles
         $checkinPrices = CheckinDetail::with('checkid')
             ->whereIn('product_id', $productIds)
             ->where('status', 1)
-            ->where('price', '>', 0)
+            // 1.00 narxli eski inventar/ko'chirish yozuvlari tannarx emas.
+            ->where('price', '>', 1)
             ->whereHas('checkid', function ($query) use ($periodEnd) {
                 $query->where('status', 1)
-                    ->where('type_id', '!=', 4)
+                    ->where('type_id', 1)
                     ->whereDate('date', '<=', $periodEnd->toDateString());
             })
             ->get()
@@ -165,7 +167,6 @@ class CheckoutMonthExport implements FromView, WithStyles
                     ->first();
 
                 $factoryPriceUsd = 0;
-                $factoryPriceUzs = 0;
                 $rawCheckinUnit = 0;
                 $checkinRate = Currency::usdRateForDate($checkout->date ?: $checkout->created_at);
                 if ($latestCheckin) {
@@ -176,51 +177,36 @@ class CheckoutMonthExport implements FromView, WithStyles
                         : (float) $latestCheckin->price;
                     $rawCheckinUnit = $checkinUnitPrice;
                     $checkinRate = (float) (optional($checkin)->currency_type_price ?: Currency::usdRateForDate(optional($checkin)->date ?? $latestCheckin->created_at));
-                    $factoryPriceUzs = Currency::documentAmountToUzs(
+                    // Kirim qatorining valyutasi eski sarlavhadagi xato belgidan
+                    // ishonchliroq; har bir hujjat o'z tarixiy kursida USDga o'tadi.
+                    $factoryPriceUsd = Currency::documentAmountToUsd(
                         $rawCheckinUnit,
-                        (int) (optional($checkin)->currency_type ?? $latestCheckin->currency_type ?? 2),
-                        $checkinRate,
-                        $latestCheckin->currency_type,
-                        $latestCheckin->currency_type_price
+                        (int) ($latestCheckin->currency_type ?? optional($checkin)->currency_type ?? 2),
+                        (float) ($latestCheckin->currency_type_price ?: $checkinRate),
+                        optional($checkin)->date ?? $latestCheckin->created_at
                     );
                 }
 
-                $salePriceUzs = Currency::saleUnitPriceToUzs(
+                // Har bir hujjat o'z sanasida saqlangan kurs bo'yicha USDga o'tadi.
+                // Bu tarixiy UZS va USD narxlarini taxminsiz, bir valyutada solishtiradi.
+                $unitPriceUsd = Currency::documentAmountToUsd(
                     $rawSaleUnit,
-                    $factoryPriceUzs,
-                    $checkout->currency_type,
+                    (int) $checkout->currency_type,
                     $saleRate,
-                    $detail->currency_type,
-                    $detail->currency_type_price,
-                    $saleRate
+                    $checkout->date ?: $checkout->created_at
                 );
-
-                if ($latestCheckin) {
-                    $factoryPriceUzs = Currency::purchaseUnitPriceToUzs(
-                        $rawCheckinUnit,
-                        $salePriceUzs,
-                        optional($checkin)->currency_type,
-                        $checkinRate,
-                        $latestCheckin->currency_type,
-                        $latestCheckin->currency_type_price,
-                        $checkinRate
-                    );
-                    [$factoryPriceUzs, $salePriceUzs] = Currency::reconcileLegacyUnitPrices(
-                        $rawCheckinUnit,
-                        $rawSaleUnit,
-                        $factoryPriceUzs,
-                        $salePriceUzs,
-                        $checkinRate,
-                        $saleRate
-                    );
+                // Ayrim eski hujjatlarda narx USDda kiritilgan, ammo valyuta UZS va
+                // kurs 1 bo'lib qolgan (masalan checkout #613). Faqat shu aniq
+                // legacy holatni USD sifatida tiklaymiz; odatiy UZS savdoga tegmaymiz.
+                if ((int) $checkout->currency_type === 2
+                    && (float) $checkout->currency_type_price <= 1
+                    && $rawSaleUnit > 0
+                    && $rawSaleUnit < 1000
+                    && $factoryPriceUsd > 0) {
+                    $unitPriceUsd = $rawSaleUnit;
                 }
-
-                // Eksport USDda, ammo foiz avval ikkala narx UZSga
-                // tenglashtirilgandan keyin hisoblanadi.
-                $unitPriceUsd = $saleRate > 1 ? $salePriceUzs / $saleRate : 0;
                 $totalUsd = $unitPriceUsd * $qty;
-                $factoryPriceUsd = $saleRate > 1 ? $factoryPriceUzs / $saleRate : 0;
-                $markupPercent = Currency::markupPercent($factoryPriceUzs, $salePriceUzs);
+                $markupPercent = Currency::markupPercent($factoryPriceUsd, $unitPriceUsd);
 
                 $groupedRows[$clientKey]['products'][] = $detail->prodid->name ?? 'Noma\'lum mahsulot';
                 $groupedRows[$clientKey]['agents'][] = $checkout->managerid->name ?? '—';

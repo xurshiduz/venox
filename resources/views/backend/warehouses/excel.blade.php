@@ -39,37 +39,48 @@
 
         @foreach($stocks as $item)
             @php
-                $latestCheckin = $item->productid->checkindetails()
+                $checkinQuery = $item->productid->checkindetails()
                     ->with('checkid')
-                    ->where('warehouse_id', $wareid->id)
                     ->where('status', 1)
-                    ->where('price', '>', 0)
-                    ->latest('created_at')
-                    ->latest('id')
-                    ->first();
+                    // 1.00 bilan yozilgan eski inventar/ko'chirish qatorlari
+                    // haqiqiy xarid tannarxi emas.
+                    ->where('price', '>', 1)
+                    ->whereHas('checkid', function ($query) {
+                        $query->where('status', 1)->where('type_id', 1);
+                    });
+
+                $latestCheckin = (clone $checkinQuery)
+                    ->where('warehouse_id', $wareid->id)
+                    ->orderByDesc(App\Models\Checkin::select('date')
+                        ->whereColumn('checkins.id', 'checkin_details.checkin_id')
+                        ->limit(1))
+                    ->latest('id')->first()
+                    ?: (clone $checkinQuery)
+                        ->orderByDesc(App\Models\Checkin::select('date')
+                            ->whereColumn('checkins.id', 'checkin_details.checkin_id')
+                            ->limit(1))
+                        ->latest('id')->first();
 
                 $checkinRawPrice = $latestCheckin
                     ? (((float) $latestCheckin->qty > 0 && (float) $latestCheckin->total_price > 0)
                         ? (float) $latestCheckin->total_price / (float) $latestCheckin->qty
                         : (float) $latestCheckin->price)
                     : (float) $item->checkin_price;
-                // Valyuta hujjat sarlavhasida tanlanadi. Eski detail qatorlarida
-                // noto'g'ri standart qiymat bo'lishi mumkin, shu sabab header ustun.
                 $checkinDocument = optional($latestCheckin)->checkid;
                 $checkinFallbackRate = App\Models\Currency::usdRateForDate(
                     optional($checkinDocument)->date ?? optional($latestCheckin)->created_at
                 );
-                // Sotuv narxi faqat USDda rasmiylashtirilgan, yakunlangan sotuvdan olinadi.
-                // UZS sotuvlar bu hisobotga aralashmaydi.
                 $latestCheckout = $item->productid->checkoutdetails()
                     ->with('checkid')
                     ->where('status', 1)
                     ->where('price', '>', 0)
                     ->whereHas('checkid', function ($query) {
-                        $query->where('status', 1)
-                            ->where('currency_type', 1);
+                        // Ombor marjasi uchun faqat USDda sotilgan narx olinadi.
+                        $query->where('status', 1)->where('currency_type', 1);
                     })
-                    ->latest('created_at')
+                    ->orderByDesc(App\Models\Checkout::select('date')
+                        ->whereColumn('checkouts.id', 'checkout_details.checkout_id')
+                        ->limit(1))
                     ->latest('id')
                     ->first();
 
@@ -78,13 +89,14 @@
                         ? (float) $latestCheckout->total_price / (float) $latestCheckout->qty
                         : (float) $latestCheckout->price)
                     : 0;
-                // Kirim narxini avval hujjat sanasidagi kurs bilan UZSga o'tkazamiz.
+                // Eski kirim sarlavhalarida valyuta noto'g'ri qolgan holatlar bor.
+                // Qatorning o'z valyutasi haqiqiy narxni aniqroq ifodalaydi.
                 $checkinPrice = App\Models\Currency::documentAmountToUzs(
                     $checkinRawPrice,
+                    optional($latestCheckin)->currency_type ?? optional($checkinDocument)->currency_type,
+                    optional($latestCheckin)->currency_type_price ?: $checkinFallbackRate,
                     optional($checkinDocument)->currency_type,
-                    optional($checkinDocument)->currency_type_price ?: $checkinFallbackRate,
-                    $latestCheckin->currency_type ?? null,
-                    $latestCheckin->currency_type_price ?? null
+                    optional($checkinDocument)->currency_type_price
                 );
 
                 if ($latestCheckout) {
@@ -92,42 +104,17 @@
                     $checkoutFallbackRate = App\Models\Currency::usdRateForDate(
                         optional($checkoutDocument)->date ?? $latestCheckout->created_at
                     );
-                    $checkoutPrice = App\Models\Currency::saleUnitPriceToUzs(
+                    $checkoutPrice = App\Models\Currency::documentAmountToUzs(
                         $checkoutRawPrice,
-                        $checkinPrice,
                         optional($checkoutDocument)->currency_type,
                         optional($checkoutDocument)->currency_type_price ?: $checkoutFallbackRate,
                         $latestCheckout->currency_type,
-                        $latestCheckout->currency_type_price,
-                        $checkoutFallbackRate
+                        $latestCheckout->currency_type_price
                     );
                 } else {
                     $checkoutPrice = 0;
                     $checkoutFallbackRate = App\Models\Currency::usdRate();
                 }
-
-                // Eski kirimda USD narxi UZS deb belgilangan bo'lsa, sotuv narxiga
-                // nisbatan tarixiy kurs bilan xavfsiz tiklanadi.
-                $checkinPrice = App\Models\Currency::purchaseUnitPriceToUzs(
-                    $checkinRawPrice,
-                    $checkoutPrice,
-                    optional($checkinDocument)->currency_type,
-                    optional($checkinDocument)->currency_type_price ?: $checkinFallbackRate,
-                    $latestCheckin->currency_type ?? null,
-                    $latestCheckin->currency_type_price ?? null,
-                    $checkinFallbackRate
-                );
-
-                // Faqat -99% kabi mutlaqo noreal eski yozuvlarda USD/UZS
-                // variantlaridan iqtisodiy jihatdan eng mantiqlisi tanlanadi.
-                [$checkinPrice, $checkoutPrice] = App\Models\Currency::reconcileLegacyUnitPrices(
-                    $checkinRawPrice,
-                    $checkoutRawPrice,
-                    $checkinPrice,
-                    $checkoutPrice,
-                    $checkinFallbackRate,
-                    $checkoutFallbackRate
-                );
 
                 $stock = (float) $item->stock;
                 $markup = App\Models\Currency::markupPercent($checkinPrice, $checkoutPrice);
