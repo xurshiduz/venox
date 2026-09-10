@@ -120,7 +120,9 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'dates' => [],
                     'client' => $checkout->supid->name ?? 'Noma\'lum mijoz',
                     'client_phone' => $checkout->supid->phone ?? null,
-                    'debt_before_payment' => $closing + $paid,
+                    // Davr boshidagi qarz keyinroq, ushbu davrdagi sotuvlar
+                    // yig'indisi aniqlangach hisoblanadi.
+                    'debt_before_payment' => 0,
                     'products' => [],
                     'agents' => [],
                     'quantities' => [],
@@ -220,6 +222,11 @@ class CheckoutMonthExport implements FromView, WithStyles
 
         $rows = [];
         foreach ($groupedRows as $row) {
+            // Qoldiq qarz = oldingi qarz + davrdagi sotuvlar - davrdagi to'lovlar.
+            // Shu tenglamadan davr boshidagi qarzni tiklaymiz.
+            $row['debt_before_payment'] = $row['closing_debt_usd']
+                + $row['paid_usd']
+                - $row['total_usd'];
             $startRow = count($rows) + 3;
             foreach ($row['products'] as $index => $product) {
                 $qty = (float) $row['quantities'][$index];
@@ -260,7 +267,11 @@ class CheckoutMonthExport implements FromView, WithStyles
             'rows' => $rows,
             'periodLabel' => $periodStart->format('d.m.Y') . ' — ' . $periodEnd->format('d.m.Y'),
             'totals' => [
-                'debt_before_payment' => $clientIds->sum(fn ($id) => (float) ($closingDebts[(string) $id] ?? 0) + (float) ($clientPayments[(string) $id] ?? 0)),
+                'debt_before_payment' => collect($groupedRows)->sum(fn ($row) =>
+                    (float) $row['closing_debt_usd']
+                    + (float) $row['paid_usd']
+                    - (float) $row['total_usd']
+                ),
                 'qty' => collect($groupedRows)->sum(fn ($row) => collect($row['quantities'])->sum()),
                 'paid_usd' => $clientIds->sum(fn ($id) => (float) ($clientPayments[(string) $id] ?? 0)),
                 'closing_debt_usd' => $clientIds->sum(fn ($id) => (float) ($closingDebts[(string) $id] ?? 0)),
