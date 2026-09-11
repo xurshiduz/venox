@@ -8,6 +8,7 @@ use Maatwebsite\Excel\Concerns\FromView;
 use App\Models\CashReceipt;
 use App\Models\Checkout;
 use App\Models\Checkin;
+use App\Models\CashExpenditure;
 use App\Models\Setting;
 use App\Models\Client;
 
@@ -30,9 +31,16 @@ class ActExcel implements FromView
         $checkouts = Checkout::where('client_id', $this->clientid)->whereBetween('date', [$this->from, $this->to])->get();
         $cashs = CashReceipt::where('status', 1)->where('client_id', $this->clientid)->whereBetween('date', [$this->from, $this->to])->get();
         $checkins = Checkin::where('status', 1)->where('client_id', $this->clientid)->whereBetween('date', [$this->from, $this->to])->get();
-        $data = $checkouts->concat($cashs)->concat($checkins)->sortBy('date');
-        
-        $data = $checkouts->concat($cashs)->concat($checkins)->sortBy('date');
+        $cashExpenditures = CashExpenditure::where('supplier_id', $this->clientid)
+            ->where('cash_expenditure_types', 8)
+            ->whereBetween('date', [$this->from, $this->to])
+            ->get();
+
+        $data = $checkouts
+            ->concat($cashs)
+            ->concat($checkins)
+            ->concat($cashExpenditures)
+            ->sortBy('date');
         
         return view('backend.reconciliation_act.excel', compact('data', 'from', 'to', 'client', 'comp'));
     }

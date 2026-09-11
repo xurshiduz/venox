@@ -59,11 +59,13 @@
 					<tbody>
                         <tr style="text-align: center;">
                             <td style="padding: 0px 5px;">Дата</td>
+                            <td style="padding: 0px 5px;">Тип операции</td>
                             <td style="padding: 0px 5px;">Операции</td>
                             <td style="padding: 0px 5px;" colspan="2">{{ $comp }}</td>
                             <td style="padding: 0px 5px;" colspan="2">{{ $client->name }}</td>
                         </tr>
                         <tr style="text-align: center;">
+                            <td style="padding: 0px 5px;"></td>
                             <td style="padding: 0px 5px;"></td>
                             <td style="padding: 0px 5px;"></td>
                             <td style="padding: 0px 5px;">Дебет</td>
@@ -74,7 +76,7 @@
 
                         {{-- BOSHLANG'ICH SALDO QISMI --}}
                         <tr style="text-align: center;">
-                            <td style="padding: 0px 5px; text-align: end;" colspan="2"><b>Сальдо на {{ Carbon\Carbon::parse($from)->format('d.m.Y') }}</b></td>
+                            <td style="padding: 0px 5px; text-align: end;" colspan="3"><b>Сальдо на {{ Carbon\Carbon::parse($from)->format('d.m.Y') }}</b></td>
                             
                             {{-- Kompaniya uchun (Agar mijoz qarzdor bo'lsa Debet, biz qarzdor bo'lsak Kredit) --}}
                             <td style="padding: 0px 5px;"><b>{{ $start_saldo > 0 ? number_format($start_saldo, 2, '.', ' ') : '' }}</b></td>
@@ -118,11 +120,22 @@
                             @endphp
                         <tr>
                             <td style="padding: 0px 5px; text-align: center;">{{ $item->date }}</td>
+                            <td style="padding: 0px 5px; text-align: center; font-weight: bold;">
+                                @if($item instanceof \App\Models\Checkout)
+                                    Продажа
+                                @elseif($item instanceof \App\Models\Checkin)
+                                    Возврат товара
+                                @elseif($item instanceof \App\Models\CashExpenditure)
+                                    Возврат денег
+                                @else
+                                    Оплата
+                                @endif
+                            </td>
                             <td style="padding: 0px 5px;">
                                 @if(isset($item->checkout_tip_id)) 
                                     <a target="_blank" href="{{ route('checkout_form', ['id' => $item->code, 'view' => 'full']) }}" style="text-decoration: none; color: #000;"> Накладная - счет фактура №{{ $item->number_work }} - {{ $item->checkout_tip_id == 2 ? 'Обмен' : 'Обычный' }};</a> 
                                 @elseif(isset($item->step)) 
-                                    <a target="_blank" href="{{ route('checkin_form', ['id' => $item->code, 'view' => 'full']) }}" style="text-decoration: none; color: #000;"> Поступление товаров ИД; с/ф №{{ $item->number_work }} <b>({{ $item->reference }})</b>;</a>
+                                    <a target="_blank" href="{{ route('checkin_form', ['id' => $item->code, 'view' => 'full']) }}" style="text-decoration: none; color: #000;"> Возврат товара ИД; с/ф №{{ $item->number_work }} <b>({{ $item->reference }})</b>;</a>
                                 @elseif(isset($item->cash_expenditure_types))
                                     {{-- Pul chiqimi nomlanishi (Расходный кассовый ордер) --}}
                                     <a target="_blank" href="{{ route('cash_expenditure_form', ['id' => $item->code]) }}" style="text-decoration: none; color: #000;"> Расходный кассовый ордер №{{ $item->id }}; (Выдача денежных средств)</a>
@@ -143,7 +156,7 @@
 
                         {{-- OBOROTLAR --}}
                         <tr>
-                            <td style="padding: 0px 5px; text-align: end;" colspan="2">Обороты за период</td>
+                            <td style="padding: 0px 5px; text-align: end;" colspan="3">Обороты за период</td>
                             <td style="padding: 0px 5px; text-align: center;">{{ number_format($period_debet, 2, '.', ' ') }}</td>
                             <td style="padding: 0px 5px; text-align: center;">{{ number_format($period_credit, 2, '.', ' ') }}</td>
                             <td style="padding: 0px 5px; text-align: center;">{{ number_format($period_credit, 2, '.', ' ') }}</td>
@@ -157,7 +170,7 @@
                         @endphp
 
                         <tr>
-                            <td style="padding: 0px 5px; text-align: end;" colspan="2"><b>Сальдо на {{ Carbon\Carbon::parse($to)->format('d.m.Y') }}</b></td>
+                            <td style="padding: 0px 5px; text-align: end;" colspan="3"><b>Сальдо на {{ Carbon\Carbon::parse($to)->format('d.m.Y') }}</b></td>
                             
                             {{-- Kompaniya --}}
                             <td style="padding: 0px 5px; text-align: center;"><b>{{ $end_saldo > 0 ? number_format($end_saldo, 2, '.', ' ') : '' }}</b></td>
@@ -168,10 +181,10 @@
                             <td style="padding: 0px 5px; text-align: center;"><b>{{ $end_saldo > 0 ? number_format($end_saldo, 2, '.', ' ') : '' }}</b></td>
                         </tr>
                         <tr>
-                            <td style="padding: 0px 5px;" colspan="6">&nbsp;</td>
+                            <td style="padding: 0px 5px;" colspan="7">&nbsp;</td>
                         </tr>
                         <tr>
-                            <td style="padding: 0px 5px;" colspan="6"> 
+                            <td style="padding: 0px 5px;" colspan="7">
                                 @if($end_saldo != 0)  
                                     В пользу {{ $end_saldo > 0 ? $comp : $client->name }} 
                                     {{ number_format(abs($end_saldo), 2, '.', ' ') }} сум 
