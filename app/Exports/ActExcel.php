@@ -4,6 +4,9 @@ namespace App\Exports;
 
 use Illuminate\Contracts\View\View;
 use Maatwebsite\Excel\Concerns\FromView;
+use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Events\AfterSheet;
+use PhpOffice\PhpSpreadsheet\Style\Border;
 
 use App\Models\CashReceipt;
 use App\Models\Checkout;
@@ -12,7 +15,7 @@ use App\Models\CashExpenditure;
 use App\Models\Setting;
 use App\Models\Client;
 
-class ActExcel implements FromView
+class ActExcel implements FromView, WithEvents
 { 
     
     function __construct($from, $to, $clientid) {
@@ -43,5 +46,33 @@ class ActExcel implements FromView
             ->sortBy('date');
         
         return view('backend.reconciliation_act.excel', compact('data', 'from', 'to', 'client', 'comp'));
+    }
+
+    public function registerEvents(): array
+    {
+        return [
+            AfterSheet::class => function (AfterSheet $event) {
+                $sheet = $event->sheet->getDelegate();
+                $range = 'A1:' . $sheet->getHighestColumn() . $sheet->getHighestRow();
+
+                $sheet->getStyle($range)->applyFromArray([
+                    'borders' => [
+                        'allBorders' => [
+                            'borderStyle' => Border::BORDER_THIN,
+                            'color' => ['argb' => 'FF000000'],
+                        ],
+                    ],
+                ]);
+
+                $sheet->getStyle($range)->applyFromArray([
+                    'borders' => [
+                        'outline' => [
+                            'borderStyle' => Border::BORDER_MEDIUM,
+                            'color' => ['argb' => 'FF000000'],
+                        ],
+                    ],
+                ]);
+            },
+        ];
     }
 }
