@@ -199,8 +199,8 @@
                              foreach ($details as $key => $detail) {
                                 echo "<tr>";
         						echo "<td style='padding: 0px 5px;'> $key</td>";
-        						echo "<td style='padding: 0px 5px;'> $detail->barcode </td>";
-        						echo "<td style='padding: 0px 5px; text-align: center;'> $detail->product_id </td>";
+									echo "<td style='padding: 0px 5px;'> " . e(optional($detail->prodid)->name) . " </td>";
+									echo "<td style='padding: 0px 5px; text-align: center;'> " . e(optional(optional($detail->prodid)->unitid)->name) . " </td>";
         						echo "<td style='padding: 0px 5px; text-align: center;'> $detail->qty </td>";
         						echo "<td style='padding: 0px 5px;'> $detail->price </td>";
         						echo "<td style='padding: 0px 5px;'> $detail->total_price </td>";
