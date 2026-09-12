@@ -130,6 +130,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'factory_prices' => [],
                     'markup_percentages' => [],
                     'total_usd' => 0,
+                    'actual_total_usd' => 0,
                     'paid_usd' => $paid,
                     'closing_debt_usd' => $closing,
                     'bonus_expense_usd' => (float) ($clientBonusExpenses[$clientKey] ?? 0),
@@ -150,7 +151,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                     $saleRate,
                     $checkout->date ?: $checkout->created_at
                 );
-                $unitPriceUsd = $qty != 0 ? $totalUsd / $qty : 0;
+                $actualUnitPriceUsd = $qty != 0 ? $totalUsd / $qty : 0;
 
                 $availableCheckins = collect($checkinPrices->get($detail->product_id, []))
                     ->filter(function ($checkinDetail) use ($checkoutDate) {
@@ -168,7 +169,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                     })
                     ->first();
 
-                $factoryPriceUsd = 0;
+                $latestCheckinPriceUsd = 0;
                 $rawCheckinUnit = 0;
                 $checkinRate = Currency::usdRateForDate($checkout->date ?: $checkout->created_at);
                 if ($latestCheckin) {
@@ -181,7 +182,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                     $checkinRate = (float) (optional($checkin)->currency_type_price ?: Currency::usdRateForDate(optional($checkin)->date ?? $latestCheckin->created_at));
                     // Kirim qatorining valyutasi eski sarlavhadagi xato belgidan
                     // ishonchliroq; har bir hujjat o'z tarixiy kursida USDga o'tadi.
-                    $factoryPriceUsd = Currency::documentAmountToUsd(
+                    $latestCheckinPriceUsd = Currency::documentAmountToUsd(
                         $rawCheckinUnit,
                         (int) ($latestCheckin->currency_type ?? optional($checkin)->currency_type ?? 2),
                         (float) ($latestCheckin->currency_type_price ?: $checkinRate),
@@ -191,7 +192,7 @@ class CheckoutMonthExport implements FromView, WithStyles
 
                 // Har bir hujjat o'z sanasida saqlangan kurs bo'yicha USDga o'tadi.
                 // Bu tarixiy UZS va USD narxlarini taxminsiz, bir valyutada solishtiradi.
-                $unitPriceUsd = Currency::documentAmountToUsd(
+                $actualUnitPriceUsd = Currency::documentAmountToUsd(
                     $rawSaleUnit,
                     (int) $checkout->currency_type,
                     $saleRate,
@@ -204,9 +205,34 @@ class CheckoutMonthExport implements FromView, WithStyles
                     && (float) $checkout->currency_type_price <= 1
                     && $rawSaleUnit > 0
                     && $rawSaleUnit < 1000
-                    && $factoryPriceUsd > 0) {
-                    $unitPriceUsd = $rawSaleUnit;
+                    && $latestCheckinPriceUsd > 0) {
+                    $actualUnitPriceUsd = $rawSaleUnit;
                 }
+
+                // Oylik hisobotdagi "Sotuv Narxi" va "Zavod narxi" real
+                // hujjat/kirim narxidan emas, BOSS tasdiqlagan mahsulot
+                // praysidan olinadi. Product narxi bo'sh eski mahsulotlarda
+                // hisobotni buzmaslik uchun avvalgi hisob fallback bo'lib qoladi.
+                $product = $detail->prodid;
+                $productCurrencyType = $product && $product->currency_type
+                    ? (int) $product->currency_type
+                    : (int) $checkout->currency_type;
+                $unitPriceUsd = static::catalogUnitPriceUsd(
+                    (float) ($product->price ?? 0),
+                    $productCurrencyType,
+                    $actualUnitPriceUsd,
+                    $saleRate,
+                    $checkout->date ?: $checkout->created_at
+                );
+                $factoryPriceUsd = static::catalogUnitPriceUsd(
+                    (float) ($product->tan_price ?? 0),
+                    $productCurrencyType,
+                    $latestCheckinPriceUsd,
+                    $saleRate,
+                    $checkout->date ?: $checkout->created_at
+                );
+
+                $actualTotalUsd = $actualUnitPriceUsd * $qty;
                 $totalUsd = $unitPriceUsd * $qty;
                 $markupPercent = Currency::markupPercent($factoryPriceUsd, $unitPriceUsd);
 
@@ -217,6 +243,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                 $groupedRows[$clientKey]['factory_prices'][] = $factoryPriceUsd;
                 $groupedRows[$clientKey]['markup_percentages'][] = $markupPercent;
                 $groupedRows[$clientKey]['total_usd'] += $totalUsd;
+                $groupedRows[$clientKey]['actual_total_usd'] += $actualTotalUsd;
             }
         }
 
@@ -226,7 +253,7 @@ class CheckoutMonthExport implements FromView, WithStyles
             // Shu tenglamadan davr boshidagi qarzni tiklaymiz.
             $row['debt_before_payment'] = $row['closing_debt_usd']
                 + $row['paid_usd']
-                - $row['total_usd'];
+                - $row['actual_total_usd'];
             $startRow = count($rows) + 3;
             foreach ($row['products'] as $index => $product) {
                 $qty = (float) $row['quantities'][$index];
@@ -270,7 +297,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                 'debt_before_payment' => collect($groupedRows)->sum(fn ($row) =>
                     (float) $row['closing_debt_usd']
                     + (float) $row['paid_usd']
-                    - (float) $row['total_usd']
+                    - (float) $row['actual_total_usd']
                 ),
                 'qty' => collect($groupedRows)->sum(fn ($row) => collect($row['quantities'])->sum()),
                 'paid_usd' => $clientIds->sum(fn ($id) => (float) ($clientPayments[(string) $id] ?? 0)),
@@ -278,6 +305,30 @@ class CheckoutMonthExport implements FromView, WithStyles
                 'bonus_expense_usd' => $clientIds->sum(fn ($id) => (float) ($clientBonusExpenses[(string) $id] ?? 0)),
             ],
         ]);
+    }
+
+    /**
+     * Convert an approved product catalogue price to the report currency.
+     * The calculated document/checkin price is retained only as a fallback
+     * for legacy products whose approved catalogue price is still empty.
+     */
+    public static function catalogUnitPriceUsd(
+        float $catalogPrice,
+        ?int $catalogCurrencyType,
+        float $fallbackUsd,
+        ?float $rate,
+        $date = null
+    ): float {
+        if ($catalogPrice <= 0) {
+            return $fallbackUsd;
+        }
+
+        return Currency::documentAmountToUsd(
+            $catalogPrice,
+            $catalogCurrencyType,
+            $rate,
+            $date
+        );
     }
 
     private function clientDebtTotalsUsd(array $clientKeys, Carbon $periodEnd): array
