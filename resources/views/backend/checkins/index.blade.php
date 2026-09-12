@@ -59,7 +59,7 @@
                                        <td>{{ $item->warid?->name }} </td>
                                        <td>{{ $item->typeid?->name }} </td>
                                        <td>{{ $item->client_id ? $item->supid->name : NULL }}</td>
-                                       <td>{{ $item->details()->count() }} </td>
+                                       <td>{{ $item->details->count() }} </td>
                                        <td>{{ number_format($item->currency_type_price, 0, '.', ' ') }}</td>
                                        <td>
                                            <a href="{{ route('checkin_form', ['id' => $item->code])}}" style="text-decoration:underline;">{{ trans('backend.table.post_edit_short') }}</a>
@@ -67,7 +67,21 @@
                                        </td>
                                        <td>{{ $item->reference }} </td>
                                        <td><a target="_blank" href="{{ route('checkin_excel', ['id' => $item->code]) }}">{{ trans('backend.table.download') }}</a></td>
-                                       <td>{{ number_format($item->details()->where('currency_type', 2)->sum('total_price'), 2, '.', ' ') }} {{ $item->currencytypeid?->name }}</td>
+                                       <td>
+                                           @php
+                                               $totalsByCurrency = $item->details
+                                                   ->groupBy(fn ($detail) => $detail->currency_type ?: $item->currency_type)
+                                                   ->map(fn ($details) => $details->sum('total_price'));
+                                           @endphp
+                                           @forelse($totalsByCurrency as $currencyType => $total)
+                                               <div>
+                                                   {{ number_format($total, 2, '.', ' ') }}
+                                                   {{ $currencyTypes[$currencyType] ?? $item->currencytypeid?->name }}
+                                               </div>
+                                           @empty
+                                               0.00 {{ $item->currencytypeid?->name }}
+                                           @endforelse
+                                       </td>
                                       <td>{{ Carbon\Carbon::parse($item->date)->format('Y-m-d') . ' ' .  $item->created_at->format('H:i') }} </td>
                                       <td>{{ $item->userid ? $item->userid->name : null  }}</td>
                                       <td><a href="{{ route('delete_checkin', ['id' => $item->code])}}" style="text-decoration:underline;">{{ trans('backend.table.delete') }}</a></td>

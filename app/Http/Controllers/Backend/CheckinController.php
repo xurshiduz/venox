@@ -35,15 +35,16 @@ class CheckinController extends Controller
     { 
         
         if(Auth::user()->hasAnyRole('admin|cashier')){
-            $data = Checkin::orderBy('id', 'desc')->paginate(50);
+            $data = Checkin::with('details')->orderBy('id', 'desc')->paginate(50);
         } elseif(Auth::user()->hasAnyRole('diler_admin')) {
-            $data = Checkin::where('dealer_id', Auth::user()->dealer_id)->orderBy('id', 'desc')->paginate(50);
+            $data = Checkin::with('details')->where('dealer_id', Auth::user()->dealer_id)->orderBy('id', 'desc')->paginate(50);
         } else {
-            $data = Checkin::where('user_id', Auth::id())->orderBy('id', 'desc')->paginate(50);
+            $data = Checkin::with('details')->where('user_id', Auth::id())->orderBy('id', 'desc')->paginate(50);
         }
         
-        $keyword = NULL; 
-        return view('backend.checkins.index', compact('data', 'keyword'));
+        $keyword = NULL;
+        $currencyTypes = CurrencyType::pluck('name', 'id');
+        return view('backend.checkins.index', compact('data', 'keyword', 'currencyTypes'));
     }
     
     public function sverka_index()
@@ -604,12 +605,14 @@ class CheckinController extends Controller
     { 
         $keyword = $request->input('search');
 
-        $data = Checkin::where(function ($query) use($keyword) {
+        $data = Checkin::with('details')->where(function ($query) use($keyword) {
                 $query->where('number_work', 'like', '%' . $keyword . '%');
               })
         ->orderBy('id', 'desc')->paginate(100);
 
-        return view('backend.checkins.index', compact('data', 'keyword'));
+        $currencyTypes = CurrencyType::pluck('name', 'id');
+
+        return view('backend.checkins.index', compact('data', 'keyword', 'currencyTypes'));
     }
 
     public function print($id = null)
