@@ -15,6 +15,11 @@
   @hasanyrole('admin|cashier')
   <div class="card card-bordered mb-4"><div class="card-inner">
    <h5 class="mb-3">Bonusni ishlatish</h5>
+   @if($balance < 0.01)
+    <div class="alert alert-info mb-0">
+     Bu mijozda foydalanish uchun Shartnoma bonusi mavjud emas.
+    </div>
+   @else
    <form method="post" action="{{ route('contract_bonuses.redeem', $client) }}" class="row g-3">@csrf
     <div class="col-md-3"><label class="form-label">Qanday ishlatiladi</label><select class="form-select" name="type" required><option value="gift">Sovg‘aga aylantirish</option><option value="cash">Naqd pul berish</option><option value="debt_offset">Qarzidan ayirish</option></select></div>
     <div class="col-md-3"><label class="form-label">Summa (USD)</label><input type="number" step="0.01" min="0.01" max="{{ $balance }}" name="amount_usd" class="form-control" required></div>
@@ -22,6 +27,7 @@
     <div class="col-md-2 d-flex align-items-end"><button class="btn btn-primary w-100" onclick="return confirm('Ushbu amalni tasdiqlaysizmi?')">Tasdiqlash</button></div>
    </form>
    <div class="text-soft mt-2">Qarzdan ayirilsa, summa eng eski qarzlardan boshlab avtomatik yopiladi.</div>
+   @endif
   </div></div>
   @endhasanyrole
   <div class="card card-bordered"><div class="card-inner">
