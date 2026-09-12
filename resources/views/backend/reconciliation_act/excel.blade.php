@@ -28,6 +28,28 @@
 			$cashExpenditureName = $item instanceof \App\Models\CashExpenditure
 				? optional($item->cename)->name
 				: null;
+			$companyDebit = null;
+			$companyCredit = null;
+			$clientDebit = null;
+			$clientCredit = null;
+
+			if ($item instanceof \App\Models\Checkout) {
+				$companyDebit = $item->sumtotal();
+				$clientCredit = $companyDebit;
+				$nak += $companyDebit;
+			} elseif ($item instanceof \App\Models\Checkin) {
+				$companyCredit = $item->sumtotal();
+				$clientDebit = $companyCredit;
+				$pos += $companyCredit;
+			} elseif ($item instanceof \App\Models\CashExpenditure) {
+				$companyDebit = $item->price;
+				$clientCredit = $companyDebit;
+				$nak += $companyDebit;
+			} elseif ($item instanceof \App\Models\CashReceipt) {
+				$companyCredit = $item->price;
+				$clientDebit = $companyCredit;
+				$pos += $companyCredit;
+			}
 		@endphp
 		<tr>
 			<td style="text-align: center;">{{ $item->date }}</td>
@@ -52,10 +74,10 @@
 			    @else
 			        Учтена выручка Приходный кассовый ордер {{ $item->id }}; Вид оплата: {{ $item->tname ? $item->tname->name : NULL }}
 			    @endif</td>
-			<td style="text-align: center;">@if($item instanceof \App\Models\Checkout) @php($nak += $item->sumtotal()) {{ number_format($item->sumtotal(), 2, '.', ' ') }} @elseif($item instanceof \App\Models\CashExpenditure) @php($nak += $item->price) {{ number_format($item->price, 2, '.', ' ') }} @endif</td>
-			<td style="text-align: center;">@if($item instanceof \App\Models\Checkin) @php($pos += $item->sumtotal()) {{ number_format($item->sumtotal(), 2, '.', ' ') }} @elseif($item instanceof \App\Models\CashReceipt) @php($pos += $item->price) {{ number_format($item->price, 2, '.', ' ') }} @endif</td>
-			<td style="text-align: center;">@if($item instanceof \App\Models\Checkin) {{ number_format($item->sumtotal(), 2, '.', ' ') }} @elseif($item instanceof \App\Models\CashReceipt) {{ number_format($item->price, 2, '.', ' ') }} @endif</td>
-			<td style="text-align: center;">@if($item instanceof \App\Models\Checkout) {{ number_format($item->sumtotal(), 2, '.', ' ') }} @elseif($item instanceof \App\Models\CashExpenditure) {{ number_format($item->price, 2, '.', ' ') }} @endif</td>
+			<td style="text-align: center;">{{ $companyDebit !== null ? number_format($companyDebit, 2, '.', ' ') : '' }}</td>
+			<td style="text-align: center;">{{ $companyCredit !== null ? number_format($companyCredit, 2, '.', ' ') : '' }}</td>
+			<td style="text-align: center;">{{ $clientDebit !== null ? number_format($clientDebit, 2, '.', ' ') : '' }}</td>
+			<td style="text-align: center;">{{ $clientCredit !== null ? number_format($clientCredit, 2, '.', ' ') : '' }}</td>
 		</tr>
 		@endforeach
 		<tr>
