@@ -10,6 +10,7 @@ use App\Models\Client;
 use App\Models\ContractBonusTransaction;
 use App\Models\Currency;
 use App\Services\AccountingCashReportService;
+use App\Services\ApprovedProductPriceService;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Maatwebsite\Excel\Concerns\FromView;
@@ -70,6 +71,7 @@ class CheckoutMonthExport implements FromView, WithStyles
 
         $clientIds = $checkouts->pluck('client_id')->filter()->unique()->values();
         $accounting = app(AccountingCashReportService::class);
+        $approvedPriceService = app(ApprovedProductPriceService::class);
         $clientPayments = [];
 
         $payments = CashReceipt::query()
@@ -217,20 +219,26 @@ class CheckoutMonthExport implements FromView, WithStyles
                 $productCurrencyType = $product && $product->currency_type
                     ? (int) $product->currency_type
                     : (int) $checkout->currency_type;
-                $unitPriceUsd = static::catalogUnitPriceUsd(
-                    (float) ($product->price ?? 0),
-                    $productCurrencyType,
-                    $actualUnitPriceUsd,
-                    $saleRate,
-                    $checkout->date ?: $checkout->created_at
-                );
-                $factoryPriceUsd = static::catalogUnitPriceUsd(
-                    (float) ($product->tan_price ?? 0),
-                    $productCurrencyType,
-                    $latestCheckinPriceUsd,
-                    $saleRate,
-                    $checkout->date ?: $checkout->created_at
-                );
+                $approvedPrices = $approvedPriceService->pricesFor((string) ($product->name ?? ''));
+                $approvedRate = Currency::usdRateForDate($checkout->date ?: $checkout->created_at);
+                $unitPriceUsd = isset($approvedPrices['sale_uzs'])
+                    ? Currency::documentAmountToUsd((float) $approvedPrices['sale_uzs'], 2, $approvedRate)
+                    : static::catalogUnitPriceUsd(
+                        (float) ($product->price ?? 0),
+                        $productCurrencyType,
+                        $actualUnitPriceUsd,
+                        $approvedRate,
+                        $checkout->date ?: $checkout->created_at
+                    );
+                $factoryPriceUsd = isset($approvedPrices['factory_uzs'])
+                    ? Currency::documentAmountToUsd((float) $approvedPrices['factory_uzs'], 2, $approvedRate)
+                    : static::catalogUnitPriceUsd(
+                        (float) ($product->tan_price ?? 0),
+                        $productCurrencyType,
+                        $latestCheckinPriceUsd,
+                        $approvedRate,
+                        $checkout->date ?: $checkout->created_at
+                    );
 
                 $actualTotalUsd = $actualUnitPriceUsd * $qty;
                 $totalUsd = $unitPriceUsd * $qty;
@@ -321,6 +329,12 @@ class CheckoutMonthExport implements FromView, WithStyles
     ): float {
         if ($catalogPrice <= 0) {
             return $fallbackUsd;
+        }
+
+        // Legacy mahsulotlarda currency_type=UZS bo'lib qolgan bo'lsa ham,
+        // 1000 dan kichik katalog qiymati amalda USD narxidir.
+        if ($catalogCurrencyType === 2 && $catalogPrice < 1000) {
+            return $catalogPrice;
         }
 
         return Currency::documentAmountToUsd(
