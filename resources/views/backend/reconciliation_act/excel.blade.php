@@ -20,10 +20,10 @@
 			<td style="text-align: center;"><b>{{ $startSaldo < 0 ? number_format(abs($startSaldo), 2, '.', ' ') : '' }}</b></td>
 			<td style="text-align: center;"><b>{{ $startSaldo > 0 ? number_format($startSaldo, 2, '.', ' ') : '' }}</b></td>
 		</tr>
-		@php($nak = 0)
-		@php($pos = 0)
-		@foreach($data as $item)
-		@php
+		<?php
+		$nak = 0;
+		$pos = 0;
+		foreach ($data as $item) {
 			$isReturnedCheckout = $item instanceof \App\Models\Checkout && (int) $item->checkout_tip_id === 2;
 			$cashExpenditureName = $item instanceof \App\Models\CashExpenditure
 				? optional($item->cename)->name
@@ -50,7 +50,7 @@
 				$clientDebit = $companyCredit;
 				$pos += $companyCredit;
 			}
-		@endphp
+		?>
 		<tr>
 			<td style="text-align: center;">{{ $item->date }}</td>
 			<td style="text-align: center; font-weight: bold;">
@@ -79,7 +79,7 @@
 			<td style="text-align: center;">{{ $clientDebit !== null ? number_format($clientDebit, 2, '.', ' ') : '' }}</td>
 			<td style="text-align: center;">{{ $clientCredit !== null ? number_format($clientCredit, 2, '.', ' ') : '' }}</td>
 		</tr>
-		@endforeach
+		<?php } ?>
 		<tr>
 			<td colspan="3">Обороты за период</td>
 			<td style="text-align: center;">{{ number_format($nak, 2, '.', ' ') }}</td>
@@ -88,7 +88,7 @@
 			<td style="text-align: center;">{{ number_format($nak, 2, '.', ' ') }}</td>
 		</tr>
 		<tr>
-		    @php($endSaldo = $startSaldo + $nak - $pos)
+		    <?php $endSaldo = $startSaldo + $nak - $pos; ?>
 			<td colspan="3"><b>Сальдо на {{ Carbon\Carbon::parse($to)->format('d.m.Y') }}</b></td>
 			<td style="text-align: center;"><b>{{ $endSaldo > 0 ? number_format($endSaldo, 2, '.', ' ') : '' }}</b></td>
 			<td style="text-align: center;"><b>{{ $endSaldo < 0 ? number_format(abs($endSaldo), 2, '.', ' ') : '' }}</b></td>
