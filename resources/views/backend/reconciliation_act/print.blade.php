@@ -119,26 +119,32 @@
                                 }
                             @endphp
                         <tr>
+							@php
+								$isReturnedCheckout = $item instanceof \App\Models\Checkout && (int) $item->checkout_tip_id === 2;
+								$cashExpenditureName = $item instanceof \App\Models\CashExpenditure
+									? optional($item->cename)->name
+									: null;
+							@endphp
                             <td style="padding: 0px 5px; text-align: center;">{{ $item->date }}</td>
                             <td style="padding: 0px 5px; text-align: center; font-weight: bold;">
                                 @if($item instanceof \App\Models\Checkout)
-                                    Продажа
+                                    {{ $isReturnedCheckout ? 'Возврат товара' : (optional($item->checktypeid)->name ?: 'Продажа') }}
                                 @elseif($item instanceof \App\Models\Checkin)
                                     Возврат товара
                                 @elseif($item instanceof \App\Models\CashExpenditure)
-                                    Возврат денег
+                                    {{ $cashExpenditureName ?: 'Выдача денежных средств' }}
                                 @else
                                     Оплата
                                 @endif
                             </td>
                             <td style="padding: 0px 5px;">
                                 @if(isset($item->checkout_tip_id)) 
-                                    <a target="_blank" href="{{ route('checkout_form', ['id' => $item->code, 'view' => 'full']) }}" style="text-decoration: none; color: #000;"> Накладная - счет фактура №{{ $item->number_work }} - {{ $item->checkout_tip_id == 2 ? 'Обмен' : 'Обычный' }};</a> 
+                                    <a target="_blank" href="{{ route('checkout_form', ['id' => $item->code, 'view' => 'full']) }}" style="text-decoration: none; color: #000;"> {{ $isReturnedCheckout ? 'Возврат товара; накладная' : 'Накладная - счет фактура' }} №{{ $item->number_work }};</a>
                                 @elseif(isset($item->step)) 
                                     <a target="_blank" href="{{ route('checkin_form', ['id' => $item->code, 'view' => 'full']) }}" style="text-decoration: none; color: #000;"> Возврат товара ИД; с/ф №{{ $item->number_work }} <b>({{ $item->reference }})</b>;</a>
                                 @elseif(isset($item->cash_expenditure_types))
                                     {{-- Pul chiqimi nomlanishi (Расходный кассовый ордер) --}}
-                                    <a target="_blank" href="{{ route('cash_expenditure_form', ['id' => $item->code]) }}" style="text-decoration: none; color: #000;"> Расходный кассовый ордер №{{ $item->id }}; (Выдача денежных средств)</a>
+                                    <a target="_blank" href="{{ route('cash_expenditure_form', ['id' => $item->code]) }}" style="text-decoration: none; color: #000;"> Расходный кассовый ордер №{{ $item->id }}; {{ $cashExpenditureName ?: 'Выдача денежных средств' }}</a>
                                 @else 
                                     <a target="_blank" href="{{ route('cash_receipt_form', ['id' => $item->code, 'view' => 'full']) }}" style="text-decoration: none; color: #000;">  Поступление денежных средств №{{ $item->id }}; Оплата: {{ $item->tname ? $item->tname->name : NULL }} {!! $item->comment ? '<b>(' . e($item->comment) . ')</b>' : '' !!}</a> 
                                 @endif

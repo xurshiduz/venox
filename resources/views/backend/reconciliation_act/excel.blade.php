@@ -23,26 +23,32 @@
 		@php($nak = 0)
 		@php($pos = 0)
 		@foreach($data as $item)
+		@php
+			$isReturnedCheckout = $item instanceof \App\Models\Checkout && (int) $item->checkout_tip_id === 2;
+			$cashExpenditureName = $item instanceof \App\Models\CashExpenditure
+				? optional($item->cename)->name
+				: null;
+		@endphp
 		<tr>
 			<td style="text-align: center;">{{ $item->date }}</td>
 			<td style="text-align: center; font-weight: bold;">
 			    @if($item instanceof \App\Models\Checkout)
-			        Продажа
+			        {{ $isReturnedCheckout ? 'Возврат товара' : (optional($item->checktypeid)->name ?: 'Продажа') }}
 			    @elseif($item instanceof \App\Models\Checkin)
 			        Возврат товара
 			    @elseif($item instanceof \App\Models\CashExpenditure)
-			        Возврат денег
+			        {{ $cashExpenditureName ?: 'Выдача денежных средств' }}
 			    @else
 			        Оплата
 			    @endif
 			</td>
 			<td>
 			    @if($item instanceof \App\Models\Checkout)
-			        Накладная - счет фактура {{ $item->number_work }};
+			        {{ $isReturnedCheckout ? 'Возврат товара; накладная' : 'Накладная - счет фактура' }} №{{ $item->number_work }};
 			    @elseif($item instanceof \App\Models\Checkin)
 			        Возврат товара ИД; с/ф №{{ $item->number_work }} ({{ $item->reference }});
 			    @elseif($item instanceof \App\Models\CashExpenditure)
-			        Расходный кассовый ордер №{{ $item->id }}; Возврат денег клиенту
+			        Расходный кассовый ордер №{{ $item->id }}; {{ $cashExpenditureName ?: 'Выдача денежных средств' }}
 			    @else
 			        Учтена выручка Приходный кассовый ордер {{ $item->id }}; Вид оплата: {{ $item->tname ? $item->tname->name : NULL }}
 			    @endif</td>

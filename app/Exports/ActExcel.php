@@ -59,10 +59,10 @@ class ActExcel implements FromView, WithEvents
             });
         $startSaldo = (float) ($client->balance ?? 0) + $previousDebits - $previousCredits;
         
-        $checkouts = Checkout::where('client_id', $this->clientid)->whereBetween('date', [$this->from, $this->to])->get();
-        $cashs = CashReceipt::where('status', 1)->where('client_id', $this->clientid)->whereBetween('date', [$this->from, $this->to])->get();
-        $checkins = Checkin::where('status', 1)->where('client_id', $this->clientid)->whereBetween('date', [$this->from, $this->to])->get();
-        $cashExpenditures = CashExpenditure::where('supplier_id', $this->clientid)
+        $checkouts = Checkout::with('checktypeid')->where('client_id', $this->clientid)->whereBetween('date', [$this->from, $this->to])->get();
+        $cashs = CashReceipt::with('tname')->where('status', 1)->where('client_id', $this->clientid)->whereBetween('date', [$this->from, $this->to])->get();
+        $checkins = Checkin::with('typeid')->where('status', 1)->where('client_id', $this->clientid)->whereBetween('date', [$this->from, $this->to])->get();
+        $cashExpenditures = CashExpenditure::with('cename')->where('supplier_id', $this->clientid)
             ->where('cash_expenditure_types', 8)
             ->whereBetween('date', [$this->from, $this->to])
             ->get();
