@@ -50,6 +50,15 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $this->assertSame($factoryUzs, (float) $prices['factory_uzs']);
     }
 
+    public function test_approved_price_sheet_uses_the_sample_usd_rate(): void
+    {
+        $service = new ApprovedProductPriceService();
+
+        $this->assertSame(11900.0, $service->usdRate());
+        $this->assertEqualsWithDelta(17.39495798, 207000 / $service->usdRate(), 0.00000001);
+        $this->assertEqualsWithDelta(16.13445378, 192000 / $service->usdRate(), 0.00000001);
+    }
+
     public function approvedPriceProvider(): array
     {
         return [

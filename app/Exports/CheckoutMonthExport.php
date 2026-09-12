@@ -220,23 +220,31 @@ class CheckoutMonthExport implements FromView, WithStyles
                     ? (int) $product->currency_type
                     : (int) $checkout->currency_type;
                 $approvedPrices = $approvedPriceService->pricesFor((string) ($product->name ?? ''));
-                $approvedRate = Currency::usdRateForDate($checkout->date ?: $checkout->created_at);
+                $catalogRate = Currency::usdRateForDate($checkout->date ?: $checkout->created_at);
                 $unitPriceUsd = isset($approvedPrices['sale_uzs'])
-                    ? Currency::documentAmountToUsd((float) $approvedPrices['sale_uzs'], 2, $approvedRate)
+                    ? Currency::documentAmountToUsd(
+                        (float) $approvedPrices['sale_uzs'],
+                        2,
+                        $approvedPriceService->usdRate()
+                    )
                     : static::catalogUnitPriceUsd(
                         (float) ($product->price ?? 0),
                         $productCurrencyType,
                         $actualUnitPriceUsd,
-                        $approvedRate,
+                        $catalogRate,
                         $checkout->date ?: $checkout->created_at
                     );
                 $factoryPriceUsd = isset($approvedPrices['factory_uzs'])
-                    ? Currency::documentAmountToUsd((float) $approvedPrices['factory_uzs'], 2, $approvedRate)
+                    ? Currency::documentAmountToUsd(
+                        (float) $approvedPrices['factory_uzs'],
+                        2,
+                        $approvedPriceService->usdRate()
+                    )
                     : static::catalogUnitPriceUsd(
                         (float) ($product->tan_price ?? 0),
                         $productCurrencyType,
                         $latestCheckinPriceUsd,
-                        $approvedRate,
+                        $catalogRate,
                         $checkout->date ?: $checkout->created_at
                     );
 

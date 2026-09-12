@@ -4,6 +4,9 @@ namespace App\Services;
 
 class ApprovedProductPriceService
 {
+    /** The USD rate used by the approved 13.08.2026 price sheets/sample. */
+    private const USD_RATE = 11900;
+
     /**
      * BOSS RUXSAT BERGAN NARX.xlsx, 13.08.2026.
      * Prices are per canister/unit in UZS. More specific rules must come first.
@@ -68,6 +71,11 @@ class ApprovedProductPriceService
         }
 
         return null;
+    }
+
+    public function usdRate(): float
+    {
+        return self::USD_RATE;
     }
 
     private function normalize(string $name): string
