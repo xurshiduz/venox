@@ -15,7 +15,10 @@
 		</tr>	
 		<tr>
 			<td colspan="3"><b>Сальдо на {{ Carbon\Carbon::parse($from)->format('d.m.Y') }}</b></td>
-			<td colspan="4"></td>
+			<td style="text-align: center;"><b>{{ $startSaldo > 0 ? number_format($startSaldo, 2, '.', ' ') : '' }}</b></td>
+			<td style="text-align: center;"><b>{{ $startSaldo < 0 ? number_format(abs($startSaldo), 2, '.', ' ') : '' }}</b></td>
+			<td style="text-align: center;"><b>{{ $startSaldo < 0 ? number_format(abs($startSaldo), 2, '.', ' ') : '' }}</b></td>
+			<td style="text-align: center;"><b>{{ $startSaldo > 0 ? number_format($startSaldo, 2, '.', ' ') : '' }}</b></td>
 		</tr>
 		@php($nak = 0)
 		@php($pos = 0)
@@ -57,19 +60,18 @@
 			<td style="text-align: center;">{{ number_format($nak, 2, '.', ' ') }}</td>
 		</tr>
 		<tr>
-		    @php($nak_t = $nak - $pos)
-		    @php($pos_t = $pos - $nak)
+		    @php($endSaldo = $startSaldo + $nak - $pos)
 			<td colspan="3"><b>Сальдо на {{ Carbon\Carbon::parse($to)->format('d.m.Y') }}</b></td>
-			<td style="text-align: center;">@if($nak_t != 0) <b>{{ $nak_t > 0 ? number_format($nak_t, 2, '.', ' ') : null }}</b>@else @endif</td>
-			<td style="text-align: center;">@if($nak_t != 0) <b>{{ $pos_t > 0 ? number_format($pos_t, 2, '.', ' ') : null }}</b>@else @endif</td>
-			<td style="text-align: center;">@if($nak_t != 0) <b>{{ $pos_t > 0 ? number_format($pos_t, 2, '.', ' ') : null }}</b>@else @endif</td>
-			<td style="text-align: center;">@if($nak_t != 0) <b>{{ $nak_t > 0 ? number_format($nak_t, 2, '.', ' ') : null }}</b>@else @endif</td>
+			<td style="text-align: center;"><b>{{ $endSaldo > 0 ? number_format($endSaldo, 2, '.', ' ') : '' }}</b></td>
+			<td style="text-align: center;"><b>{{ $endSaldo < 0 ? number_format(abs($endSaldo), 2, '.', ' ') : '' }}</b></td>
+			<td style="text-align: center;"><b>{{ $endSaldo < 0 ? number_format(abs($endSaldo), 2, '.', ' ') : '' }}</b></td>
+			<td style="text-align: center;"><b>{{ $endSaldo > 0 ? number_format($endSaldo, 2, '.', ' ') : '' }}</b></td>
 		</tr>
 		<tr>
 			<td colspan="7">&nbsp;</td>
 		</tr>
 		<tr>
-			<td colspan="7"> @if($nak_t != 0)  В пользу {{ $nak_t > 0 ? $comp : $client->name }} {{ $nak_t > 0 ? number_format($nak_t, 2, '.', ' ') : number_format($pos_t, 2, '.', ' ') }} сум ({{ (new \MessageFormatter('ru-RU', '{n, spellout}'))->format(['n' => $nak_t > 0 ? $nak_t : $pos_t]) }} сумов 00 тийин). @endif </td>
+			<td colspan="7"> @if($endSaldo != 0) В пользу {{ $endSaldo > 0 ? $comp : $client->name }} {{ number_format(abs($endSaldo), 2, '.', ' ') }} сум ({{ (new \MessageFormatter('ru-RU', '{n, spellout}'))->format(['n' => abs($endSaldo)]) }} сумов 00 тийин). @else Сальдо ноль. @endif </td>
 		</tr>
 	</tbody>
 </table>

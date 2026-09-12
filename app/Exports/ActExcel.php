@@ -30,6 +30,34 @@ class ActExcel implements FromView, WithEvents
         $to = $this->to;
         $comp = Setting::find(1)->value;
         $client = Client::find($this->clientid);
+
+        // Excel va PDF bir xil boshlang'ich saldo bilan ishlashi kerak.
+        // Tanlangan sanadan oldingi barcha harakatlar mijozning dastlabki
+        // balansiga qo'shiladi.
+        $previousCheckouts = Checkout::where('client_id', $this->clientid)
+            ->where('date', '<', $from)
+            ->get();
+        $previousCashReceipts = CashReceipt::where('status', 1)
+            ->where('client_id', $this->clientid)
+            ->where('date', '<', $from)
+            ->get();
+        $previousCheckins = Checkin::where('status', 1)
+            ->where('client_id', $this->clientid)
+            ->where('date', '<', $from)
+            ->get();
+        $previousCashExpenditures = CashExpenditure::where('supplier_id', $this->clientid)
+            ->where('cash_expenditure_types', 8)
+            ->where('date', '<', $from)
+            ->get();
+
+        $previousDebits = $previousCheckouts->sum(function ($item) {
+            return $item->sumtotal();
+        }) + $previousCashExpenditures->sum('price');
+        $previousCredits = $previousCashReceipts->sum('price')
+            + $previousCheckins->sum(function ($item) {
+                return $item->sumtotal();
+            });
+        $startSaldo = (float) ($client->balance ?? 0) + $previousDebits - $previousCredits;
         
         $checkouts = Checkout::where('client_id', $this->clientid)->whereBetween('date', [$this->from, $this->to])->get();
         $cashs = CashReceipt::where('status', 1)->where('client_id', $this->clientid)->whereBetween('date', [$this->from, $this->to])->get();
@@ -45,7 +73,14 @@ class ActExcel implements FromView, WithEvents
             ->concat($cashExpenditures)
             ->sortBy('date');
         
-        return view('backend.reconciliation_act.excel', compact('data', 'from', 'to', 'client', 'comp'));
+        return view('backend.reconciliation_act.excel', compact(
+            'data',
+            'from',
+            'to',
+            'client',
+            'comp',
+            'startSaldo'
+        ));
     }
 
     public function registerEvents(): array
