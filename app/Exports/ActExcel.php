@@ -73,7 +73,7 @@ class ActExcel implements FromView, WithEvents
             ->concat($cashExpenditures)
             ->sortBy('date');
         
-        return view('backend.reconciliation_act.excel', compact(
+        return view('backend.reconciliation_act.excel_v2', compact(
             'data',
             'from',
             'to',
