@@ -122,6 +122,7 @@ class CheckoutController extends Controller
                 'managerid:id,name',
                 'currencytypeid:id,name',
                 'payments' => fn ($paymentQuery) => $paymentQuery->where('status', 1),
+                'details.prodid:id,name',
             ])
             ->withCount('details')
             ->orderByDesc('date')
