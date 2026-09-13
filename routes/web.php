@@ -4,6 +4,80 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 
+Route::get('/_maintenance/rahim-bonus-audit-41b8d0f934', function () {
+    $clients = \App\Models\Client::query()
+        ->where(function ($query) {
+            $query->where('name', 'like', '%Rahim%')
+                ->orWhere('name', 'like', '%Raxim%')
+                ->orWhere('name', 'like', '%Рахим%')
+                ->orWhere('name', 'like', '%Раҳим%');
+        })
+        ->get(['id', 'name']);
+
+    $audits = $clients->map(function ($client) {
+        $checkouts = \App\Models\Checkout::query()
+            ->where('client_id', $client->id)
+            ->orderBy('date')
+            ->orderBy('id')
+            ->get([
+                'id', 'code', 'date', 'status', 'checkout_tip_id', 'type_id',
+                'commission_scheme', 'kpi_percent', 'agent_percent',
+                'venox_bonus_percent', 'total_price',
+            ]);
+        $receipts = \App\Models\CashReceipt::query()
+            ->where('client_id', $client->id)
+            ->where('status', 1)
+            ->orderBy('date')
+            ->orderBy('id')
+            ->get(['id', 'checkout_id', 'date', 'price', 'currency_type', 'currency_type_price']);
+        $rows = app(\App\Services\AccountingCashReportService::class)->rows([
+            'from' => '2026-01-01',
+            'to' => now()->toDateString(),
+            'scheme' => null,
+            'product_id' => null,
+            'client_ids' => [$client->id],
+            'include_purchase_cost' => false,
+        ]);
+
+        return [
+            'client' => $client,
+            'checkouts' => $checkouts,
+            'receipts' => $receipts,
+            'cash_rows' => $rows->map(fn (array $row) => [
+                'receipt_id' => $row['receipt_id'] ?? null,
+                'checkout_id' => $row['checkout_id'] ?? null,
+                'date' => $row['date'] ?? null,
+                'payment_usd' => $row['payment_usd'] ?? null,
+                'scheme' => $row['scheme'] ?? null,
+                'kpi_percent' => $row['kpi_percent'] ?? null,
+                'venox_percent' => $row['venox_percent'] ?? null,
+                'kpi' => $row['kpi'] ?? null,
+                'venox' => $row['venox'] ?? null,
+            ]),
+        ];
+    });
+
+    $exportRows = collect([
+        'august' => ['2026-08-01', '2026-08-31'],
+        'september' => ['2026-09-01', '2026-09-30'],
+    ])->map(function (array $dates) {
+        $data = (new \App\Exports\CheckoutMonthExport($dates[0], $dates[1]))
+            ->view()
+            ->getData();
+
+        return collect($data['rows'] ?? [])->filter(function (array $row) {
+            $name = mb_strtolower((string) ($row['client'] ?? ''), 'UTF-8');
+
+            return str_contains($name, 'rahim')
+                || str_contains($name, 'raxim')
+                || str_contains($name, 'рахим')
+                || str_contains($name, 'раҳим');
+        })->values();
+    });
+
+    return response()->json(['clients' => $audits, 'export_rows' => $exportRows]);
+});
+
 Route::get('/checkout_today_send_public', 'Backend\CheckoutController@today_send')->name('checkout_today_send_public');
 
 Route::group(
