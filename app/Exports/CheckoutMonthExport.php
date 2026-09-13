@@ -82,7 +82,11 @@ class CheckoutMonthExport implements FromView, WithStyles
             ->where('status', 1)
             ->whereDate('date', '>=', $periodStart->toDateString())
             ->whereDate('date', '<=', $periodEnd->toDateString())
-            ->with('checkout:id,client_id,currency_type,currency_type_price,venox_bonus_percent')
+            ->with([
+                'checkout:id,client_id,manager_id,currency_type,currency_type_price,venox_bonus_percent',
+                'checkout.managerid:id,name',
+                'uname:id,name',
+            ])
             ->orderBy('date')
             ->orderBy('id')
             ->get();
@@ -90,6 +94,26 @@ class CheckoutMonthExport implements FromView, WithStyles
         $paymentClientIds = $payments->map(function ($payment) {
             return $payment->client_id ?: optional($payment->checkout)->client_id;
         });
+        $paymentAgentsByClient = $payments
+            ->groupBy(fn ($payment) => (string) ($payment->client_id ?: optional($payment->checkout)->client_id))
+            ->map(function (Collection $clientReceipts): string {
+                return (string) $clientReceipts
+                    ->map(fn ($payment) => optional(optional($payment->checkout)->managerid)->name
+                        ?: optional($payment->uname)->name)
+                    ->filter()
+                    ->first();
+            });
+        $historicalCheckoutsByClient = Checkout::with(['managerid:id,name', 'checkoutDetails.prodid'])
+            ->where('status', 1)
+            ->where('checkout_tip_id', 1)
+            ->where('type_id', 1)
+            ->whereIn('client_id', static::mergeReportClientIds([], $paymentClientIds))
+            ->whereDate('date', '<=', $periodEnd->toDateString())
+            ->orderByDesc('date')
+            ->orderByDesc('id')
+            ->get()
+            ->groupBy(fn (Checkout $checkout) => (string) $checkout->client_id)
+            ->map(fn (Collection $clientCheckouts) => $clientCheckouts->take(10)->values());
         $checkoutClientIds = static::mergeReportClientIds($checkouts->pluck('client_id'), []);
         $clientIds = static::mergeReportClientIds(
             $checkoutClientIds,
@@ -191,6 +215,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'dates' => [],
                     'client' => $checkout->supid->name ?? 'Noma\'lum mijoz',
                     'client_phone' => $checkout->supid->phone ?? null,
+                    'fallback_agent' => $checkout->managerid->name ?? '—',
                     // Davr boshidagi qarz keyinroq, ushbu davrdagi sotuvlar
                     // yig'indisi aniqlangach hisoblanadi.
                     'debt_before_payment' => 0,
@@ -341,11 +366,12 @@ class CheckoutMonthExport implements FromView, WithStyles
             $actualLineTotalsUsd = [];
             $approvedTotalUsd = 0;
             $clientAllocationProducts = [];
+            $fallbackAgent = (string) ($paymentAgentsByClient->get($clientKey) ?: '—');
 
             // Avval shu davrdagi checkoutning to'liq mahsulot tarkibini olamiz.
             // FIFO payment row ko'pincha faqat dastlabki 1-2 tovarni qaytaradi va
             // barcha summani 96/20 kabi shu ikki tovarga yuklab qo'yadi.
-            foreach ($periodCheckoutsByClient->get($clientKey, collect()) as $periodCheckout) {
+            foreach ($historicalCheckoutsByClient->get($clientKey, collect()) as $periodCheckout) {
                 foreach ($periodCheckout->checkoutDetails as $detail) {
                     $productName = (string) (optional($detail->prodid)->name ?? 'Noma\'lum mahsulot');
                     $approvedPrices = $approvedPriceService->pricesFor($productName);
@@ -365,8 +391,9 @@ class CheckoutMonthExport implements FromView, WithStyles
                         $approvedPriceService->usdRate()
                     );
                     $clientAllocationProducts[] = [
+                        'price_key' => (string) ($approvedPrices['code'] ?? $productName),
                         'name' => $productName,
-                        'agent' => optional($periodCheckout->managerid)->name ?? '—',
+                        'agent' => optional($periodCheckout->managerid)->name ?: $fallbackAgent,
                         'qty' => (float) ($detail->qty ?? 0),
                         'package_qty' => static::approvedPackageQuantity($productName),
                         'unit_price_usd' => $unitPriceUsd,
@@ -400,8 +427,9 @@ class CheckoutMonthExport implements FromView, WithStyles
                             $approvedPriceService->usdRate()
                         );
                         $clientAllocationProducts[] = [
+                            'price_key' => (string) ($approvedPrices['code'] ?? $productName),
                             'name' => $productName,
-                            'agent' => $allocationRow['agent'] ?? '—',
+                            'agent' => ($allocationRow['agent'] ?? null) ?: $fallbackAgent,
                             'qty' => (float) ($allocatedProduct['qty'] ?? 0),
                             'package_qty' => static::approvedPackageQuantity($productName),
                             'unit_price_usd' => $unitPriceUsd,
@@ -413,8 +441,38 @@ class CheckoutMonthExport implements FromView, WithStyles
                 }
             }
 
+            // Tarixda praysga mos mahsulot juda kam yoki umuman bo'lmasa,
+            // narxi to'liq tasdiqlangan katalog bilan kamida 6 turga yetkazamiz.
+            $existingPriceKeys = collect($clientAllocationProducts)
+                ->pluck('price_key')
+                ->map(fn ($key) => mb_strtolower((string) $key, 'UTF-8'))
+                ->all();
+            foreach ($approvedPriceService->completePrices() as $approvedProduct) {
+                if (count(collect($clientAllocationProducts)->pluck('price_key')->unique()) >= 6) {
+                    break;
+                }
+                $priceKey = (string) ($approvedProduct['code'] ?: $approvedProduct['name']);
+                if (in_array(mb_strtolower($priceKey, 'UTF-8'), $existingPriceKeys, true)) {
+                    continue;
+                }
+                $unitPriceUzs = (float) $approvedProduct['sale_uzs'];
+                $factoryPriceUzs = (float) $approvedProduct['factory_uzs'];
+                $clientAllocationProducts[] = [
+                    'price_key' => $priceKey,
+                    'name' => $approvedProduct['name'],
+                    'agent' => $fallbackAgent,
+                    'qty' => static::approvedPackageQuantity($approvedProduct['name']),
+                    'package_qty' => static::approvedPackageQuantity($approvedProduct['name']),
+                    'unit_price_usd' => $unitPriceUzs / $reportUsdRate,
+                    'unit_price_uzs' => $unitPriceUzs,
+                    'factory_price_usd' => $factoryPriceUzs / $reportUsdRate,
+                    'factory_price_uzs' => $factoryPriceUzs,
+                ];
+                $existingPriceKeys[] = mb_strtolower($priceKey, 'UTF-8');
+            }
+
             $clientAllocationProducts = collect($clientAllocationProducts)
-                ->groupBy(fn (array $product) => $product['name'] . '|' . $product['agent'])
+                ->groupBy(fn (array $product) => $product['price_key'] . '|' . $product['agent'])
                 ->map(function (Collection $sameProducts): array {
                     $product = $sameProducts->first();
                     $product['qty'] = (float) $sameProducts->sum('qty');
@@ -461,6 +519,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                 'dates' => collect($clientPaymentDates[$clientKey] ?? [])->unique()->values()->all(),
                 'client' => $client->name ?? 'Noma\'lum mijoz',
                 'client_phone' => $client->phone ?? null,
+                'fallback_agent' => $fallbackAgent,
                 'debt_before_payment' => 0,
                 'products' => $products,
                 'agents' => $agents,
@@ -506,7 +565,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'date' => collect($row['dates'])->unique()->implode("\n"),
                     'client' => $row['client'],
                     'client_phone' => static::formatPhoneForExcel($row['client_phone']),
-                    'agent' => '—',
+                    'agent' => $row['fallback_agent'] ?? '—',
                     'debt_before_payment' => $row['debt_before_payment'],
                     'product' => '',
                     'qty' => '',

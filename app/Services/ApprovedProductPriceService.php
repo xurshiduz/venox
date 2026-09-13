@@ -27,6 +27,8 @@ class ApprovedProductPriceService
 
             if ($matches) {
                 return [
+                    'code' => $rule['code'] ?? null,
+                    'name' => $rule['name'] ?? $productName,
                     'sale_uzs' => $rule['sale_uzs'],
                     'factory_uzs' => $rule['factory_uzs'],
                 ];
@@ -39,6 +41,22 @@ class ApprovedProductPriceService
     public function usdRate(): float
     {
         return self::USD_RATE;
+    }
+
+    /** All explicitly entered sale/factory prices available for allocation. */
+    public function completePrices(): array
+    {
+        return collect($this->rules())
+            ->filter(fn (array $rule) => (float) ($rule['sale_uzs'] ?? 0) > 0
+                && (float) ($rule['factory_uzs'] ?? 0) > 0)
+            ->map(fn (array $rule) => [
+                'code' => (string) ($rule['code'] ?? ''),
+                'name' => (string) ($rule['name'] ?? $rule['code'] ?? 'Venox'),
+                'sale_uzs' => (float) $rule['sale_uzs'],
+                'factory_uzs' => (float) $rule['factory_uzs'],
+            ])
+            ->values()
+            ->all();
     }
 
     /**
@@ -95,6 +113,8 @@ class ApprovedProductPriceService
                     ->orderBy('id')
                     ->get()
                     ->map(fn (ApprovedProductPrice $price) => [
+                        'code' => $price->code,
+                        'name' => $price->name,
                         'needles' => $price->match_tokens ?: [],
                         'sale_uzs' => $price->sale_price_uzs !== null ? (float) $price->sale_price_uzs : null,
                         'factory_uzs' => $price->factory_price_uzs !== null ? (float) $price->factory_price_uzs : null,

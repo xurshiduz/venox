@@ -159,6 +159,42 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $this->assertFalse(CheckoutMonthExport::hasCompleteApprovedPrices(null));
     }
 
+    public function test_approved_catalog_fallback_has_no_missing_prices(): void
+    {
+        $prices = (new ApprovedProductPriceService())->completePrices();
+
+        $this->assertGreaterThanOrEqual(6, count($prices));
+        foreach ($prices as $price) {
+            $this->assertNotSame('', $price['name']);
+            $this->assertGreaterThan(0, $price['sale_uzs']);
+            $this->assertGreaterThan(0, $price['factory_uzs']);
+        }
+    }
+
+    public function test_carton_total_never_exceeds_client_payment(): void
+    {
+        $prices = [207000, 52000, 197000, 49000, 84000, 283000];
+        $packages = [4, 12, 4, 12, 4, 4];
+        $paymentUzs = 1500 * 11900;
+        $quantities = CheckoutMonthExport::balanceApprovedQuantities(
+            [20, 12, 12, 24, 20, 8],
+            $prices,
+            $paymentUzs,
+            $packages
+        );
+        $total = 0.0;
+        foreach ($quantities as $index => $qty) {
+            $total += $qty * $prices[$index];
+        }
+
+        $this->assertLessThanOrEqual($paymentUzs, $total);
+        $this->assertLessThan(min(array_map(
+            fn (float $price, int $index) => $price * $packages[$index],
+            $prices,
+            array_keys($prices)
+        )), $paymentUzs - $total);
+    }
+
     public function test_venox_bonus_and_net_payment_reconstruct_the_approved_total(): void
     {
         $breakdown = CheckoutMonthExport::paymentBreakdownUsd(3600, 180);
