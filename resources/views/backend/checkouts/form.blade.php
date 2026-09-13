@@ -413,9 +413,9 @@
                                         $commissionSelected = str_starts_with((string) $item->commission_scheme, 'venox_')
                                             ? 'venox_bonus'
                                             : $item->commission_scheme;
-                                        $commissionPercent = (float) ($item->kpi_percent ?? 0)
-                                            + (float) ($item->agent_percent ?? 0)
+                                        $bonusTotalPercent = (float) ($item->kpi_percent ?? 0)
                                             + (float) ($item->venox_bonus_percent ?? 0);
+                                        $commissionPercent = 8 + $bonusTotalPercent;
                                         $discountPercent = max(0, min(100, (float) ($item->discount ?? 0)));
                                         $factoryPercent = (100 - $discountPercent)
                                             * (100 - $commissionPercent) / 100;
@@ -432,17 +432,18 @@
                                                         @endforeach
                                                     </select>
                                                 </div>
-                                                <div class="col-lg-2 col-md-4">
-                                                    <label class="form-label mb-1">KPI (%)</label>
-                                                    <input type="number" min="0" max="100" step="0.01" class="form-control commission-kpi-input" value="{{ (float) ($item->kpi_percent ?? 0) }}">
+                                                <div class="col-lg-3 col-md-6">
+                                                    <label class="form-label mb-1">KPI + Venox bonus jami (%)</label>
+                                                    <input type="number" min="0" max="92" step="0.01" class="form-control commission-bonus-total-input" value="{{ $bonusTotalPercent }}">
+                                                    <small class="text-soft">Kiritilsa: KPI 5%, qolgan qismi Venox bonus.</small>
                                                 </div>
-                                                <div class="col-lg-2 col-md-4">
-                                                    <label class="form-label mb-1">Agent (%)</label>
-                                                    <input type="number" min="0" max="100" step="0.01" class="form-control commission-agent-input" value="{{ (float) ($item->agent_percent ?? 8) }}">
-                                                </div>
-                                                <div class="col-lg-2 col-md-4">
-                                                    <label class="form-label mb-1">Venox bonus (%)</label>
-                                                    <input type="number" min="0" max="100" step="0.01" class="form-control commission-venox-input" value="{{ (float) ($item->venox_bonus_percent ?? 0) }}">
+                                                <div class="col-lg-2 col-md-6">
+                                                    <label class="form-label mb-1">Avtomatik taqsimot</label>
+                                                    <div class="d-flex flex-wrap" style="gap: 6px;">
+                                                        <span class="badge bg-outline-primary">KPI: <b class="commission-kpi-value">{{ $bonusTotalPercent > 0 ? 5 : 0 }}</b>%</span>
+                                                        <span class="badge bg-outline-info">Agent: <b>8</b>%</span>
+                                                        <span class="badge bg-outline-secondary">Venox: <b class="commission-venox-value">{{ number_format(max(0, $bonusTotalPercent - 5), 2, '.', '') }}</b>%</span>
+                                                    </div>
                                                 </div>
                                                 <div class="col-lg-1 col-md-6">
                                                     <label class="form-label mb-1">Zavod</label>
@@ -457,7 +458,7 @@
                                                     </button>
                                                 </div>
                                             </div>
-                                            <small class="text-soft d-block mt-2">Zavod ulushi boshlang‘ich narxga nisbatan hisoblanadi: chegirmadan keyingi summa − KPI − Agent − Venox bonus.</small>
+                                            <small class="text-soft d-block mt-2">Agent har doim 8%. Bonus jami kiritilsa, undan 5% KPI, qolgan qismi Venox bonus bo‘ladi. Zavod ulushi chegirma va shu foizlar ayirilgandan keyin hisoblanadi.</small>
                                             <small class="text-warning d-block mt-1">Shartnoma jamg‘armasiga tushishi uchun “Shartnoma” turini tanlang. O‘zgartirishlar avtomatik saqlanadi.</small>
                                         </div>
                                     </div>
@@ -680,13 +681,16 @@
 
     function updateFactoryPercent() {
         var discount = parseFloat($('.discount').first().val()) || 0;
-        var commission = (parseFloat($('.commission-kpi-input').val()) || 0)
-            + (parseFloat($('.commission-agent-input').val()) || 0)
-            + (parseFloat($('.commission-venox-input').val()) || 0);
+        var bonusTotal = parseFloat($('.commission-bonus-total-input').val()) || 0;
+        var kpi = bonusTotal > 0 ? 5 : 0;
+        var venox = Math.max(0, bonusTotal - kpi);
+        var commission = 8 + bonusTotal;
         discount = Math.max(0, Math.min(100, discount));
         commission = Math.max(0, Math.min(100, commission));
         var factory = (100 - discount) * (100 - commission) / 100;
 
+        $('.commission-kpi-value').text(kpi.toFixed(2).replace(/\.00$/, ''));
+        $('.commission-venox-value').text(venox.toFixed(2).replace(/\.00$/, ''));
         $('.commission-discount').text(discount.toFixed(2).replace(/\.00$/, ''));
         $('.commission-factory').text(factory.toFixed(2).replace(/\.00$/, ''));
     }
@@ -764,13 +768,18 @@
     function saveCommission(showValidationAlert) {
         var btn = $('.apply-commission-btn');
         var scheme = $('.commission-scheme').val();
-        var kpi = parseFloat($('.commission-kpi-input').val()) || 0;
-        var agent = parseFloat($('.commission-agent-input').val()) || 0;
-        var venox = parseFloat($('.commission-venox-input').val()) || 0;
+        var bonusTotal = parseFloat($('.commission-bonus-total-input').val()) || 0;
 
         if (!scheme) {
             if (showValidationAlert) {
                 alert('KPI va bonus hisoblash turini tanlang.');
+            }
+            return;
+        }
+
+        if (bonusTotal < 0 || bonusTotal > 92 || (bonusTotal > 0 && bonusTotal < 5)) {
+            if (showValidationAlert) {
+                alert('Bonus jami 0 yoki 5% dan 92% gacha bo‘lishi kerak.');
             }
             return;
         }
@@ -790,9 +799,7 @@
             data: {
                 checkout_id: btn.data('id'),
                 scheme: scheme,
-                kpi_percent: kpi,
-                agent_percent: agent,
-                venox_bonus_percent: venox
+                total_bonus_percent: bonusTotal
             },
             success: function(data) {
                 if (data.status === 'success') {
@@ -845,7 +852,7 @@
         saveCommission(true);
     });
 
-    $('.commission-kpi-input, .commission-agent-input, .commission-venox-input').on('input', function() {
+    $('.commission-bonus-total-input').on('input', function() {
         updateFactoryPercent();
         scheduleCommissionSave();
     });

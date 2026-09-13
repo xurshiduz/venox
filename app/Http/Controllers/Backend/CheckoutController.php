@@ -1444,17 +1444,18 @@ class CheckoutController extends Controller
         $validated = $request->validate([
             'checkout_id' => ['required', 'integer', 'exists:checkouts,id'],
             'scheme' => ['required', 'string', 'in:' . implode(',', array_keys($schemes))],
-            'kpi_percent' => ['required', 'numeric', 'min:0', 'max:100'],
-            'agent_percent' => ['required', 'numeric', 'min:0', 'max:100'],
-            'venox_bonus_percent' => ['required', 'numeric', 'min:0', 'max:100'],
+            'total_bonus_percent' => ['required', 'numeric', 'min:0', 'max:92'],
         ]);
 
-        $totalPercent = (float) $validated['kpi_percent']
-            + (float) $validated['agent_percent']
-            + (float) $validated['venox_bonus_percent'];
-        if ($totalPercent > 100) {
-            return response()->json(['message' => 'KPI, Agent va Venox foizlari jami 100% dan oshmasligi kerak.'], 422);
+        $bonusTotalPercent = (float) $validated['total_bonus_percent'];
+        if ($bonusTotalPercent > 0 && $bonusTotalPercent < 5) {
+            return response()->json(['message' => 'Bonus jami 0 yoki kamida 5% bo‘lishi kerak.'], 422);
         }
+
+        $kpiPercent = $bonusTotalPercent > 0 ? 5.0 : 0.0;
+        $agentPercent = 8.0;
+        $venoxBonusPercent = max(0, $bonusTotalPercent - $kpiPercent);
+        $totalPercent = $agentPercent + $bonusTotalPercent;
 
         $this->ensureCheckoutCommissionColumns();
         $checkout = Checkout::findOrFail($validated['checkout_id']);
@@ -1465,9 +1466,9 @@ class CheckoutController extends Controller
 
         $checkout->update([
             'commission_scheme' => $validated['scheme'],
-            'kpi_percent' => $validated['kpi_percent'],
-            'agent_percent' => $validated['agent_percent'],
-            'venox_bonus_percent' => $validated['venox_bonus_percent'],
+            'kpi_percent' => $kpiPercent,
+            'agent_percent' => $agentPercent,
+            'venox_bonus_percent' => $venoxBonusPercent,
         ]);
 
         // Saqlangan foiz Shartnoma jamg'armasida darhol ko'rinsin. Faqat shu
@@ -1477,9 +1478,10 @@ class CheckoutController extends Controller
         return response()->json([
             'status' => 'success',
             'label' => $schemes[$validated['scheme']],
-            'kpi_percent' => (float) $validated['kpi_percent'],
-            'agent_percent' => (float) $validated['agent_percent'],
-            'venox_bonus_percent' => (float) $validated['venox_bonus_percent'],
+            'total_bonus_percent' => $bonusTotalPercent,
+            'kpi_percent' => $kpiPercent,
+            'agent_percent' => $agentPercent,
+            'venox_bonus_percent' => $venoxBonusPercent,
             'discount_percent' => $discountPercent,
             'factory_percent' => round($factoryPercent, 2),
         ]);
