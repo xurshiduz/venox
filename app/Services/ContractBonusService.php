@@ -61,14 +61,143 @@ class ContractBonusService
 
     public function debtUsd(Client $client): float
     {
-        return (float) $client->activeDebts()->get()->sum(function ($checkout) {
-            return Currency::documentAmountToUsd(
-                (float) $checkout->total_price_debt,
-                (int) $checkout->currency_type,
-                (float) $checkout->currency_type_price,
-                $checkout->date
-            );
-        });
+        $this->loadDebtRelations($client);
+        $usdCheckouts = $client->checkouts->where('currency_type', 1);
+        $allCheckoutIds = $client->checkouts->pluck('id')->all();
+        $debt = (int) $client->currency_type === 1 ? (float) $client->balance : 0.0;
+
+        foreach ($usdCheckouts as $checkout) {
+            $sale = (float) $checkout->alldetails->sum('total_price');
+            $linkedPayments = (float) $client->cashReceipts
+                ->where('checkout_id', $checkout->id)
+                ->where('currency_type', 1)
+                ->sum('price');
+            $debt += $sale - $linkedPayments;
+        }
+
+        $generalPayments = (float) $client->cashReceipts
+            ->where('currency_type', 1)
+            ->filter(fn ($receipt) => is_null($receipt->checkout_id) || ! in_array($receipt->checkout_id, $allCheckoutIds))
+            ->sum('price');
+        $returns = (float) $client->checkins
+            ->where('type_id', 4)
+            ->where('currency_type', 1)
+            ->sum(fn ($checkin) => (float) $checkin->details->sum('total_price'));
+
+        $debt -= $generalPayments + $returns + $this->debtOffsetUsd($client, 1);
+
+        return max(0, $debt);
+    }
+
+    /** The same UZS debt formula used by checkout_debts_report. */
+    public function debtUzs(Client $client): float
+    {
+        $this->loadDebtRelations($client);
+        $allCheckoutIds = $client->checkouts->pluck('id')->all();
+        $debt = (float) $client->balance;
+        if ((int) $client->currency_type === 1) {
+            $debt *= (float) $client->currency_type_price;
+        }
+
+        foreach ($client->checkouts as $checkout) {
+            $sale = (float) $checkout->alldetails->sum('total_price');
+            $linkedPayments = (float) $client->cashReceipts
+                ->where('checkout_id', $checkout->id)
+                ->where('currency_type', $checkout->currency_type)
+                ->sum('price');
+            $balance = $sale - $linkedPayments;
+            if ((int) $checkout->currency_type === 1) {
+                $balance *= (float) $checkout->currency_type_price;
+            }
+            $debt += $balance;
+        }
+
+        foreach ($client->cashReceipts->filter(fn ($receipt) => is_null($receipt->checkout_id) || ! in_array($receipt->checkout_id, $allCheckoutIds)) as $receipt) {
+            $amount = (float) $receipt->price;
+            if ((int) $receipt->currency_type === 1) {
+                $amount *= (float) $receipt->currency_type_price;
+            }
+            $debt -= $amount;
+        }
+
+        foreach ($client->checkins->where('type_id', 4) as $checkin) {
+            $amount = (float) $checkin->details->sum('total_price');
+            if ((int) $checkin->currency_type === 1) {
+                $amount *= (float) $checkin->currency_type_price;
+            }
+            $debt -= $amount;
+        }
+
+        $debt -= $this->debtOffsetUzs($client);
+
+        return max(0, $debt);
+    }
+
+    public function debtOffsetUsd(Client $client, int $currencyType): float
+    {
+        $this->loadDebtRelations($client);
+        $checkouts = $client->checkouts->keyBy('id');
+
+        return (float) $client->contractBonusTransactions
+            ->where('status', true)
+            ->where('type', 'debt_offset')
+            ->where('direction', 'debit')
+            ->sum(function (ContractBonusTransaction $transaction) use ($checkouts, $currencyType) {
+                return collect(data_get($transaction->meta, 'debt_allocations', []))
+                    ->sum(function (array $allocation) use ($checkouts, $currencyType) {
+                        $checkout = $checkouts->get((int) ($allocation['checkout_id'] ?? 0));
+
+                        return $checkout && (int) $checkout->currency_type === $currencyType
+                            ? (float) ($allocation['amount_usd'] ?? 0)
+                            : 0.0;
+                    });
+            });
+    }
+
+    public function debtOffsetUzs(Client $client): float
+    {
+        $this->loadDebtRelations($client);
+        $checkouts = $client->checkouts->keyBy('id');
+
+        return (float) $client->contractBonusTransactions
+            ->where('status', true)
+            ->where('type', 'debt_offset')
+            ->where('direction', 'debit')
+            ->sum(function (ContractBonusTransaction $transaction) use ($checkouts) {
+                return collect(data_get($transaction->meta, 'debt_allocations', []))
+                    ->sum(function (array $allocation) use ($checkouts, $transaction) {
+                        $checkout = $checkouts->get((int) ($allocation['checkout_id'] ?? 0));
+                        if (! $checkout) {
+                            return 0.0;
+                        }
+
+                        $rate = (float) $checkout->currency_type_price;
+                        if ($rate <= 1) {
+                            $rate = Currency::usdRateForDate($transaction->transaction_date);
+                        }
+
+                        return static::allocationAmountUzs(
+                            (float) ($allocation['amount_native'] ?? 0),
+                            (int) $checkout->currency_type,
+                            $rate
+                        );
+                    });
+            });
+    }
+
+    public static function allocationAmountUzs(float $amountNative, int $currencyType, float $usdRate): float
+    {
+        return $currencyType === 1 ? $amountNative * $usdRate : $amountNative;
+    }
+
+    private function loadDebtRelations(Client $client): void
+    {
+        $client->loadMissing([
+            'checkouts.alldetails',
+            'checkins.details',
+            'cashReceipts' => fn ($query) => $query->where('status', 1),
+            'contractBonusTransactions',
+        ]);
     }
 
     public function redeem(Client $client, string $type, float $amountUsd, ?string $note, int $userId): ContractBonusTransaction

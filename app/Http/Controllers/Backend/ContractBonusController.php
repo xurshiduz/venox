@@ -27,6 +27,12 @@ class ContractBonusController extends Controller
                         ->orWhereHas('contractBonusTransactions', fn ($bonusQuery) => $bonusQuery->where('status', true));
                 });
             })
+            ->with([
+                'checkouts.alldetails',
+                'checkins.details',
+                'cashReceipts' => fn ($query) => $query->where('status', 1),
+                'contractBonusTransactions',
+            ])
             ->withSum(['contractBonusTransactions as contract_credit_usd' => fn ($query) => $query->where('status', true)->where('direction', 'credit')], 'amount_usd')
             ->withSum(['contractBonusTransactions as contract_debit_usd' => fn ($query) => $query->where('status', true)->where('direction', 'debit')], 'amount_usd')
             ->orderBy('name')

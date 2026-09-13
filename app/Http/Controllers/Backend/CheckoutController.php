@@ -15,6 +15,7 @@ use App\Exports\DayExcel;
 use App\Exports\CheckoutMonthExport;
 use App\Exports\AccountingCashReportExport;
 use App\Services\AccountingCashReportService;
+use App\Services\ContractBonusService;
 
 use App\Models\CashExpenditure;
 use App\Models\InventoryDetail;
@@ -123,41 +124,16 @@ class CheckoutController extends Controller
     {
         $clients = $this->getClientsForReport();
         $report_data = [];
+        $debtService = app(ContractBonusService::class);
     
         foreach ($clients as $client) {
             $usd_checkouts = $client->checkouts->where('currency_type', 1);
-            $all_checkout_ids = $client->checkouts->pluck('id')->toArray();
-    
-            $current_debt = 0;
             $initial_debt = 0;
 
             // 0. Boshlang'ich qarz (faqat USD bo'lsa)
             if ((int)$client->currency_type === 1) {
                 $initial_debt = (float)$client->balance;
-                $current_debt += $initial_debt;
             }
-    
-            // 1. Savdolar
-            foreach ($usd_checkouts as $checkout) {
-                $sale_amount = $checkout->alldetails ? $checkout->alldetails->sum('total_price') : 0;
-    
-                $linked_payments = $client->cashReceipts
-                    ->where('checkout_id', $checkout->id)
-                    ->where('currency_type', 1)
-                    ->sum('price');
-    
-                $current_debt += ($sale_amount - $linked_payments);
-            }
-    
-            // 2. Egasiz / umumiy to'lovlar (USD)
-            $general_payments = $client->cashReceipts
-                ->where('currency_type', 1)
-                ->filter(function ($receipt) use ($all_checkout_ids) {
-                    return is_null($receipt->checkout_id) || !in_array($receipt->checkout_id, $all_checkout_ids);
-                })
-                ->sum('price');
-    
-            $current_debt -= $general_payments;
     
             // 3. Vozvratlar (Checkin type_id == 4 va currency_type == 1)
             $returns = 0;
@@ -171,8 +147,7 @@ class CheckoutController extends Controller
                 }
             }
             
-            // Qarzdan vozvratni ayiramiz
-            $current_debt -= $returns;
+            $current_debt = $debtService->debtUsd($client);
     
             if ($current_debt > 0.01) {
                 // $initial_debt o'zgaruvchisini ham yuboramiz
@@ -191,47 +166,13 @@ class CheckoutController extends Controller
     {
         $clients = $this->getClientsForReport();
         $report_data = [];
+        $debtService = app(ContractBonusService::class);
     
         foreach ($clients as $client) {
-            $all_checkout_ids = $client->checkouts->pluck('id')->toArray();
-            $current_debt = 0;
-            
             // 0. Boshlang'ich qarz
             $initial_debt = (float)$client->balance;
             if ((int)$client->currency_type === 1) {
                 $initial_debt = $initial_debt * (float)$client->currency_type_price;
-            }
-            $current_debt += $initial_debt;
-    
-            // 1. Savdolar
-            foreach ($client->checkouts as $checkout) {
-                $sale_amount = $checkout->alldetails ? $checkout->alldetails->sum('total_price') : 0;
-    
-                $linked_payments = $client->cashReceipts
-                    ->where('checkout_id', $checkout->id)
-                    ->where('currency_type', $checkout->currency_type)
-                    ->sum('price');
-    
-                $balance = $sale_amount - $linked_payments;
-    
-                if ((int)$checkout->currency_type === 1) {
-                    $balance = $balance * (float)$checkout->currency_type_price;
-                }
-    
-                $current_debt += $balance;
-            }
-    
-            // 2. Egasiz / umumiy to'lovlar
-            $general_receipts = $client->cashReceipts->filter(function ($receipt) use ($all_checkout_ids) {
-                return is_null($receipt->checkout_id) || !in_array($receipt->checkout_id, $all_checkout_ids);
-            });
-    
-            foreach ($general_receipts as $receipt) {
-                $amount = $receipt->price;
-                if ((int)$receipt->currency_type === 1) {
-                    $amount = $amount * (float)$receipt->currency_type_price;
-                }
-                $current_debt -= $amount;
             }
     
             // 3. Vozvratlar (Checkin type_id == 4)
@@ -250,8 +191,7 @@ class CheckoutController extends Controller
                 }
             }
 
-            // Qarzdan vozvratni ayiramiz
-            $current_debt -= $returns;
+            $current_debt = $debtService->debtUzs($client);
     
             if ($current_debt > 0.01) {
                 // $initial_debt o'zgaruvchisini ham yuboramiz
@@ -352,7 +292,8 @@ class CheckoutController extends Controller
             'checkins.details',
             'cashReceipts' => function ($query) {
                 $query->where('status', 1);
-            }
+            },
+            'contractBonusTransactions',
         ])
         ->when(!Auth::user()->hasAnyRole(['admin', 'report']), function ($query) {
             $query->where('user_id', Auth::id());
