@@ -3,7 +3,6 @@
 namespace Tests\Unit;
 
 use App\Exports\CheckoutMonthExport;
-use App\Models\CashExpenditureType;
 use App\Services\ApprovedProductPriceService;
 use PHPUnit\Framework\TestCase;
 
@@ -77,42 +76,30 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $this->assertSame([10, 20, 148], $clientIds->all());
     }
 
-    public function test_main_expense_is_removed_from_displayed_payment_without_changing_debt_payment(): void
-    {
-        $breakdown = CheckoutMonthExport::paymentBreakdownUsd(2000, 2000, 500);
-
-        $this->assertSame(2000.0, $breakdown['gross_usd']);
-        $this->assertSame(1500.0, $breakdown['net_usd']);
-        $this->assertSame(500.0, $breakdown['bonus_usd']);
-
-        // Qarz formulasi sof 1 500 emas, asl 2 000 to'lovdan foydalanadi.
-        $saleUsd = 3000;
-        $closingDebtUsd = 1000;
-        $openingDebtUsd = $closingDebtUsd + $breakdown['gross_usd'] - $saleUsd;
-
-        $this->assertSame(0.0, $openingDebtUsd);
-    }
-
     public function test_kpi_and_venox_bonus_are_included_in_monthly_bonus_expenses(): void
     {
-        $breakdown = CheckoutMonthExport::paymentBreakdownUsd(2000, 2000, 500, 100, 200);
+        $breakdown = CheckoutMonthExport::paymentBreakdownUsd(2000, 100, 200);
 
         $this->assertSame(2000.0, $breakdown['gross_usd']);
-        $this->assertSame(1200.0, $breakdown['net_usd']);
-        $this->assertSame(800.0, $breakdown['bonus_usd']);
+        $this->assertSame(1700.0, $breakdown['net_usd']);
+        $this->assertSame(300.0, $breakdown['bonus_usd']);
         $this->assertSame(2000.0, $breakdown['net_usd'] + $breakdown['bonus_usd']);
     }
 
-    public function test_report_separates_approved_total_from_actual_debt_total(): void
+    public function test_opening_debt_reverses_the_visible_approved_price_formula(): void
+    {
+        $openingDebt = CheckoutMonthExport::openingDebtUsd(3204.43, 2094, 1800, 200);
+
+        $this->assertEqualsWithDelta(3110.43, $openingDebt, 0.000001);
+        $this->assertEqualsWithDelta(3204.43, $openingDebt + 2094 - 1800 - 200, 0.000001);
+    }
+
+    public function test_report_tracks_approved_and_actual_totals_separately(): void
     {
         $totals = CheckoutMonthExport::reportLineTotalsUsd(10, 65, 53);
 
         $this->assertSame(650.0, $totals['approved_total_usd']);
         $this->assertSame(530.0, $totals['actual_total_usd']);
-
-        // Ravshanali 2 misolida qarz faqat real savdo summasi bilan tenglashadi.
-        $this->assertSame(5743.0, 720.0 + 5023.0 - 0.0);
-        $this->assertNotSame(5743.0, 720.0 + 5360.840336 - 0.0);
     }
 
     public function test_payment_only_product_allocation_does_not_create_a_sale_total(): void
@@ -146,15 +133,6 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $totalUzs = CheckoutMonthExport::paidTotalUzs(234325435 / 11078, 11078);
 
         $this->assertEqualsWithDelta(234325435, $totalUzs, 0.01);
-    }
-
-    public function test_only_main_expense_type_supports_payment_bonus_link(): void
-    {
-        $main = new CashExpenditureType(['name' => 'Основной']);
-        $other = new CashExpenditureType(['name' => 'Транспорт']);
-
-        $this->assertTrue($main->supportsBonusSource());
-        $this->assertFalse($other->supportsBonusSource());
     }
 
     public function approvedPriceProvider(): array

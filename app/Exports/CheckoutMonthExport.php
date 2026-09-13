@@ -3,13 +3,10 @@
 namespace App\Exports;
 
 use App\Models\CashReceipt;
-use App\Models\CashExpenditure;
-use App\Models\CashExpenditureType;
 use App\Models\Checkin;
 use App\Models\CheckinDetail;
 use App\Models\Checkout;
 use App\Models\Client;
-use App\Models\ContractBonusTransaction;
 use App\Models\Currency;
 use App\Models\Product;
 use App\Services\AccountingCashReportService;
@@ -76,7 +73,6 @@ class CheckoutMonthExport implements FromView, WithStyles
         $accounting = app(AccountingCashReportService::class);
         $approvedPriceService = app(ApprovedProductPriceService::class);
         $clientPayments = [];
-        $clientGrossPayments = [];
         $clientPaymentDates = [];
         $paymentBonusExpensesByClient = [];
 
@@ -88,17 +84,6 @@ class CheckoutMonthExport implements FromView, WithStyles
             ->orderBy('date')
             ->orderBy('id')
             ->get();
-
-        $linkedBonusExpensesByReceipt = CashExpenditure::query()
-            ->whereIn(
-                'cash_expenditure_types',
-                CashExpenditureType::query()->get(['id', 'name'])
-                    ->filter(fn (CashExpenditureType $type) => $type->supportsBonusSource())
-                    ->pluck('id')
-            )
-            ->whereIn('source_cash_receipt_id', $payments->pluck('id'))
-            ->get(['source_cash_receipt_id', 'price'])
-            ->groupBy('source_cash_receipt_id');
 
         $paymentClientIds = $payments->map(function ($payment) {
             return $payment->client_id ?: optional($payment->checkout)->client_id;
@@ -174,7 +159,6 @@ class CheckoutMonthExport implements FromView, WithStyles
                     (float) ($payment->currency_type_price ?: Currency::usdRateForDate($payment->date ?: $payment->created_at)),
                     (string) $payment->comment
                 );
-            $linkedNative = (float) collect($linkedBonusExpensesByReceipt->get($payment->id, []))->sum('price');
             $cashReportRow = $cashReportRowsByReceipt->get((string) $payment->id, []);
             $kpiUsd = array_key_exists('kpi', $cashReportRow)
                 ? (float) $cashReportRow['kpi']
@@ -183,37 +167,24 @@ class CheckoutMonthExport implements FromView, WithStyles
                 ? (float) $cashReportRow['venox']
                 : $usd * (float) optional($payment->checkout)->venox_bonus_percent / 100;
             $paymentBreakdown = static::paymentBreakdownUsd(
-                (float) $payment->price,
                 $usd,
-                $linkedNative,
                 $kpiUsd,
                 $venoxBonusUsd
             );
-            $clientGrossPayments[$key] = ($clientGrossPayments[$key] ?? 0) + $paymentBreakdown['gross_usd'];
             $clientPayments[$key] = ($clientPayments[$key] ?? 0) + $paymentBreakdown['net_usd'];
             $paymentBonusExpensesByClient[$key] = ($paymentBonusExpensesByClient[$key] ?? 0) + $paymentBreakdown['bonus_usd'];
             $clientPaymentDates[$key][] = Carbon::parse($payment->date ?: $payment->created_at)->format('d.m.Y');
         }
 
         $closingDebts = $this->clientDebtTotalsUsd($clientIds->map(fn ($id) => (string) $id)->all(), $periodEnd);
-        $clientBonusExpenses = ContractBonusTransaction::query()
-            ->where('status', true)
-            ->where('direction', 'debit')
-            ->whereIn('client_id', $clientIds)
-            ->whereDate('transaction_date', '>=', $periodStart->toDateString())
-            ->whereDate('transaction_date', '<=', $periodEnd->toDateString())
-            ->selectRaw('client_id, SUM(amount_usd) as total_amount')
-            ->groupBy('client_id')
-            ->pluck('total_amount', 'client_id');
-        foreach ($paymentBonusExpensesByClient as $clientKey => $amount) {
-            $clientBonusExpenses[$clientKey] = (float) ($clientBonusExpenses[$clientKey] ?? 0) + $amount;
-        }
+        // Bu hisobotdagi bonus xarajatlari faqat checkout formasida saqlangan
+        // KPI va Venox bonus foizlaridan olinadi. Agent foizi sotuv narxida.
+        $clientBonusExpenses = collect($paymentBonusExpensesByClient);
         $groupedRows = [];
 
         foreach ($checkouts as $checkout) {
             $clientKey = (string) $checkout->client_id;
             $paid = (float) ($clientPayments[$clientKey] ?? 0);
-            $grossPaid = (float) ($clientGrossPayments[$clientKey] ?? 0);
             $closing = (float) ($closingDebts[$clientKey] ?? 0);
 
             if (!isset($groupedRows[$clientKey])) {
@@ -234,7 +205,6 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'approved_total_usd' => 0,
                     'actual_total_usd' => 0,
                     'paid_usd' => $paid,
-                    'gross_paid_usd' => $grossPaid,
                     'closing_debt_usd' => $closing,
                     'bonus_expense_usd' => (float) ($clientBonusExpenses[$clientKey] ?? 0),
                 ];
@@ -448,7 +418,6 @@ class CheckoutMonthExport implements FromView, WithStyles
                 'approved_total_usd' => $approvedTotalUsd,
                 'actual_total_usd' => 0,
                 'paid_usd' => (float) ($clientPayments[$clientKey] ?? 0),
-                'gross_paid_usd' => (float) ($clientGrossPayments[$clientKey] ?? 0),
                 'closing_debt_usd' => (float) ($closingDebts[$clientKey] ?? 0),
                 'bonus_expense_usd' => (float) ($clientBonusExpenses[$clientKey] ?? 0),
             ];
@@ -459,11 +428,14 @@ class CheckoutMonthExport implements FromView, WithStyles
 
         $rows = [];
         foreach ($groupedRows as $row) {
-            // Qoldiq qarz = oldingi qarz + davrdagi sotuvlar - davrdagi to'lovlar.
-            // Shu tenglamadan davr boshidagi qarzni tiklaymiz.
-            $row['debt_before_payment'] = $row['closing_debt_usd']
-                + $row['gross_paid_usd']
-                - $row['actual_total_usd'];
+            // Qoldiq = avvalgi qarz + tasdiqlangan prays jami - to'langan
+            // - KPI/Venox bonus. Shu tenglamadan avvalgi qarzni tiklaymiz.
+            $row['debt_before_payment'] = static::openingDebtUsd(
+                $row['closing_debt_usd'],
+                $row['approved_total_usd'],
+                $row['paid_usd'],
+                $row['bonus_expense_usd']
+            );
             $venoxCashUsd = static::venoxCashTotalUsd(
                 $row['quantities'],
                 $row['unit_prices'],
@@ -540,9 +512,12 @@ class CheckoutMonthExport implements FromView, WithStyles
             'totalPaidUzs' => static::paidTotalUzs($totalPaidUsd, $reportUsdRate),
             'totals' => [
                 'debt_before_payment' => collect($groupedRows)->sum(fn ($row) =>
-                    (float) $row['closing_debt_usd']
-                    + (float) $row['gross_paid_usd']
-                    - (float) $row['actual_total_usd']
+                    static::openingDebtUsd(
+                        (float) $row['closing_debt_usd'],
+                        (float) $row['approved_total_usd'],
+                        (float) $row['paid_usd'],
+                        (float) $row['bonus_expense_usd']
+                    )
                 ),
                 'qty' => collect($groupedRows)->sum(fn ($row) => collect($row['quantities'])->sum()),
                 'paid_usd' => $totalPaidUsd,
@@ -586,25 +561,20 @@ class CheckoutMonthExport implements FromView, WithStyles
     }
 
     /**
-     * Bonus expenses displayed in the monthly report consist of a linked
-     * "Основной" expense plus KPI and Venox bonus. The gross receipt still
-     * remains available for customer debt accounting.
+     * The checkout form's KPI and Venox bonus are shown as bonus expenses.
+     * Agent commission is intentionally excluded because it is in the sale price.
      */
     public static function paymentBreakdownUsd(
-        float $grossNative,
         float $grossUsd,
-        float $linkedBonusNative,
         float $kpiUsd = 0,
         float $venoxBonusUsd = 0
     ): array
     {
-        if ($grossNative <= 0 || $grossUsd <= 0) {
+        if ($grossUsd <= 0) {
             return ['gross_usd' => $grossUsd, 'net_usd' => $grossUsd, 'bonus_usd' => 0.0];
         }
 
-        $linkedBonusNative = min(max(0, $linkedBonusNative), $grossNative);
-        $linkedBonusUsd = $grossUsd * ($linkedBonusNative / $grossNative);
-        $bonusUsd = min($grossUsd, $linkedBonusUsd + max(0, $kpiUsd) + max(0, $venoxBonusUsd));
+        $bonusUsd = min($grossUsd, max(0, $kpiUsd) + max(0, $venoxBonusUsd));
 
         return [
             'gross_usd' => $grossUsd,
@@ -613,12 +583,17 @@ class CheckoutMonthExport implements FromView, WithStyles
         ];
     }
 
-    /**
-     * Keep the BOSS-approved price total visible for price control, while the
-     * debt reconciliation total always follows the actual checkout contract.
-     * Payment-only allocation rows have no sale in the selected period, so
-     * their actual total is intentionally null.
-     */
+    /** Reverse the exact debt equation displayed in the spreadsheet. */
+    public static function openingDebtUsd(
+        float $closingDebtUsd,
+        float $approvedTotalUsd,
+        float $paidUsd,
+        float $bonusExpenseUsd
+    ): float {
+        return $closingDebtUsd + $paidUsd + $bonusExpenseUsd - $approvedTotalUsd;
+    }
+
+    /** Keep approved and actual sale totals separate for report calculations. */
     public static function reportLineTotalsUsd(
         float $qty,
         float $approvedUnitPriceUsd,
