@@ -40,6 +40,17 @@ class AccountingCashReportServiceTest extends TestCase
         $this->assertEqualsWithDelta(25, $result['unallocated_usd'], 0.000001);
     }
 
+    public function test_product_allocation_can_skip_purchase_cost_for_fast_exports(): void
+    {
+        $details = collect([$this->detail(1, 10, 'Tovar A', 10, 100, 4)]);
+
+        $result = (new AccountingCashReportService())->allocatePayment($details, 50, 0, false);
+
+        $this->assertEqualsWithDelta(5, $result['products'][0]['qty'], 0.000001);
+        $this->assertSame(0.0, $result['purchase_cost_usd']);
+        $this->assertEqualsWithDelta(0, $result['unallocated_usd'], 0.000001);
+    }
+
     public function test_commission_shares_and_factory_remainder_are_calculated_from_payment(): void
     {
         $result = (new AccountingCashReportService())->splitPayment(2500, 5, 8, 25);

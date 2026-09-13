@@ -15,13 +15,21 @@ class AccountingCashReportService
     public function rows(array $filters): Collection
     {
         $filterClientIds = collect($filters['client_ids'] ?? [])->filter()->unique()->values();
+        $includePurchaseCost = (bool) ($filters['include_purchase_cost'] ?? true);
+        $receiptRelations = ['clientname', 'uname', 'checkout.managerid', 'checkout.supid', 'checkout.details.prodid.unitid'];
+        $checkoutRelations = ['managerid', 'supid', 'details.prodid.unitid'];
+        if ($includePurchaseCost) {
+            $receiptRelations[] = 'checkout.details.checkid';
+            $checkoutRelations[] = 'details.checkid';
+        }
+
         $receipts = CashReceipt::query()
             ->where('status', 1)
             ->where('date', '<=', $filters['to'])
             ->when($filterClientIds->isNotEmpty(), function ($query) use ($filterClientIds) {
                 $query->whereIn('client_id', $filterClientIds);
             })
-            ->with(['clientname', 'uname', 'checkout.managerid', 'checkout.supid', 'checkout.details.prodid.unitid', 'checkout.details.checkid'])
+            ->with($receiptRelations)
             ->orderBy('date')
             ->orderBy('id')
             ->get();
@@ -40,7 +48,7 @@ class AccountingCashReportService
                 ->where('type_id', 1)
                 ->whereIn('client_id', $unlinkedClientIds)
                 ->whereDate('date', '<=', $filters['to'])
-                ->with(['managerid', 'supid', 'details.prodid.unitid', 'details.checkid'])
+                ->with($checkoutRelations)
                 ->orderBy('date')
                 ->orderBy('id')
                 ->get()
@@ -60,7 +68,7 @@ class AccountingCashReportService
                     $checkout->currency_type !== null ? (int) $checkout->currency_type : null,
                     $checkout->currency_type_price !== null ? (float) $checkout->currency_type_price : null
                 );
-                $rows->push($this->makeRow($receipt, $checkout, $paymentUsd, $paidBefore[$checkoutId] ?? 0));
+                $rows->push($this->makeRow($receipt, $checkout, $paymentUsd, $paidBefore[$checkoutId] ?? 0, $includePurchaseCost));
                 $paidBefore[$checkoutId] = ($paidBefore[$checkoutId] ?? 0) + $paymentUsd;
                 continue;
             }
@@ -92,7 +100,7 @@ class AccountingCashReportService
                     continue;
                 }
                 $allocatedUsd = min($remainingUsd, $unpaidUsd);
-                $receiptRows->push($this->makeRow($receipt, $checkout, $allocatedUsd, $previousUsd));
+                $receiptRows->push($this->makeRow($receipt, $checkout, $allocatedUsd, $previousUsd, $includePurchaseCost));
                 $paidBefore[$checkoutId] = $previousUsd + $allocatedUsd;
                 $remainingUsd -= $allocatedUsd;
             }
@@ -122,7 +130,13 @@ class AccountingCashReportService
         })->values();
     }
 
-    private function makeRow(CashReceipt $receipt, Checkout $checkout, float $paymentUsd, float $previousUsd): array
+    private function makeRow(
+        CashReceipt $receipt,
+        Checkout $checkout,
+        float $paymentUsd,
+        float $previousUsd,
+        bool $includePurchaseCost
+    ): array
     {
         // `checkouts.details` matn ustuni details() relationi bilan bir xil nomda.
         // Property orqali o'qilsa relation o'rniga NULL/text qaytadi, shu sabab eager-loaded
@@ -130,7 +144,7 @@ class AccountingCashReportService
         $details = $checkout->relationLoaded('details')
             ? $checkout->getRelation('details')
             : $checkout->details()->with('prodid.unitid')->get();
-        $allocation = $this->allocatePayment($details ?? collect(), $paymentUsd, $previousUsd);
+        $allocation = $this->allocatePayment($details ?? collect(), $paymentUsd, $previousUsd, $includePurchaseCost);
 
         $scheme = (string) ($checkout->commission_scheme ?? '');
         $kpiPercent = (float) ($checkout->kpi_percent ?? 0);
@@ -320,12 +334,17 @@ class AccountingCashReportService
     /**
      * Bir to'lovni checkout qatorlariga oldingi to'lovlar qoplagan joydan boshlab taqsimlaydi.
      */
-    public function allocatePayment(Collection $details, float $paymentUsd, float $previousUsd = 0): array
+    public function allocatePayment(
+        Collection $details,
+        float $paymentUsd,
+        float $previousUsd = 0,
+        bool $includePurchaseCost = true
+    ): array
     {
         $remaining = max(0, $paymentUsd);
         $offset = max(0, $previousUsd);
         $products = [];
-        $purchaseCostUsd = 0;
+        $purchaseCostUsd = 0.0;
         $productIds = [];
 
         foreach ($details->sortBy('id') as $detail) {
@@ -343,8 +362,10 @@ class AccountingCashReportService
             $coveredUsd = min($remaining, $availableLineUsd);
             $coveredQty = $qty * ($coveredUsd / $lineUsd);
             if ($coveredQty > 0) {
-                $unitCostUsd = $this->detailUnitCostUsd($detail);
-                $purchaseCostUsd += $coveredQty * $unitCostUsd;
+                if ($includePurchaseCost) {
+                    $unitCostUsd = $this->detailUnitCostUsd($detail);
+                    $purchaseCostUsd += $coveredQty * $unitCostUsd;
+                }
                 $productIds[] = (int) $detail->product_id;
                 $products[] = [
                     'id' => (int) $detail->product_id,
