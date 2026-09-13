@@ -18,6 +18,7 @@ use Maatwebsite\Excel\Concerns\FromView;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class CheckoutMonthExport implements FromView, WithStyles
@@ -73,6 +74,7 @@ class CheckoutMonthExport implements FromView, WithStyles
 
         $accounting = app(AccountingCashReportService::class);
         $approvedPriceService = app(ApprovedProductPriceService::class);
+        $reportUsdRate = $approvedPriceService->usdRate();
         $clientPayments = [];
         $clientPaymentDates = [];
         $paymentBonusExpensesByClient = [];
@@ -161,19 +163,11 @@ class CheckoutMonthExport implements FromView, WithStyles
                     (string) $payment->comment
                 );
             $cashReportRow = $cashReportRowsByReceipt->get((string) $payment->id, []);
-            $commissionCheckout = $payment->checkout;
-            if (! $commissionCheckout) {
-                $paymentDate = Carbon::parse($payment->date ?: $payment->created_at)->endOfDay();
-                $commissionCheckout = collect($periodCheckoutsByClient->get($key, []))
-                    ->filter(function (Checkout $checkout) use ($paymentDate) {
-                        return Carbon::parse($checkout->date ?: $checkout->created_at)->lte($paymentDate);
-                    })
-                    ->sortByDesc(function (Checkout $checkout) {
-                        return Carbon::parse($checkout->date ?: $checkout->created_at)->format('Y-m-d H:i:s')
-                            . '-' . str_pad((string) $checkout->id, 12, '0', STR_PAD_LEFT);
-                    })
-                    ->first();
-            }
+            $commissionCheckout = static::venoxBonusCheckout(
+                $payment->checkout,
+                $periodCheckoutsByClient->get($key, []),
+                $payment->date ?: $payment->created_at
+            );
 
             // Bog'lanmagan "za dolg" to'lovi uchun ham shu davrdagi eng yaqin
             // checkout formasidagi Venox foizi FIFO tarixidan ustun turadi.
@@ -212,7 +206,9 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'agents' => [],
                     'quantities' => [],
                     'unit_prices' => [],
+                    'unit_prices_uzs' => [],
                     'factory_prices' => [],
+                    'factory_prices_uzs' => [],
                     'markup_percentages' => [],
                     'actual_line_totals_usd' => [],
                     'approved_total_usd' => 0,
@@ -331,6 +327,12 @@ class CheckoutMonthExport implements FromView, WithStyles
                         $catalogRate,
                         $checkout->date ?: $checkout->created_at
                     );
+                $unitPriceUzs = isset($approvedPrices['sale_uzs'])
+                    ? (float) $approvedPrices['sale_uzs']
+                    : $unitPriceUsd * $reportUsdRate;
+                $factoryPriceUzs = isset($approvedPrices['factory_uzs'])
+                    ? (float) $approvedPrices['factory_uzs']
+                    : $factoryPriceUsd * $reportUsdRate;
 
                 $lineTotals = static::reportLineTotalsUsd($qty, $unitPriceUsd, $actualUnitPriceUsd);
                 $markupPercent = Currency::markupPercent($factoryPriceUsd, $unitPriceUsd);
@@ -339,7 +341,9 @@ class CheckoutMonthExport implements FromView, WithStyles
                 $groupedRows[$clientKey]['agents'][] = $checkout->managerid->name ?? '—';
                 $groupedRows[$clientKey]['quantities'][] = $qty;
                 $groupedRows[$clientKey]['unit_prices'][] = $unitPriceUsd;
+                $groupedRows[$clientKey]['unit_prices_uzs'][] = $unitPriceUzs;
                 $groupedRows[$clientKey]['factory_prices'][] = $factoryPriceUsd;
+                $groupedRows[$clientKey]['factory_prices_uzs'][] = $factoryPriceUzs;
                 $groupedRows[$clientKey]['markup_percentages'][] = $markupPercent;
                 $groupedRows[$clientKey]['actual_line_totals_usd'][] = $lineTotals['actual_total_usd'];
                 $groupedRows[$clientKey]['approved_total_usd'] += $lineTotals['approved_total_usd'];
@@ -361,7 +365,9 @@ class CheckoutMonthExport implements FromView, WithStyles
             $agents = [];
             $quantities = [];
             $unitPrices = [];
+            $unitPricesUzs = [];
             $factoryPrices = [];
+            $factoryPricesUzs = [];
             $markupPercentages = [];
             $actualLineTotalsUsd = [];
             $approvedTotalUsd = 0;
@@ -402,13 +408,21 @@ class CheckoutMonthExport implements FromView, WithStyles
                             $catalogRate,
                             $allocationDate
                         );
+                    $unitPriceUzs = isset($approvedPrices['sale_uzs'])
+                        ? (float) $approvedPrices['sale_uzs']
+                        : $unitPriceUsd * $reportUsdRate;
+                    $factoryPriceUzs = isset($approvedPrices['factory_uzs'])
+                        ? (float) $approvedPrices['factory_uzs']
+                        : $factoryPriceUsd * $reportUsdRate;
                     $qty = (float) ($allocatedProduct['qty'] ?? 0);
 
                     $products[] = $productName;
                     $agents[] = $allocationRow['agent'] ?? '—';
                     $quantities[] = $qty;
                     $unitPrices[] = $unitPriceUsd;
+                    $unitPricesUzs[] = $unitPriceUzs;
                     $factoryPrices[] = $factoryPriceUsd;
+                    $factoryPricesUzs[] = $factoryPriceUzs;
                     $markupPercentages[] = Currency::markupPercent($factoryPriceUsd, $unitPriceUsd);
                     $lineTotals = static::reportLineTotalsUsd($qty, $unitPriceUsd, null);
                     $actualLineTotalsUsd[] = $lineTotals['actual_total_usd'];
@@ -425,7 +439,9 @@ class CheckoutMonthExport implements FromView, WithStyles
                 'agents' => $agents,
                 'quantities' => $quantities,
                 'unit_prices' => $unitPrices,
+                'unit_prices_uzs' => $unitPricesUzs,
                 'factory_prices' => $factoryPrices,
+                'factory_prices_uzs' => $factoryPricesUzs,
                 'markup_percentages' => $markupPercentages,
                 'actual_line_totals_usd' => $actualLineTotalsUsd,
                 'approved_total_usd' => $approvedTotalUsd,
@@ -468,7 +484,9 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'product' => '',
                     'qty' => '',
                     'unit_price_usd' => '',
+                    'unit_price_usd_formula' => null,
                     'factory_price_usd' => null,
+                    'factory_price_usd_formula' => null,
                     'markup_percent' => null,
                     'markup_percent_formula' => null,
                     'approved_total_usd' => null,
@@ -489,10 +507,12 @@ class CheckoutMonthExport implements FromView, WithStyles
             foreach ($row['products'] as $index => $product) {
                 $qty = (float) $row['quantities'][$index];
                 $unitPrice = (float) $row['unit_prices'][$index];
+                $unitPriceUzs = (float) $row['unit_prices_uzs'][$index];
                 $factoryPrice = (float) $row['factory_prices'][$index];
+                $factoryPriceUzs = (float) $row['factory_prices_uzs'][$index];
                 $first = $index === 0;
                 $excelRow = count($rows) + 3;
-                $lineFormulas = static::lineExcelFormulas($excelRow);
+                $lineFormulas = static::lineExcelFormulas($excelRow, $unitPriceUzs, $factoryPriceUzs);
 
                 $rows[] = [
                     'date' => $first ? collect($row['dates'])->unique()->implode("\n") : null,
@@ -503,7 +523,9 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'product' => $product,
                     'qty' => $qty,
                     'unit_price_usd' => $unitPrice,
+                    'unit_price_usd_formula' => $lineFormulas['unit_price_usd'],
                     'factory_price_usd' => $factoryPrice,
+                    'factory_price_usd_formula' => $lineFormulas['factory_price_usd'],
                     'markup_percent' => $row['markup_percentages'][$index],
                     'markup_percent_formula' => $lineFormulas['markup_percent'],
                     'approved_total_usd' => $qty * $unitPrice,
@@ -533,8 +555,6 @@ class CheckoutMonthExport implements FromView, WithStyles
         $this->rowCount = count($rows);
         $this->rowLineCounts = array_fill(0, $this->rowCount, 1);
         $totalPaidUsd = $clientIds->sum(fn ($id) => (float) ($clientPayments[(string) $id] ?? 0));
-        $reportUsdRate = Currency::usdRate();
-
         return view('backend.checkouts.excel_matrix', [
             'rows' => $rows,
             'periodLabel' => $periodStart->format('d.m.Y') . ' — ' . $periodEnd->format('d.m.Y'),
@@ -609,13 +629,26 @@ class CheckoutMonthExport implements FromView, WithStyles
         return $total;
     }
 
-    public static function lineExcelFormulas(int $row): array
+    public static function lineExcelFormulas(
+        int $row,
+        float $unitPriceUzs = 0,
+        float $factoryPriceUzs = 0
+    ): array
     {
         return [
+            'unit_price_usd' => '=' . static::excelNumber($unitPriceUzs) . '/$Q$2',
+            'factory_price_usd' => '=' . static::excelNumber($factoryPriceUzs) . '/$Q$2',
             'markup_percent' => sprintf('=IFERROR((H%d-I%d)/I%d,"")', $row, $row, $row),
             'approved_total_usd' => sprintf('=G%d*H%d', $row, $row),
             'factory_total_usd' => sprintf('=G%d*I%d', $row, $row),
         ];
+    }
+
+    private static function excelNumber(float $value): string
+    {
+        $number = rtrim(rtrim(sprintf('%.8F', $value), '0'), '.');
+
+        return $number === '' ? '0' : $number;
     }
 
     public static function clientExcelFormulas(int $startRow, int $endRow): array
@@ -659,6 +692,32 @@ class CheckoutMonthExport implements FromView, WithStyles
             'net_usd' => $grossUsd - $bonusUsd,
             'bonus_usd' => $bonusUsd,
         ];
+    }
+
+    /**
+     * Resolve the checkout form that supplies Venox bonus for any client.
+     * A saved positive bonus in the selected period takes precedence over a
+     * linked legacy checkout whose bonus is still zero.
+     */
+    public static function venoxBonusCheckout($linkedCheckout, iterable $periodCheckouts, $paymentDate)
+    {
+        if ($linkedCheckout && (float) $linkedCheckout->venox_bonus_percent > 0) {
+            return $linkedCheckout;
+        }
+
+        $paymentEnd = Carbon::parse($paymentDate)->endOfDay();
+        $eligible = collect($periodCheckouts)
+            ->filter(function (Checkout $checkout) use ($paymentEnd) {
+                return Carbon::parse($checkout->date ?: $checkout->created_at)->lte($paymentEnd);
+            })
+            ->sortByDesc(function (Checkout $checkout) {
+                return Carbon::parse($checkout->date ?: $checkout->created_at)->format('Y-m-d H:i:s')
+                    . '-' . str_pad((string) $checkout->id, 12, '0', STR_PAD_LEFT);
+            });
+
+        return $eligible->first(fn (Checkout $checkout) => (float) $checkout->venox_bonus_percent > 0)
+            ?: $linkedCheckout
+            ?: $eligible->first();
     }
 
     /** Reverse the exact debt equation displayed in the spreadsheet. */
@@ -783,11 +842,11 @@ class CheckoutMonthExport implements FromView, WithStyles
             $sheet->mergeCells($range);
         }
 
-        foreach (['A' => 13, 'B' => 28, 'C' => 19, 'D' => 24, 'E' => 20, 'F' => 52, 'G' => 15, 'H' => 16, 'I' => 16, 'J' => 20, 'K' => 23, 'L' => 20, 'M' => 17, 'N' => 18, 'O' => 22, 'P' => 18] as $column => $width) {
+        foreach (['A' => 13, 'B' => 28, 'C' => 19, 'D' => 24, 'E' => 20, 'F' => 52, 'G' => 15, 'H' => 16, 'I' => 16, 'J' => 20, 'K' => 23, 'L' => 20, 'M' => 17, 'N' => 18, 'O' => 22, 'P' => 18, 'Q' => 18, 'R' => 26] as $column => $width) {
             $sheet->getColumnDimension($column)->setWidth($width);
         }
 
-        $sheet->getStyle('A1:P' . $lastRow)->getAlignment()
+        $sheet->getStyle('A1:R' . $lastRow)->getAlignment()
             ->setVertical(Alignment::VERTICAL_CENTER)
             ->setHorizontal(Alignment::HORIZONTAL_CENTER)
             ->setWrapText(true);
@@ -800,5 +859,10 @@ class CheckoutMonthExport implements FromView, WithStyles
         $sheet->getStyle('J3:J' . $lastRow)->getNumberFormat()->setFormatCode('0.00%');
         $sheet->getStyle('K3:P' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
         $sheet->getStyle('A' . $lastRow . ':P' . $lastRow)->getFont()->setBold(true);
+        $sheet->getStyle('Q1:R2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setWrapText(true);
+        $sheet->getStyle('Q1:R1')->getFont()->setBold(true);
+        $sheet->getStyle('Q1:R2')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('C9C9C9');
+        $sheet->getStyle('Q2:R2')->getNumberFormat()->setFormatCode('#,##0.00');
+        $sheet->getStyle('Q2')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFF2CC');
     }
 }

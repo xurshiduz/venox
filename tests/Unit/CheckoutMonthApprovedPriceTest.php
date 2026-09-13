@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Exports\CheckoutMonthExport;
+use App\Models\Checkout;
 use App\Services\ApprovedProductPriceService;
 use PHPUnit\Framework\TestCase;
 
@@ -137,10 +138,26 @@ class CheckoutMonthApprovedPriceTest extends TestCase
     public function test_monthly_export_line_cells_are_real_excel_formulas(): void
     {
         $this->assertSame([
+            'unit_price_usd' => '=207000/$Q$2',
+            'factory_price_usd' => '=192000/$Q$2',
             'markup_percent' => '=IFERROR((H3-I3)/I3,"")',
             'approved_total_usd' => '=G3*H3',
             'factory_total_usd' => '=G3*I3',
-        ], CheckoutMonthExport::lineExcelFormulas(3));
+        ], CheckoutMonthExport::lineExcelFormulas(3, 207000, 192000));
+    }
+
+    public function test_saved_period_venox_bonus_is_used_when_linked_checkout_has_zero_bonus(): void
+    {
+        $linked = new Checkout(['id' => 10, 'date' => '2026-09-10', 'venox_bonus_percent' => 0]);
+        $savedBonus = new Checkout(['id' => 11, 'date' => '2026-09-11', 'venox_bonus_percent' => 25]);
+
+        $resolved = CheckoutMonthExport::venoxBonusCheckout(
+            $linked,
+            [$linked, $savedBonus],
+            '2026-09-11'
+        );
+
+        $this->assertSame($savedBonus, $resolved);
     }
 
     public function test_monthly_export_client_totals_are_real_excel_formulas(): void
