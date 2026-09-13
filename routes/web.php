@@ -30,6 +30,14 @@ Route::get('/_maintenance/rahim-bonus-audit-41b8d0f934', function () {
             ->orderBy('date')
             ->orderBy('id')
             ->get(['id', 'checkout_id', 'date', 'price', 'currency_type', 'currency_type_price']);
+        $allPossibleReceipts = \App\Models\CashReceipt::query()
+            ->where(function ($query) use ($client, $checkouts) {
+                $query->where('client_id', $client->id)
+                    ->orWhereIn('checkout_id', $checkouts->pluck('id'));
+            })
+            ->orderBy('date')
+            ->orderBy('id')
+            ->get(['id', 'client_id', 'checkout_id', 'date', 'status', 'price', 'currency_type', 'currency_type_price']);
         $rows = app(\App\Services\AccountingCashReportService::class)->rows([
             'from' => '2026-01-01',
             'to' => now()->toDateString(),
@@ -43,6 +51,7 @@ Route::get('/_maintenance/rahim-bonus-audit-41b8d0f934', function () {
             'client' => $client,
             'checkouts' => $checkouts,
             'receipts' => $receipts,
+            'all_possible_receipts' => $allPossibleReceipts,
             'cash_rows' => $rows->map(fn (array $row) => [
                 'receipt_id' => $row['receipt_id'] ?? null,
                 'checkout_id' => $row['checkout_id'] ?? null,
