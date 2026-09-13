@@ -74,7 +74,7 @@
                         <div class="col-lg-3 col-md-6">
                             <div class="d-flex" style="gap: 8px;">
                                 <button type="submit" class="btn btn-primary flex-grow-1">Ko‘rish</button>
-                                <a href="{{ route('checkouts_pdf', ['ctype_alias' => $ctypeAlias, 'agent_id' => $selectedAgent, 'date_from' => $dateFrom, 'date_to' => $dateTo]) }}" class="btn btn-danger">PDF</a>
+                                <a target="_blank" href="{{ route('checkouts_pdf', ['ctype_alias' => $ctypeAlias, 'agent_id' => $selectedAgent, 'date_from' => $dateFrom, 'date_to' => $dateTo]) }}" class="btn btn-danger">PDF</a>
                                 <a href="{{ route('checkouts_index', ['ctypeAlias' => $ctypeAlias]) }}" class="btn btn-outline-light">Tozalash</a>
                             </div>
                         </div>

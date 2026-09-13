@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Продажа КПИ</title>
-@if($clientSidePdf ?? false)<link rel="stylesheet" href="/css/sheets-of-paper-a4.css"><link href="https://fonts.googleapis.com/css2?family=Tinos&display=swap" rel="stylesheet">@endif
 <style>
-@page{size:A4 landscape;margin:10mm}body{margin:0;color:#000;font-family:"DejaVu Sans","Tinos",serif;font-size:10px}.page{width:100%}.title-order{text-align:center;font-size:14px;margin:0}.filter-line{text-align:center;margin:4px 0 12px}.summary-wrap{width:100%;margin-bottom:10px}.summary-box{width:49%;display:inline-table;vertical-align:top}.summary-box+.summary-box{float:right}table{width:100%;border-collapse:collapse}th,td{border:1px solid #000;padding:3px 4px}th{text-align:center;font-weight:normal}.summary-box td{border:0;padding:1px 5px}.summary-box td:last-child{border-bottom:1px dotted #000}.contract-row td{background:#f1f1f1;text-align:center}.center{text-align:center}.number{text-align:right;white-space:nowrap}.signatures{margin-top:14px}.signatures td{border:0;padding:5px 0}.pdf-status{margin-bottom:10px;padding:10px;background:#eef6ff;text-align:center}tr{page-break-inside:avoid}
+@page{size:A4 landscape;margin:8mm}*{box-sizing:border-box}body{margin:0;color:#000;background:#fff;font-family:Arial,"DejaVu Sans",sans-serif;font-size:11pt;line-height:1.3}.page{width:100%}.title-order{text-align:center;font-size:16pt;margin:0}.filter-line{text-align:center;font-size:11pt;margin:5px 0 14px}.summary-wrap{width:100%;margin-bottom:12px}.summary-wrap:after{content:"";display:block;clear:both}.summary-box{width:49%;display:inline-table;vertical-align:top}.summary-box+.summary-box{float:right}table{width:100%;border-collapse:collapse;table-layout:auto}th,td{border:1px solid #000;padding:5px 6px;font-size:10pt}th{text-align:center;font-weight:600;background:#eee}.summary-box td{border:0;padding:2px 6px;font-size:10.5pt}.summary-box td:last-child{border-bottom:1px dotted #000}.contract-row td{background:#e8e8e8;text-align:center;font-size:10.5pt;padding:6px}.center{text-align:center}.number{text-align:right;white-space:nowrap}.signatures{margin-top:16px}.signatures td{border:0;padding:6px 0;font-size:10.5pt}.pdf-status{margin:10px auto;padding:12px;max-width:900px;background:#eef6ff;text-align:center;font-size:11pt}.print-button{margin-left:10px;padding:7px 14px;border:0;border-radius:4px;background:#1976d2;color:#fff;cursor:pointer}thead{display:table-header-group}tr{page-break-inside:avoid}@media print{.pdf-status{display:none!important}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 </style></head><body class="document">
-@if($clientSidePdf ?? false)<div id="pdf-status" class="pdf-status">PDF tayyorlanmoqda, iltimos kuting...</div>@endif
+@if($clientSidePdf ?? false)<div id="pdf-status" class="pdf-status">PDF oynasi ochilmoqda... <button type="button" class="print-button" onclick="window.print()">Qayta ochish</button></div>@endif
 <div id="pdf-report" class="page">
 @php
     $actualFrom = $dateFrom ?: optional($data->sortBy('date')->first())->date;
@@ -42,6 +41,6 @@
 @endforeach
 </div>
 @if($clientSidePdf ?? false)
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script><script>window.addEventListener('load',function(){var s=document.getElementById('pdf-status');if(typeof html2pdf==='undefined'){s.textContent='PDF moduli yuklanmadi. Chop etish oynasi ochilmoqda...';window.print();return}html2pdf().set({margin:5,filename:@json($filename),image:{type:'jpeg',quality:.98},html2canvas:{scale:2,useCORS:true},jsPDF:{unit:'mm',format:'a4',orientation:'landscape'},pagebreak:{mode:['css','legacy'],avoid:['tr']}}).from(document.getElementById('pdf-report')).save().then(function(){s.textContent='PDF yuklandi.'}).catch(function(){window.print()})});</script>
+<script>window.addEventListener('load',function(){setTimeout(function(){window.print()},300)});</script>
 @endif
 </body></html>
