@@ -50,6 +50,7 @@ class CheckoutMonthExport implements FromView, WithStyles
             ->orderBy('date')
             ->orderBy('id')
             ->get();
+        $periodCheckoutsByClient = $checkouts->groupBy(fn (Checkout $checkout) => (string) $checkout->client_id);
 
         $productIds = $checkouts->flatMap(function ($checkout) {
             return $checkout->checkoutDetails->pluck('product_id');
@@ -80,7 +81,7 @@ class CheckoutMonthExport implements FromView, WithStyles
             ->where('status', 1)
             ->whereDate('date', '>=', $periodStart->toDateString())
             ->whereDate('date', '<=', $periodEnd->toDateString())
-            ->with('checkout:id,client_id,currency_type,currency_type_price,kpi_percent,venox_bonus_percent')
+            ->with('checkout:id,client_id,currency_type,currency_type_price,venox_bonus_percent')
             ->orderBy('date')
             ->orderBy('id')
             ->get();
@@ -111,7 +112,7 @@ class CheckoutMonthExport implements FromView, WithStyles
         if ($cashReportClientIds->isNotEmpty()) {
             // AccountingCashReportService eski, shartnomaga bog'lanmagan to'lovlarni
             // mijozning avvalgi savdolariga FIFO bo'yicha taqsimlab beradi. Shu
-            // qatorlardan KPI va Venox bonus summalarini ham olamiz.
+            // qatorlardan Venox bonus summasini ham olamiz.
             $cashReportRows = $accounting->rows([
                 'from' => $periodStart->toDateString(),
                 'to' => $periodEnd->toDateString(),
@@ -160,15 +161,27 @@ class CheckoutMonthExport implements FromView, WithStyles
                     (string) $payment->comment
                 );
             $cashReportRow = $cashReportRowsByReceipt->get((string) $payment->id, []);
-            $kpiUsd = array_key_exists('kpi', $cashReportRow)
-                ? (float) $cashReportRow['kpi']
-                : $usd * (float) optional($payment->checkout)->kpi_percent / 100;
-            $venoxBonusUsd = array_key_exists('venox', $cashReportRow)
-                ? (float) $cashReportRow['venox']
-                : $usd * (float) optional($payment->checkout)->venox_bonus_percent / 100;
+            $commissionCheckout = $payment->checkout;
+            if (! $commissionCheckout) {
+                $paymentDate = Carbon::parse($payment->date ?: $payment->created_at)->endOfDay();
+                $commissionCheckout = collect($periodCheckoutsByClient->get($key, []))
+                    ->filter(function (Checkout $checkout) use ($paymentDate) {
+                        return Carbon::parse($checkout->date ?: $checkout->created_at)->lte($paymentDate);
+                    })
+                    ->sortByDesc(function (Checkout $checkout) {
+                        return Carbon::parse($checkout->date ?: $checkout->created_at)->format('Y-m-d H:i:s')
+                            . '-' . str_pad((string) $checkout->id, 12, '0', STR_PAD_LEFT);
+                    })
+                    ->first();
+            }
+
+            // Bog'lanmagan "za dolg" to'lovi uchun ham shu davrdagi eng yaqin
+            // checkout formasidagi Venox foizi FIFO tarixidan ustun turadi.
+            $venoxBonusUsd = $commissionCheckout
+                ? $usd * (float) $commissionCheckout->venox_bonus_percent / 100
+                : (float) ($cashReportRow['venox'] ?? 0);
             $paymentBreakdown = static::paymentBreakdownUsd(
                 $usd,
-                $kpiUsd,
                 $venoxBonusUsd
             );
             $clientPayments[$key] = ($clientPayments[$key] ?? 0) + $paymentBreakdown['net_usd'];
@@ -178,7 +191,7 @@ class CheckoutMonthExport implements FromView, WithStyles
 
         $closingDebts = $this->clientDebtTotalsUsd($clientIds->map(fn ($id) => (string) $id)->all(), $periodEnd);
         // Bu hisobotdagi bonus xarajatlari faqat checkout formasida saqlangan
-        // KPI va Venox bonus foizlaridan olinadi. Agent foizi sotuv narxida.
+        // Venox bonus foizidan olinadi. KPI va Agent bu ustunga kirmaydi.
         $clientBonusExpenses = collect($paymentBonusExpensesByClient);
         $groupedRows = [];
 
@@ -429,7 +442,7 @@ class CheckoutMonthExport implements FromView, WithStyles
         $rows = [];
         foreach ($groupedRows as $row) {
             // Qoldiq = avvalgi qarz + tasdiqlangan prays jami - to'langan
-            // - KPI/Venox bonus. Shu tenglamadan avvalgi qarzni tiklaymiz.
+            // - Venox bonus. Shu tenglamadan avvalgi qarzni tiklaymiz.
             $row['debt_before_payment'] = static::openingDebtUsd(
                 $row['closing_debt_usd'],
                 $row['approved_total_usd'],
@@ -561,12 +574,11 @@ class CheckoutMonthExport implements FromView, WithStyles
     }
 
     /**
-     * The checkout form's KPI and Venox bonus are shown as bonus expenses.
-     * Agent commission is intentionally excluded because it is in the sale price.
+     * Only the checkout form's Venox bonus is shown as a bonus expense.
+     * KPI and Agent commission are intentionally excluded.
      */
     public static function paymentBreakdownUsd(
         float $grossUsd,
-        float $kpiUsd = 0,
         float $venoxBonusUsd = 0
     ): array
     {
@@ -574,7 +586,7 @@ class CheckoutMonthExport implements FromView, WithStyles
             return ['gross_usd' => $grossUsd, 'net_usd' => $grossUsd, 'bonus_usd' => 0.0];
         }
 
-        $bonusUsd = min($grossUsd, max(0, $kpiUsd) + max(0, $venoxBonusUsd));
+        $bonusUsd = min($grossUsd, max(0, $venoxBonusUsd));
 
         return [
             'gross_usd' => $grossUsd,

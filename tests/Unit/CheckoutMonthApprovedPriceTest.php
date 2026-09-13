@@ -76,13 +76,13 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $this->assertSame([10, 20, 148], $clientIds->all());
     }
 
-    public function test_kpi_and_venox_bonus_are_included_in_monthly_bonus_expenses(): void
+    public function test_only_venox_bonus_is_removed_from_displayed_payment(): void
     {
-        $breakdown = CheckoutMonthExport::paymentBreakdownUsd(2000, 100, 200);
+        $breakdown = CheckoutMonthExport::paymentBreakdownUsd(2000, 500);
 
         $this->assertSame(2000.0, $breakdown['gross_usd']);
-        $this->assertSame(1700.0, $breakdown['net_usd']);
-        $this->assertSame(300.0, $breakdown['bonus_usd']);
+        $this->assertSame(1500.0, $breakdown['net_usd']);
+        $this->assertSame(500.0, $breakdown['bonus_usd']);
         $this->assertSame(2000.0, $breakdown['net_usd'] + $breakdown['bonus_usd']);
     }
 
