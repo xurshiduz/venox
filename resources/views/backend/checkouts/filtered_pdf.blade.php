@@ -15,9 +15,14 @@
         .center { text-align: center; }
         .summary { margin-top: 10px; }
         .summary td { font-weight: bold; }
+        .pdf-status { padding: 12px; margin-bottom: 10px; background: #eef6ff; text-align: center; }
     </style>
 </head>
 <body>
+@if($clientSidePdf ?? false)
+    <div id="pdf-status" class="pdf-status">PDF tayyorlanmoqda, iltimos kuting...</div>
+@endif
+<div id="pdf-report">
     <h2>Sotuvlar hisoboti</h2>
     <div class="filters">
         Agent: <b>{{ $selectedAgentName ?: 'Barcha agentlar' }}</b>
@@ -81,5 +86,34 @@
             </tr>
         </table>
     @endforeach
+</div>
+
+@if($clientSidePdf ?? false)
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script>
+        window.addEventListener('load', function () {
+            var status = document.getElementById('pdf-status');
+            if (typeof html2pdf === 'undefined') {
+                status.textContent = 'PDF moduli yuklanmadi. Brauzerning PDF saqlash oynasi ochilmoqda...';
+                window.print();
+                return;
+            }
+
+            html2pdf().set({
+                margin: 5,
+                filename: @json($filename),
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+                pagebreak: { mode: ['css', 'legacy'], avoid: ['tr'] }
+            }).from(document.getElementById('pdf-report')).save().then(function () {
+                status.textContent = 'PDF yuklandi. Bu oynani yopishingiz mumkin.';
+            }).catch(function () {
+                status.textContent = 'Avtomatik yuklashda xato. Brauzerning PDF saqlash oynasi ochilmoqda...';
+                window.print();
+            });
+        });
+    </script>
+@endif
 </body>
 </html>

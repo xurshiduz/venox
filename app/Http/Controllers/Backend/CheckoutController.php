@@ -131,17 +131,22 @@ class CheckoutController extends Controller
             ? optional(User::find($selectedAgent))->name
             : null;
 
+        $filename = 'sotuvlar_' . ($dateFrom ?: 'boshidan') . '_' . ($dateTo ?: now()->format('Y-m-d')) . '.pdf';
+        $viewData = compact('data', 'selectedAgentName', 'dateFrom', 'dateTo', 'filename');
+
+        // Ba'zi production deploylarda Composer paketlari darhol o'rnatilmaydi.
+        // Bunday paytda sahifa brauzerda PDF yaratadi va foydalanuvchi xato ko'rmaydi.
+        if (! class_exists(Dompdf::class) || ! class_exists(Options::class)) {
+            return view('backend.checkouts.filtered_pdf', $viewData + ['clientSidePdf' => true]);
+        }
+
         $options = new Options();
         $options->set('defaultFont', 'DejaVu Sans');
         $options->set('isRemoteEnabled', false);
         $pdf = new Dompdf($options);
-        $pdf->loadHtml(view('backend.checkouts.filtered_pdf', compact(
-            'data', 'selectedAgentName', 'dateFrom', 'dateTo'
-        ))->render(), 'UTF-8');
+        $pdf->loadHtml(view('backend.checkouts.filtered_pdf', $viewData + ['clientSidePdf' => false])->render(), 'UTF-8');
         $pdf->setPaper('A4', 'landscape');
         $pdf->render();
-
-        $filename = 'sotuvlar_' . ($dateFrom ?: 'boshidan') . '_' . ($dateTo ?: now()->format('Y-m-d')) . '.pdf';
 
         return response($pdf->output(), 200, [
             'Content-Type' => 'application/pdf',
