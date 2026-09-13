@@ -462,7 +462,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                 $rows[] = [
                     'date' => collect($row['dates'])->unique()->implode("\n"),
                     'client' => $row['client'],
-                    'client_phone' => $row['client_phone'],
+                    'client_phone' => static::formatPhoneForExcel($row['client_phone']),
                     'agent' => '—',
                     'debt_before_payment' => $row['debt_before_payment'],
                     'product' => '',
@@ -497,7 +497,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                 $rows[] = [
                     'date' => $first ? collect($row['dates'])->unique()->implode("\n") : null,
                     'client' => $first ? $row['client'] : null,
-                    'client_phone' => $first ? $row['client_phone'] : null,
+                    'client_phone' => $first ? static::formatPhoneForExcel($row['client_phone']) : null,
                     'agent' => $row['agents'][$index] ?? '—',
                     'debt_before_payment' => $first ? $row['debt_before_payment'] : null,
                     'product' => $product,
@@ -566,6 +566,25 @@ class CheckoutMonthExport implements FromView, WithStyles
             ->filter()
             ->unique()
             ->values();
+    }
+
+    /** Format an Uzbek phone number as XX XXX XX XX for the spreadsheet. */
+    public static function formatPhoneForExcel($phone): string
+    {
+        $original = trim((string) $phone);
+        $digits = preg_replace('/\D+/', '', $original);
+        if (strlen($digits) === 12 && str_starts_with($digits, '998')) {
+            $digits = substr($digits, 3);
+        }
+
+        if (strlen($digits) !== 9) {
+            return $original;
+        }
+
+        return substr($digits, 0, 2) . ' '
+            . substr($digits, 2, 3) . ' '
+            . substr($digits, 5, 2) . ' '
+            . substr($digits, 7, 2);
     }
 
     public static function venoxCashUsd(float $qty, float $saleUnitPriceUsd, float $factoryUnitPriceUsd): float

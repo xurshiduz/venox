@@ -76,6 +76,12 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $this->assertSame([10, 20, 148], $clientIds->all());
     }
 
+    /** @dataProvider excelPhoneProvider */
+    public function test_client_phone_is_formatted_for_excel($phone, string $expected): void
+    {
+        $this->assertSame($expected, CheckoutMonthExport::formatPhoneForExcel($phone));
+    }
+
     public function test_only_venox_bonus_is_removed_from_displayed_payment(): void
     {
         $breakdown = CheckoutMonthExport::paymentBreakdownUsd(2000, 500);
@@ -162,6 +168,17 @@ class CheckoutMonthApprovedPriceTest extends TestCase
             ['Масло трансмиссионное ATF-V| Venox Dexron 5л', 283000, 261000],
             ['Масло трансмиссионное ATF-||| Venox 1л', 49000, 52200],
             ['Антифриз VENOX ANTIFREEZE -40°C красный 1л', 16800, 15600],
+        ];
+    }
+
+    public function excelPhoneProvider(): array
+    {
+        return [
+            ['770561836', '77 056 18 36'],
+            ['+998 (77) 056-18-36', '77 056 18 36'],
+            ['998770561836', '77 056 18 36'],
+            ['12345', '12345'],
+            [null, ''],
         ];
     }
 }
