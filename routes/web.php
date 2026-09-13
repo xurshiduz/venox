@@ -10,15 +10,16 @@ Route::get('/_maintenance/ravshan-debt-audit-f71ac8936e2b', function () {
         ->where('name', 'like', '%2%')
         ->get();
     $accounting = app(\App\Services\AccountingCashReportService::class);
+    $approvedPrices = app(\App\Services\ApprovedProductPriceService::class);
 
-    return response()->json($clients->map(function ($client) use ($accounting) {
+    return response()->json($clients->map(function ($client) use ($accounting, $approvedPrices) {
         $initialUsd = \App\Models\Currency::documentAmountToUsd(
             (float) ($client->balance ?? 0),
             (int) ($client->currency_type ?? 2),
             (float) ($client->currency_type_price ?? 0),
             $client->created_at
         );
-        $checkouts = \App\Models\Checkout::with('alldetails')
+        $checkouts = \App\Models\Checkout::with('alldetails.prodid')
             ->where('client_id', $client->id)
             ->orderBy('date')
             ->orderBy('id')
@@ -42,8 +43,48 @@ Route::get('/_maintenance/ravshan-debt-audit-f71ac8936e2b', function () {
             ->orderBy('id')
             ->get();
 
-        $checkoutRows = $checkouts->map(function ($checkout) {
+        $checkoutRows = $checkouts->map(function ($checkout) use ($approvedPrices) {
             $raw = (float) $checkout->alldetails->sum('total_price');
+            $detailRows = $checkout->alldetails->map(function ($detail) use ($checkout, $approvedPrices) {
+                $qty = (float) $detail->qty;
+                $rawTotal = (float) $detail->total_price;
+                $rawUnit = $qty > 0 ? $rawTotal / $qty : 0;
+                $product = $detail->prodid;
+                $prices = $approvedPrices->pricesFor((string) ($product->name ?? ''));
+                $productCurrencyType = $product && $product->currency_type
+                    ? (int) $product->currency_type
+                    : (int) $checkout->currency_type;
+                $actualUnitUsd = \App\Models\Currency::documentAmountToUsd(
+                    $rawUnit,
+                    (int) $checkout->currency_type,
+                    (float) $checkout->currency_type_price,
+                    $checkout->date
+                );
+                $displayUnitUsd = isset($prices['sale_uzs'])
+                    ? \App\Models\Currency::documentAmountToUsd(
+                        (float) $prices['sale_uzs'],
+                        2,
+                        $approvedPrices->usdRate()
+                    )
+                    : \App\Exports\CheckoutMonthExport::catalogUnitPriceUsd(
+                        (float) ($product->price ?? 0),
+                        $productCurrencyType,
+                        $actualUnitUsd,
+                        \App\Models\Currency::usdRateForDate($checkout->date),
+                        $checkout->date
+                    );
+
+                return [
+                    'product_id' => $detail->product_id,
+                    'product' => $product->name ?? null,
+                    'qty' => $qty,
+                    'actual_unit_usd' => $actualUnitUsd,
+                    'actual_total_usd' => $actualUnitUsd * $qty,
+                    'excel_unit_usd' => $displayUnitUsd,
+                    'excel_total_usd' => $displayUnitUsd * $qty,
+                    'difference_usd' => ($displayUnitUsd - $actualUnitUsd) * $qty,
+                ];
+            })->values();
             return [
                 'id' => $checkout->id,
                 'date' => $checkout->date,
@@ -53,10 +94,13 @@ Route::get('/_maintenance/ravshan-debt-audit-f71ac8936e2b', function () {
                 'rate' => $checkout->currency_type_price,
                 'detail_total_raw' => $raw,
                 'detail_total_usd' => \App\Models\Currency::documentAmountToUsd($raw, (int) $checkout->currency_type, (float) $checkout->currency_type_price, $checkout->date),
+                'excel_total_usd' => (float) $detailRows->sum('excel_total_usd'),
+                'excel_difference_usd' => (float) $detailRows->sum('difference_usd'),
                 'stored_total' => $checkout->total_price,
                 'stored_paid' => $checkout->total_price_payme,
                 'stored_debt' => $checkout->total_price_debt,
                 'detail_count' => $checkout->alldetails->count(),
+                'details' => $detailRows,
             ];
         });
         $paymentRows = $payments->map(function ($payment) use ($accounting) {
