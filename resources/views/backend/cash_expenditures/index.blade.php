@@ -58,8 +58,10 @@
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    @php($s = 0)
-                                    @php($unassignedSupplierPayments = 0)
+                                    @php
+                                        $s = 0;
+                                        $unassignedSupplierPayments = 0;
+                                    @endphp
                                     @foreach($contracts as $contract)
                                     @php
                                         $visibleDetails = $contract->details;
