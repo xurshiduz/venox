@@ -12,6 +12,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 
 class FactoryLedgerController extends Controller
 {
@@ -57,12 +58,23 @@ class FactoryLedgerController extends Controller
             })
             ->first() ?: CashReceiptType::findOrFail(config('services.lidaz_factory.default_payment_type_id', 1));
         $date = Carbon::parse($factory['date'])->format('Y-m-d');
+        $hasSourceColumns = Schema::hasColumn('cash_expenditures', 'source_system');
 
-        $expense = DB::transaction(function () use ($factory, $supplier, $expenseType, $paymentType, $date) {
-            $expense = CashExpenditure::query()
-                ->where('source_system', 'lidaz_factory')
-                ->where('source_type', 'cash_receipt')
-                ->where('source_id', $factory['source_id'])
+        $expense = DB::transaction(function () use ($factory, $supplier, $expenseType, $paymentType, $date, $hasSourceColumns) {
+            $sourceMarker = '[LIDAZ#' . $factory['source_id'] . ']';
+            $expense = null;
+
+            if ($hasSourceColumns) {
+                $expense = CashExpenditure::query()
+                    ->where('source_system', 'lidaz_factory')
+                    ->where('source_type', 'cash_receipt')
+                    ->where('source_id', $factory['source_id'])
+                    ->lockForUpdate()
+                    ->first();
+            }
+
+            $expense = $expense ?: CashExpenditure::query()
+                ->where('comment', 'like', '%' . $sourceMarker . '%')
                 ->lockForUpdate()
                 ->first();
 
@@ -79,18 +91,24 @@ class FactoryLedgerController extends Controller
                     ->first();
             }
 
+            $comment = trim(($factory['comment'] ?: $date . ' №' . $factory['source_id']) . ' ' . $sourceMarker);
             $data = [
                 'date' => $date,
                 'cash_expenditure_types' => $expenseType->id,
                 'cash_receipt_type_id' => $paymentType->id,
                 'price' => (float) $factory['amount'],
-                'comment' => $factory['comment'] ?: $date . ' №' . $factory['source_id'],
+                'comment' => $comment,
                 'supplier_id' => $supplier->id,
-                'source_system' => 'lidaz_factory',
-                'source_type' => 'cash_receipt',
-                'source_id' => $factory['source_id'],
-                'source_code' => $factory['source_code'],
             ];
+
+            if ($hasSourceColumns) {
+                $data += [
+                    'source_system' => 'lidaz_factory',
+                    'source_type' => 'cash_receipt',
+                    'source_id' => $factory['source_id'],
+                    'source_code' => $factory['source_code'],
+                ];
+            }
 
             if ($expense) {
                 $expense->update($data);
