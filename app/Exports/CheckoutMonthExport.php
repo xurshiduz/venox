@@ -8,7 +8,6 @@ use App\Models\CheckinDetail;
 use App\Models\Checkout;
 use App\Models\Client;
 use App\Models\Currency;
-use App\Models\Product;
 use App\Services\AccountingCashReportService;
 use App\Services\ApprovedProductPriceService;
 use Carbon\Carbon;
@@ -106,7 +105,6 @@ class CheckoutMonthExport implements FromView, WithStyles
         $cashReportRows = collect();
         $cashReportRowsByReceipt = collect();
         $paymentAllocationRows = collect();
-        $allocatedProductsById = collect();
 
         if ($cashReportClientIds->isNotEmpty()) {
             // AccountingCashReportService eski, shartnomaga bog'lanmagan to'lovlarni
@@ -125,15 +123,6 @@ class CheckoutMonthExport implements FromView, WithStyles
             $paymentAllocationRows = $cashReportRows
                 ->groupBy(fn (array $row) => (string) $row['client_id']);
 
-            $allocatedProductIds = $paymentAllocationRows
-                ->collapse()
-                ->flatMap(fn (array $row) => collect($row['products'] ?? [])->pluck('id'))
-                ->filter()
-                ->unique()
-                ->values();
-            $allocatedProductsById = Product::whereIn('id', $allocatedProductIds)
-                ->get()
-                ->keyBy(fn ($product) => (string) $product->id);
         }
 
         foreach ($payments as $payment) {
@@ -294,48 +283,25 @@ class CheckoutMonthExport implements FromView, WithStyles
                     $actualUnitPriceUsd = $rawSaleUnit;
                 }
 
-                // Oylik hisobotdagi "Sotuv Narxi" va "Zavod narxi" real
-                // hujjat/kirim narxidan emas, BOSS tasdiqlagan mahsulot
-                // praysidan olinadi. Product narxi bo'sh eski mahsulotlarda
-                // hisobotni buzmaslik uchun avvalgi hisob fallback bo'lib qoladi.
+                // Oylik hisobotda faqat BOSS praysida Sotuv va Zavod narxi
+                // ikkalasi ham aniq kiritilgan mahsulotlar ko'rsatiladi.
                 $product = $detail->prodid;
-                $productCurrencyType = $product && $product->currency_type
-                    ? (int) $product->currency_type
-                    : (int) $checkout->currency_type;
                 $approvedPrices = $approvedPriceService->pricesFor((string) ($product->name ?? ''));
-                $catalogRate = Currency::usdRateForDate($checkout->date ?: $checkout->created_at);
-                $unitPriceUsd = isset($approvedPrices['sale_uzs'])
-                    ? Currency::documentAmountToUsd(
-                        (float) $approvedPrices['sale_uzs'],
-                        2,
-                        $approvedPriceService->usdRate()
-                    )
-                    : static::catalogUnitPriceUsd(
-                        (float) ($product->price ?? 0),
-                        $productCurrencyType,
-                        $actualUnitPriceUsd,
-                        $catalogRate,
-                        $checkout->date ?: $checkout->created_at
-                    );
-                $factoryPriceUsd = isset($approvedPrices['factory_uzs'])
-                    ? Currency::documentAmountToUsd(
-                        (float) $approvedPrices['factory_uzs'],
-                        2,
-                        $approvedPriceService->usdRate()
-                    )
-                    : static::catalogUnitPriceUsd(
-                        (float) ($product->tan_price ?? 0),
-                        $productCurrencyType,
-                        $latestCheckinPriceUsd,
-                        $catalogRate,
-                        $checkout->date ?: $checkout->created_at
-                    );
-                $unitPriceUzs = isset($approvedPrices['sale_uzs'])
-                    ? (float) $approvedPrices['sale_uzs']
-                    : $unitPriceUsd * $reportUsdRate;
-                $factoryPriceUzs = isset($approvedPrices['factory_uzs'])
-                    ? (float) $approvedPrices['factory_uzs']
-                    : $factoryPriceUsd * $reportUsdRate;
+                if (! static::hasCompleteApprovedPrices($approvedPrices)) {
+                    continue;
+                }
+                $unitPriceUzs = (float) $approvedPrices['sale_uzs'];
+                $factoryPriceUzs = (float) $approvedPrices['factory_uzs'];
+                $unitPriceUsd = Currency::documentAmountToUsd(
+                    $unitPriceUzs,
+                    2,
+                    $approvedPriceService->usdRate()
+                );
+                $factoryPriceUsd = Currency::documentAmountToUsd(
+                    $factoryPriceUzs,
+                    2,
+                    $approvedPriceService->usdRate()
+                );
 
                 $lineTotals = static::reportLineTotalsUsd($qty, $unitPriceUsd, $actualUnitPriceUsd);
                 $markupPercent = Currency::markupPercent($factoryPriceUsd, $unitPriceUsd);
@@ -374,51 +340,28 @@ class CheckoutMonthExport implements FromView, WithStyles
             $markupPercentages = [];
             $actualLineTotalsUsd = [];
             $approvedTotalUsd = 0;
+            $clientAllocationProducts = [];
 
             foreach ($paymentAllocationRows->get($clientKey, collect()) as $allocationRow) {
-                $allocationDate = $allocationRow['date'] ?? $periodEnd;
-                $allocationProducts = [];
                 foreach ($allocationRow['products'] ?? [] as $allocatedProduct) {
                     $productName = (string) ($allocatedProduct['name'] ?? 'Noma\'lum mahsulot');
-                    $product = $allocatedProductsById->get((string) ($allocatedProduct['id'] ?? ''));
-                    $productCurrencyType = $product && $product->currency_type
-                        ? (int) $product->currency_type
-                        : 1;
                     $approvedPrices = $approvedPriceService->pricesFor($productName);
-                    $catalogRate = Currency::usdRateForDate($allocationDate);
-                    $unitPriceUsd = isset($approvedPrices['sale_uzs'])
-                        ? Currency::documentAmountToUsd(
-                            (float) $approvedPrices['sale_uzs'],
-                            2,
-                            $approvedPriceService->usdRate()
-                        )
-                        : static::catalogUnitPriceUsd(
-                            (float) ($product->price ?? 0),
-                            $productCurrencyType,
-                            0,
-                            $catalogRate,
-                            $allocationDate
-                        );
-                    $factoryPriceUsd = isset($approvedPrices['factory_uzs'])
-                        ? Currency::documentAmountToUsd(
-                            (float) $approvedPrices['factory_uzs'],
-                            2,
-                            $approvedPriceService->usdRate()
-                        )
-                        : static::catalogUnitPriceUsd(
-                            (float) ($product->tan_price ?? 0),
-                            $productCurrencyType,
-                            0,
-                            $catalogRate,
-                            $allocationDate
-                        );
-                    $unitPriceUzs = isset($approvedPrices['sale_uzs'])
-                        ? (float) $approvedPrices['sale_uzs']
-                        : $unitPriceUsd * $reportUsdRate;
-                    $factoryPriceUzs = isset($approvedPrices['factory_uzs'])
-                        ? (float) $approvedPrices['factory_uzs']
-                        : $factoryPriceUsd * $reportUsdRate;
-                    $allocationProducts[] = [
+                    if (! static::hasCompleteApprovedPrices($approvedPrices)) {
+                        continue;
+                    }
+                    $unitPriceUzs = (float) $approvedPrices['sale_uzs'];
+                    $factoryPriceUzs = (float) $approvedPrices['factory_uzs'];
+                    $unitPriceUsd = Currency::documentAmountToUsd(
+                        $unitPriceUzs,
+                        2,
+                        $approvedPriceService->usdRate()
+                    );
+                    $factoryPriceUsd = Currency::documentAmountToUsd(
+                        $factoryPriceUzs,
+                        2,
+                        $approvedPriceService->usdRate()
+                    );
+                    $clientAllocationProducts[] = [
                         'name' => $productName,
                         'agent' => $allocationRow['agent'] ?? '—',
                         'qty' => (float) ($allocatedProduct['qty'] ?? 0),
@@ -428,29 +371,38 @@ class CheckoutMonthExport implements FromView, WithStyles
                         'factory_price_uzs' => $factoryPriceUzs,
                     ];
                 }
+            }
 
-                $balancedQuantities = static::balanceApprovedQuantities(
-                    collect($allocationProducts)->pluck('qty')->all(),
-                    collect($allocationProducts)->pluck('unit_price_usd')->all(),
-                    (float) ($allocationRow['payment_usd'] ?? 0)
-                );
+            // Har bir mijoz kesimida tasdiqlangan jami gross to'lovga eng yaqin
+            // bo'lsin. Gross = Excelda ko'rinadigan net to'lov + Venox bonus.
+            $grossClientPaymentUzs = (
+                (float) ($clientPayments[$clientKey] ?? 0)
+                + (float) ($clientBonusExpenses[$clientKey] ?? 0)
+            ) * $reportUsdRate;
+            $balancedQuantities = static::balanceApprovedQuantities(
+                collect($clientAllocationProducts)->pluck('qty')->all(),
+                collect($clientAllocationProducts)->pluck('unit_price_uzs')->all(),
+                $grossClientPaymentUzs
+            );
 
-                foreach ($allocationProducts as $index => $allocationProduct) {
-                    $qty = (float) ($balancedQuantities[$index] ?? 0);
-                    $unitPriceUsd = (float) $allocationProduct['unit_price_usd'];
-                    $factoryPriceUsd = (float) $allocationProduct['factory_price_usd'];
-
-                    $products[] = $allocationProduct['name'];
-                    $agents[] = $allocationProduct['agent'];
-                    $quantities[] = $qty;
-                    $unitPrices[] = $unitPriceUsd;
-                    $unitPricesUzs[] = (float) $allocationProduct['unit_price_uzs'];
-                    $factoryPrices[] = $factoryPriceUsd;
-                    $factoryPricesUzs[] = (float) $allocationProduct['factory_price_uzs'];
-                    $markupPercentages[] = Currency::markupPercent($factoryPriceUsd, $unitPriceUsd);
-                    $actualLineTotalsUsd[] = null;
-                    $approvedTotalUsd += $qty * $unitPriceUsd;
+            foreach ($clientAllocationProducts as $index => $allocationProduct) {
+                $qty = (float) ($balancedQuantities[$index] ?? 0);
+                if ($qty <= 0) {
+                    continue;
                 }
+                $unitPriceUsd = (float) $allocationProduct['unit_price_usd'];
+                $factoryPriceUsd = (float) $allocationProduct['factory_price_usd'];
+
+                $products[] = $allocationProduct['name'];
+                $agents[] = $allocationProduct['agent'];
+                $quantities[] = $qty;
+                $unitPrices[] = $unitPriceUsd;
+                $unitPricesUzs[] = (float) $allocationProduct['unit_price_uzs'];
+                $factoryPrices[] = $factoryPriceUsd;
+                $factoryPricesUzs[] = (float) $allocationProduct['factory_price_uzs'];
+                $markupPercentages[] = Currency::markupPercent($factoryPriceUsd, $unitPriceUsd);
+                $actualLineTotalsUsd[] = null;
+                $approvedTotalUsd += $qty * $unitPriceUsd;
             }
 
             $groupedRows[$clientKey] = [
@@ -718,45 +670,93 @@ class CheckoutMonthExport implements FromView, WithStyles
     }
 
     /**
-     * Scale FIFO product quantities so their approved-price total equals the
-     * gross cash receipt. Product proportions and ordering remain unchanged.
+     * Keep quantities as whole pieces and make their approved UZS total as
+     * close as possible to the client's gross cash receipts.
      */
     public static function balanceApprovedQuantities(
         iterable $quantities,
-        array $approvedUnitPricesUsd,
-        float $grossPaymentUsd
+        array $approvedUnitPricesUzs,
+        float $grossPaymentUzs
     ): array {
         $quantities = array_values(collect($quantities)->map(fn ($qty) => max(0, (float) $qty))->all());
         $approvedTotal = 0.0;
 
         foreach ($quantities as $index => $qty) {
-            $approvedTotal += $qty * max(0, (float) ($approvedUnitPricesUsd[$index] ?? 0));
+            $approvedTotal += $qty * max(0, (float) ($approvedUnitPricesUzs[$index] ?? 0));
         }
 
-        if ($grossPaymentUsd <= 0 || $approvedTotal <= 0) {
+        if ($grossPaymentUzs <= 0 || $approvedTotal <= 0) {
             return $quantities;
         }
 
-        $factor = $grossPaymentUsd / $approvedTotal;
-        $balanced = array_map(fn (float $qty) => $qty * $factor, $quantities);
+        $factor = $grossPaymentUzs / $approvedTotal;
+        $scaled = array_map(fn (float $qty) => $qty * $factor, $quantities);
+        $balanced = array_map(fn (float $qty) => (float) round($qty), $scaled);
+        $balancedTotal = 0.0;
+        foreach ($balanced as $index => $qty) {
+            $balancedTotal += $qty * max(0, (float) ($approvedUnitPricesUzs[$index] ?? 0));
+        }
 
-        // Floating-point qoldig'ini oxirgi narxi mavjud qatorga yuklaymiz.
-        // Natijada Excelda ham yig'indi kassa kirimiga aniq teng bo'ladi.
-        for ($index = count($balanced) - 1; $index >= 0; $index--) {
-            $price = max(0, (float) ($approvedUnitPricesUsd[$index] ?? 0));
-            if ($price <= 0) {
-                continue;
+        // Bir dona qo'shish/ayirish va ikki mahsulotni o'zaro almashtirish orqali
+        // eng yaqin butun kombinatsiyani topamiz. Har qadam farqni kamaytiradi.
+        for ($iteration = 0; $iteration < 1000; $iteration++) {
+            $currentDifference = abs($grossPaymentUzs - $balancedTotal);
+            $bestDifference = $currentDifference;
+            $bestChanges = [];
+
+            foreach ($balanced as $index => $qty) {
+                $price = max(0, (float) ($approvedUnitPricesUzs[$index] ?? 0));
+                foreach ([-1, 1] as $change) {
+                    if ($price <= 0 || $qty + $change < 0) {
+                        continue;
+                    }
+                    $difference = abs($grossPaymentUzs - ($balancedTotal + $change * $price));
+                    if ($difference + 0.000001 < $bestDifference) {
+                        $bestDifference = $difference;
+                        $bestChanges = [[$index, $change]];
+                    }
+                }
             }
 
-            $balancedTotal = 0.0;
-            foreach ($balanced as $balancedIndex => $qty) {
-                $balancedTotal += $qty * max(0, (float) ($approvedUnitPricesUsd[$balancedIndex] ?? 0));
+            $count = count($balanced);
+            for ($left = 0; $left < $count; $left++) {
+                $leftPrice = max(0, (float) ($approvedUnitPricesUzs[$left] ?? 0));
+                if ($balanced[$left] <= 0 || $leftPrice <= 0) {
+                    continue;
+                }
+                for ($right = 0; $right < $count; $right++) {
+                    if ($left === $right) {
+                        continue;
+                    }
+                    $rightPrice = max(0, (float) ($approvedUnitPricesUzs[$right] ?? 0));
+                    if ($rightPrice <= 0) {
+                        continue;
+                    }
+                    $difference = abs($grossPaymentUzs - ($balancedTotal - $leftPrice + $rightPrice));
+                    if ($difference + 0.000001 < $bestDifference) {
+                        $bestDifference = $difference;
+                        $bestChanges = [[$left, -1], [$right, 1]];
+                    }
+                }
             }
-            $balanced[$index] += ($grossPaymentUsd - $balancedTotal) / $price;
-            break;
+
+            if (empty($bestChanges)) {
+                break;
+            }
+            foreach ($bestChanges as [$index, $change]) {
+                $balanced[$index] += $change;
+                $balancedTotal += $change * max(0, (float) ($approvedUnitPricesUzs[$index] ?? 0));
+            }
         }
 
         return $balanced;
+    }
+
+    /** Both approved prices must be explicitly entered and greater than zero. */
+    public static function hasCompleteApprovedPrices(?array $prices): bool
+    {
+        return (float) ($prices['sale_uzs'] ?? 0) > 0
+            && (float) ($prices['factory_uzs'] ?? 0) > 0;
     }
 
     /**

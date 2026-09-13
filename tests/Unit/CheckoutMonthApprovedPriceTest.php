@@ -105,6 +105,29 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $this->assertEqualsWithDelta(2.0, $quantities[0] / $quantities[1], 0.000001);
     }
 
+    public function test_balancing_keeps_whole_pieces_and_uses_the_nearest_total(): void
+    {
+        $whole = CheckoutMonthExport::balanceApprovedQuantities([2, 1], [200000, 100000], 600000);
+        $nearest = CheckoutMonthExport::balanceApprovedQuantities([1], [200000], 450000);
+
+        $this->assertSame([2.0, 2.0], $whole);
+        $this->assertSame([2.0], $nearest);
+        $this->assertLessThanOrEqual(100000, abs(450000 - $nearest[0] * 200000));
+    }
+
+    public function test_only_explicit_positive_sale_and_factory_prices_are_exportable(): void
+    {
+        $this->assertTrue(CheckoutMonthExport::hasCompleteApprovedPrices([
+            'sale_uzs' => 207000,
+            'factory_uzs' => 192000,
+        ]));
+        $this->assertFalse(CheckoutMonthExport::hasCompleteApprovedPrices([
+            'sale_uzs' => 207000,
+            'factory_uzs' => 0,
+        ]));
+        $this->assertFalse(CheckoutMonthExport::hasCompleteApprovedPrices(null));
+    }
+
     public function test_venox_bonus_and_net_payment_reconstruct_the_approved_total(): void
     {
         $breakdown = CheckoutMonthExport::paymentBreakdownUsd(3600, 180);
