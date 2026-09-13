@@ -78,13 +78,13 @@ class CheckoutMonthExport implements FromView, WithStyles
         $clientPayments = [];
         $clientGrossPayments = [];
         $clientPaymentDates = [];
-        $linkedBonusExpensesByClient = [];
+        $paymentBonusExpensesByClient = [];
 
         $payments = CashReceipt::query()
             ->where('status', 1)
             ->whereDate('date', '>=', $periodStart->toDateString())
             ->whereDate('date', '<=', $periodEnd->toDateString())
-            ->with('checkout:id,client_id,currency_type,currency_type_price')
+            ->with('checkout:id,client_id,currency_type,currency_type_price,kpi_percent,venox_bonus_percent')
             ->orderBy('date')
             ->orderBy('id')
             ->get();
@@ -114,22 +114,33 @@ class CheckoutMonthExport implements FromView, WithStyles
         $paymentOnlyClientIds = static::mergeReportClientIds([], $paymentClientIds)
             ->diff($checkoutClientIds)
             ->values();
+        $cashReportClientIds = $paymentOnlyClientIds
+            ->merge($payments->whereNull('checkout_id')->pluck('client_id')->filter())
+            ->unique()
+            ->values();
+        $cashReportRows = collect();
+        $cashReportRowsByReceipt = collect();
         $paymentAllocationRows = collect();
         $allocatedProductsById = collect();
 
-        if ($paymentOnlyClientIds->isNotEmpty()) {
+        if ($cashReportClientIds->isNotEmpty()) {
             // AccountingCashReportService eski, shartnomaga bog'lanmagan to'lovlarni
-            // mijozning avvalgi savdolariga FIFO bo'yicha taqsimlab beradi.
-            $paymentAllocationRows = $accounting->rows([
+            // mijozning avvalgi savdolariga FIFO bo'yicha taqsimlab beradi. Shu
+            // qatorlardan KPI va Venox bonus summalarini ham olamiz.
+            $cashReportRows = $accounting->rows([
                 'from' => $periodStart->toDateString(),
                 'to' => $periodEnd->toDateString(),
                 'scheme' => null,
                 'product_id' => null,
-                'client_ids' => $paymentOnlyClientIds->all(),
+                'client_ids' => $cashReportClientIds->all(),
                 'include_purchase_cost' => false,
-            ])->filter(function (array $row) use ($paymentOnlyClientIds) {
-                return $paymentOnlyClientIds->contains((int) ($row['client_id'] ?? 0));
-            })->groupBy(fn (array $row) => (string) $row['client_id']);
+            ]);
+            $cashReportRowsByReceipt = $cashReportRows
+                ->keyBy(fn (array $row) => (string) ($row['receipt_id'] ?? ''));
+            $paymentAllocationRows = $cashReportRows
+                ->filter(function (array $row) use ($paymentOnlyClientIds) {
+                    return $paymentOnlyClientIds->contains((int) ($row['client_id'] ?? 0));
+                })->groupBy(fn (array $row) => (string) $row['client_id']);
 
             $allocatedProductIds = $paymentAllocationRows
                 ->collapse()
@@ -164,10 +175,23 @@ class CheckoutMonthExport implements FromView, WithStyles
                     (string) $payment->comment
                 );
             $linkedNative = (float) collect($linkedBonusExpensesByReceipt->get($payment->id, []))->sum('price');
-            $paymentBreakdown = static::paymentBreakdownUsd((float) $payment->price, $usd, $linkedNative);
+            $cashReportRow = $cashReportRowsByReceipt->get((string) $payment->id, []);
+            $kpiUsd = array_key_exists('kpi', $cashReportRow)
+                ? (float) $cashReportRow['kpi']
+                : $usd * (float) optional($payment->checkout)->kpi_percent / 100;
+            $venoxBonusUsd = array_key_exists('venox', $cashReportRow)
+                ? (float) $cashReportRow['venox']
+                : $usd * (float) optional($payment->checkout)->venox_bonus_percent / 100;
+            $paymentBreakdown = static::paymentBreakdownUsd(
+                (float) $payment->price,
+                $usd,
+                $linkedNative,
+                $kpiUsd,
+                $venoxBonusUsd
+            );
             $clientGrossPayments[$key] = ($clientGrossPayments[$key] ?? 0) + $paymentBreakdown['gross_usd'];
             $clientPayments[$key] = ($clientPayments[$key] ?? 0) + $paymentBreakdown['net_usd'];
-            $linkedBonusExpensesByClient[$key] = ($linkedBonusExpensesByClient[$key] ?? 0) + $paymentBreakdown['bonus_usd'];
+            $paymentBonusExpensesByClient[$key] = ($paymentBonusExpensesByClient[$key] ?? 0) + $paymentBreakdown['bonus_usd'];
             $clientPaymentDates[$key][] = Carbon::parse($payment->date ?: $payment->created_at)->format('d.m.Y');
         }
 
@@ -181,7 +205,7 @@ class CheckoutMonthExport implements FromView, WithStyles
             ->selectRaw('client_id, SUM(amount_usd) as total_amount')
             ->groupBy('client_id')
             ->pluck('total_amount', 'client_id');
-        foreach ($linkedBonusExpensesByClient as $clientKey => $amount) {
+        foreach ($paymentBonusExpensesByClient as $clientKey => $amount) {
             $clientBonusExpenses[$clientKey] = (float) ($clientBonusExpenses[$clientKey] ?? 0) + $amount;
         }
         $groupedRows = [];
@@ -429,6 +453,9 @@ class CheckoutMonthExport implements FromView, WithStyles
                 'bonus_expense_usd' => (float) ($clientBonusExpenses[$clientKey] ?? 0),
             ];
         }
+        // Excel tartibi: sana, klient, telefon, agent, avvalgi qarz, mahsulot,
+        // miqdor, sotuv narxi, zavod narxi, ustama foizi, tasdiqlangan jami,
+        // zavod jami, to'langan, bonus xarajatlar, qoldiq qarz, Venox kassa.
 
         $rows = [];
         foreach ($groupedRows as $row) {
@@ -457,7 +484,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'factory_price_usd' => null,
                     'markup_percent' => null,
                     'approved_total_usd' => null,
-                    'actual_total_usd' => null,
+                    'factory_total_usd' => null,
                     'paid_usd' => $row['paid_usd'],
                     'closing_debt_usd' => $row['closing_debt_usd'],
                     'bonus_expense_usd' => $row['bonus_expense_usd'],
@@ -485,7 +512,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'factory_price_usd' => $factoryPrice,
                     'markup_percent' => $row['markup_percentages'][$index],
                     'approved_total_usd' => $qty * $unitPrice,
-                    'actual_total_usd' => $row['actual_line_totals_usd'][$index] ?? null,
+                    'factory_total_usd' => $qty * $factoryPrice,
                     'paid_usd' => $first ? $row['paid_usd'] : null,
                     'closing_debt_usd' => $first ? $row['closing_debt_usd'] : null,
                     'bonus_expense_usd' => $first ? $row['bonus_expense_usd'] : null,
@@ -559,17 +586,25 @@ class CheckoutMonthExport implements FromView, WithStyles
     }
 
     /**
-     * A linked "Основной" expense reduces only the payment displayed in the
-     * monthly report. The gross receipt remains available for debt accounting.
+     * Bonus expenses displayed in the monthly report consist of a linked
+     * "Основной" expense plus KPI and Venox bonus. The gross receipt still
+     * remains available for customer debt accounting.
      */
-    public static function paymentBreakdownUsd(float $grossNative, float $grossUsd, float $linkedBonusNative): array
+    public static function paymentBreakdownUsd(
+        float $grossNative,
+        float $grossUsd,
+        float $linkedBonusNative,
+        float $kpiUsd = 0,
+        float $venoxBonusUsd = 0
+    ): array
     {
         if ($grossNative <= 0 || $grossUsd <= 0) {
             return ['gross_usd' => $grossUsd, 'net_usd' => $grossUsd, 'bonus_usd' => 0.0];
         }
 
         $linkedBonusNative = min(max(0, $linkedBonusNative), $grossNative);
-        $bonusUsd = $grossUsd * ($linkedBonusNative / $grossNative);
+        $linkedBonusUsd = $grossUsd * ($linkedBonusNative / $grossNative);
+        $bonusUsd = min($grossUsd, $linkedBonusUsd + max(0, $kpiUsd) + max(0, $venoxBonusUsd));
 
         return [
             'gross_usd' => $grossUsd,

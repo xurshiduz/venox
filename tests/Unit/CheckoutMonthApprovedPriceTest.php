@@ -93,6 +93,16 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $this->assertSame(0.0, $openingDebtUsd);
     }
 
+    public function test_kpi_and_venox_bonus_are_included_in_monthly_bonus_expenses(): void
+    {
+        $breakdown = CheckoutMonthExport::paymentBreakdownUsd(2000, 2000, 500, 100, 200);
+
+        $this->assertSame(2000.0, $breakdown['gross_usd']);
+        $this->assertSame(1200.0, $breakdown['net_usd']);
+        $this->assertSame(800.0, $breakdown['bonus_usd']);
+        $this->assertSame(2000.0, $breakdown['net_usd'] + $breakdown['bonus_usd']);
+    }
+
     public function test_report_separates_approved_total_from_actual_debt_total(): void
     {
         $totals = CheckoutMonthExport::reportLineTotalsUsd(10, 65, 53);

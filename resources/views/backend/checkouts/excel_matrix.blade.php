@@ -8,17 +8,17 @@
             <th>Мижоз номи</th>
             <th>Мижоз телефони</th>
             <th>Сотган агент</th>
-            <th>Умумий қарзи</th>
+            <th>Аввалги қарзи</th>
             <th>Товар Тўлиқ Номи ва Ҳажми</th>
             <th>Миқдори (шт/л)</th>
             <th>Сотув Нархи</th>
             <th>Завод нархи</th>
             <th>Устига қўйилган фоиз (%)</th>
             <th>Тасдиқланган прайс бўйича жами</th>
-            <th>Жами Сумма (реал сотув)</th>
+            <th>Завод нархи жами</th>
             <th>Тўланган</th>
-            <th>Қолдиқ Қарз</th>
-            <th>Мижоз учун сарфланган бонус</th>
+            <th>Бонус харажатлар (KPI + Venox bonus)</th>
+            <th>Қолдиқ умумий қарз</th>
             <th>Venox касса</th>
         </tr>
     </thead>
@@ -36,10 +36,10 @@
                 <td>{{ $row['factory_price_usd'] ?: null }}</td>
                 <td>{{ $row['markup_percent'] !== null ? $row['markup_percent'] / 100 : null }}</td>
                 <td>{{ $row['approved_total_usd'] }}</td>
-                <td>{{ $row['actual_total_usd'] }}</td>
+                <td>{{ $row['factory_total_usd'] }}</td>
                 <td>{{ $row['paid_usd'] }}</td>
-                <td>{{ $row['closing_debt_usd'] }}</td>
                 <td>{{ $row['bonus_expense_usd'] }}</td>
+                <td>{{ $row['closing_debt_usd'] }}</td>
                 <td>{{ $row['venox_cash_usd'] }}</td>
             </tr>
         @endforeach
@@ -54,8 +54,8 @@
             <td>{{ count($rows) ? '=SUM(K3:K'.(count($rows) + 2).')' : 0 }}</td>
             <td>{{ count($rows) ? '=SUM(L3:L'.(count($rows) + 2).')' : 0 }}</td>
             <td>{{ $totals['paid_usd'] }}</td>
-            <td>{{ $totals['closing_debt_usd'] }}</td>
             <td>{{ $totals['bonus_expense_usd'] }}</td>
+            <td>{{ $totals['closing_debt_usd'] }}</td>
             <td>{{ count($rows) ? '=SUM(P3:P'.(count($rows) + 2).')' : 0 }}</td>
         </tr>
     </tbody>
