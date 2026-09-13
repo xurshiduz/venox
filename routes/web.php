@@ -4,6 +4,51 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 
+Route::get('/_maintenance/contract-debt-audit-9c26f44bd531', function () {
+    $transaction = \App\Models\ContractBonusTransaction::query()
+        ->where('status', true)
+        ->where('type', 'debt_offset')
+        ->latest('id')
+        ->first();
+
+    if (! $transaction) {
+        return response()->json(['ok' => true, 'transaction' => null]);
+    }
+
+    $allocations = collect(data_get($transaction->meta, 'debt_allocations', []));
+    $checkouts = \App\Models\Checkout::query()
+        ->whereIn('id', $allocations->pluck('checkout_id')->filter())
+        ->get()
+        ->map(function ($checkout) use ($allocations) {
+            return [
+                'id' => $checkout->id,
+                'code' => $checkout->code,
+                'currency_type' => (int) $checkout->currency_type,
+                'currency_rate' => (float) $checkout->currency_type_price,
+                'total_price' => (float) $checkout->total_price,
+                'total_price_payme' => (float) $checkout->total_price_payme,
+                'total_price_debt' => (float) $checkout->total_price_debt,
+                'active_receipts' => (float) \App\Models\CashReceipt::query()
+                    ->where('status', 1)
+                    ->where('checkout_id', $checkout->id)
+                    ->sum('price'),
+                'last_allocation' => $allocations->firstWhere('checkout_id', $checkout->id),
+            ];
+        });
+
+    return response()->json([
+        'ok' => true,
+        'transaction' => [
+            'id' => $transaction->id,
+            'client_id' => $transaction->client_id,
+            'amount_usd' => (float) $transaction->amount_usd,
+            'created_at' => optional($transaction->created_at)->toDateTimeString(),
+            'meta' => $transaction->meta,
+        ],
+        'checkouts' => $checkouts,
+    ]);
+});
+
 Route::get('/checkout_today_send_public', 'Backend\CheckoutController@today_send')->name('checkout_today_send_public');
 
 Route::group(
