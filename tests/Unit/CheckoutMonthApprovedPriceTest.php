@@ -60,6 +60,16 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $this->assertEqualsWithDelta(16.13445378, 192000 / $service->usdRate(), 0.00000001);
     }
 
+    public function test_default_approved_price_rules_have_stable_unique_codes(): void
+    {
+        $rules = ApprovedProductPriceService::defaultRules();
+
+        $this->assertCount(30, $rules);
+        $this->assertCount(30, array_unique(array_column($rules, 'code')));
+        $this->assertSame('0w20-4l', $rules[0]['code']);
+        $this->assertSame('46lhm-20l', $rules[29]['code']);
+    }
+
     public function test_monthly_report_includes_clients_that_only_have_cash_receipts(): void
     {
         $clientIds = CheckoutMonthExport::mergeReportClientIds([10, 20], [20, 148]);

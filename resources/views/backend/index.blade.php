@@ -94,6 +94,26 @@
                         </div>
                         @endhasanyrole
 
+                        @hasanyrole('admin')
+                        <div class="col-sm-6 col-lg-4 col-xxl-3 mt-1">
+                            <div class="card card-bordered h-100">
+                                <div class="card-inner">
+                                    <div class="project">
+                                        <a href="{{ route('approved_product_prices.index') }}" class="project-title">
+                                            <div class="user-avatar sq md">
+                                                <img src="/backend/images/sys_icon/inventory_icon.png" alt="">
+                                            </div>
+                                            <div class="project-info">
+                                                <h2 style="font-size: 18px; text-transform: uppercase; font-family: inherit;" class="title">BOSS narxlari</h2>
+                                                <span class="sub-text">Sotuv va zavod narxlarini boshqarish</span>
+                                            </div>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        @endhasanyrole
+
                         @hasanyrole('admin|sale|report')
                         <div class="col-sm-6 col-lg-4 col-xxl-3 mt-1">
                             <div class="card card-bordered h-100">

@@ -22,6 +22,12 @@ Route::group(
         Route::get('/ware_id', 'Backend\HomeController@ware_id')->name('ware_id');
         Route::post('/iscompact', 'Backend\HomeController@iscompact')->name('iscompact');
         Route::post('/global-usd-rate', 'Backend\CurrencyController@saveGlobalUsdRate')->name('global_usd_rate.update');
+        Route::middleware('role:admin')->group(function () {
+            Route::get('/approved-product-prices', 'Backend\ApprovedProductPriceController@index')
+                ->name('approved_product_prices.index');
+            Route::put('/approved-product-prices/{approvedPrice}', 'Backend\ApprovedProductPriceController@update')
+                ->name('approved_product_prices.update');
+        });
         Route::get('/dashboard', 'Backend\DashboardController@index')->name('dashboard');
         Route::get('/dashboard_print', 'Backend\DashboardController@print')->name('dashboard_print');
         Route::get('/dashboard_new', 'Backend\DashboardController@dashboard_new')->name('dashboard_new');
