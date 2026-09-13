@@ -4,58 +4,6 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 
-Route::get('/_maintenance/checkout-bonus-audit-71b8c934ed20', function () {
-    $checkout = \App\Models\Checkout::query()
-        ->where('code', '4e0b3b52-283e-4307-a8e6-a6af16f8f7ef')
-        ->with(['checkoutDetails', 'payments' => fn ($query) => $query->where('status', 1), 'supid'])
-        ->firstOrFail();
-
-    $cashRows = app(\App\Services\AccountingCashReportService::class)->rows([
-        'from' => '2000-01-01',
-        'to' => now()->toDateString(),
-        'scheme' => '',
-        'product_id' => null,
-        'client_ids' => [$checkout->client_id],
-        'include_purchase_cost' => false,
-    ])->filter(fn (array $row) => (int) ($row['checkout_id'] ?? 0) === (int) $checkout->id)->values();
-
-    return response()->json([
-        'checkout' => [
-            'id' => $checkout->id,
-            'code' => $checkout->code,
-            'client_id' => $checkout->client_id,
-            'client' => optional($checkout->supid)->name,
-            'date' => $checkout->date,
-            'status' => $checkout->status,
-            'commission_scheme' => $checkout->commission_scheme,
-            'kpi_percent' => (float) $checkout->kpi_percent,
-            'agent_percent' => (float) $checkout->agent_percent,
-            'venox_bonus_percent' => (float) $checkout->venox_bonus_percent,
-            'total_price' => (float) $checkout->total_price,
-            'total_price_payme' => (float) $checkout->total_price_payme,
-            'total_price_debt' => (float) $checkout->total_price_debt,
-            'detail_bonus_total' => (float) $checkout->checkoutDetails->sum('bonus'),
-        ],
-        'receipts' => $checkout->payments->map(fn ($receipt) => [
-            'id' => $receipt->id,
-            'date' => $receipt->date,
-            'price' => (float) $receipt->price,
-            'currency_type' => (int) $receipt->currency_type,
-        ])->values(),
-        'cash_rows' => $cashRows->map(fn (array $row) => [
-            'receipt_id' => $row['receipt_id'] ?? null,
-            'payment_usd' => $row['payment_usd'] ?? null,
-            'scheme' => $row['scheme'] ?? null,
-            'venox_percent' => $row['venox_percent'] ?? null,
-            'contract_bonus_usd' => $row['contract_bonus_usd'] ?? null,
-        ]),
-        'saved_bonus_transactions' => \App\Models\ContractBonusTransaction::query()
-            ->where('checkout_id', $checkout->id)
-            ->where('status', true)
-            ->get(['id', 'cash_receipt_id', 'type', 'direction', 'amount_usd', 'transaction_date']),
-    ]);
-});
-
 Route::get('/checkout_today_send_public', 'Backend\CheckoutController@today_send')->name('checkout_today_send_public');
 
 Route::group(
