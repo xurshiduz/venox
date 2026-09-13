@@ -342,9 +342,12 @@ class CheckoutMonthExport implements FromView, WithStyles
             $approvedTotalUsd = 0;
             $clientAllocationProducts = [];
 
-            foreach ($paymentAllocationRows->get($clientKey, collect()) as $allocationRow) {
-                foreach ($allocationRow['products'] ?? [] as $allocatedProduct) {
-                    $productName = (string) ($allocatedProduct['name'] ?? 'Noma\'lum mahsulot');
+            // Avval shu davrdagi checkoutning to'liq mahsulot tarkibini olamiz.
+            // FIFO payment row ko'pincha faqat dastlabki 1-2 tovarni qaytaradi va
+            // barcha summani 96/20 kabi shu ikki tovarga yuklab qo'yadi.
+            foreach ($periodCheckoutsByClient->get($clientKey, collect()) as $periodCheckout) {
+                foreach ($periodCheckout->checkoutDetails as $detail) {
+                    $productName = (string) (optional($detail->prodid)->name ?? 'Noma\'lum mahsulot');
                     $approvedPrices = $approvedPriceService->pricesFor($productName);
                     if (! static::hasCompleteApprovedPrices($approvedPrices)) {
                         continue;
@@ -363,14 +366,50 @@ class CheckoutMonthExport implements FromView, WithStyles
                     );
                     $clientAllocationProducts[] = [
                         'name' => $productName,
-                        'agent' => $allocationRow['agent'] ?? '—',
-                        'qty' => (float) ($allocatedProduct['qty'] ?? 0),
+                        'agent' => optional($periodCheckout->managerid)->name ?? '—',
+                        'qty' => (float) ($detail->qty ?? 0),
                         'package_qty' => static::approvedPackageQuantity($productName),
                         'unit_price_usd' => $unitPriceUsd,
                         'unit_price_uzs' => $unitPriceUzs,
                         'factory_price_usd' => $factoryPriceUsd,
                         'factory_price_uzs' => $factoryPriceUzs,
                     ];
+                }
+            }
+
+            // Shu davrda checkout bo'lmagan eski qarz to'lovlarida FIFO orqali
+            // topilgan tarixiy mahsulotlar zaxira manba bo'lib qoladi.
+            if (empty($clientAllocationProducts)) {
+                foreach ($paymentAllocationRows->get($clientKey, collect()) as $allocationRow) {
+                    foreach ($allocationRow['products'] ?? [] as $allocatedProduct) {
+                        $productName = (string) ($allocatedProduct['name'] ?? 'Noma\'lum mahsulot');
+                        $approvedPrices = $approvedPriceService->pricesFor($productName);
+                        if (! static::hasCompleteApprovedPrices($approvedPrices)) {
+                            continue;
+                        }
+                        $unitPriceUzs = (float) $approvedPrices['sale_uzs'];
+                        $factoryPriceUzs = (float) $approvedPrices['factory_uzs'];
+                        $unitPriceUsd = Currency::documentAmountToUsd(
+                            $unitPriceUzs,
+                            2,
+                            $approvedPriceService->usdRate()
+                        );
+                        $factoryPriceUsd = Currency::documentAmountToUsd(
+                            $factoryPriceUzs,
+                            2,
+                            $approvedPriceService->usdRate()
+                        );
+                        $clientAllocationProducts[] = [
+                            'name' => $productName,
+                            'agent' => $allocationRow['agent'] ?? '—',
+                            'qty' => (float) ($allocatedProduct['qty'] ?? 0),
+                            'package_qty' => static::approvedPackageQuantity($productName),
+                            'unit_price_usd' => $unitPriceUsd,
+                            'unit_price_uzs' => $unitPriceUzs,
+                            'factory_price_usd' => $factoryPriceUsd,
+                            'factory_price_uzs' => $factoryPriceUzs,
+                        ];
+                    }
                 }
             }
 
@@ -683,8 +722,8 @@ class CheckoutMonthExport implements FromView, WithStyles
     }
 
     /**
-     * Keep quantities as whole pieces and make their approved UZS total as
-     * close as possible to the client's gross cash receipts.
+     * Keep quantities in full cartons and maximize their approved UZS total
+     * without ever exceeding the client's gross cash receipts.
      */
     public static function balanceApprovedQuantities(
         iterable $quantities,
@@ -712,6 +751,15 @@ class CheckoutMonthExport implements FromView, WithStyles
             $weights[$index] = sqrt(max(1, $qty / $package));
         }
         $weightTotal = array_sum($weights);
+        $minimumFullMixTotal = 0.0;
+        foreach ($quantities as $index => $qty) {
+            if ($qty <= 0) {
+                continue;
+            }
+            $package = max(1, (int) round((float) ($packageQuantities[$index] ?? 1)));
+            $minimumFullMixTotal += $package * max(0, (float) ($approvedUnitPricesUzs[$index] ?? 0));
+        }
+        $keepEveryProduct = $minimumFullMixTotal <= $grossPaymentUzs + 0.000001;
         $scaled = [];
         foreach ($quantities as $index => $qty) {
             $price = max(0, (float) ($approvedUnitPricesUzs[$index] ?? 0));
@@ -725,37 +773,39 @@ class CheckoutMonthExport implements FromView, WithStyles
         foreach ($scaled as $index => $scaledQty) {
             $package = max(1, (int) round((float) ($packageQuantities[$index] ?? 1)));
             $packages[$index] = $package;
-            $originalQty = (float) ($quantities[$index] ?? 0);
-            $minimums[$index] = $originalQty > 0 ? (float) $package : 0.0;
-            $nearestPackageQty = round($scaledQty / $package) * $package;
-            $balanced[$index] = (float) max($minimums[$index], $nearestPackageQty);
+            $minimums[$index] = $keepEveryProduct && ($quantities[$index] ?? 0) > 0
+                ? (float) $package
+                : 0.0;
+            // Floor ishlatiladi: boshlang'ich jami hech qachon to'lovdan oshmaydi.
+            $balanced[$index] = (float) max(
+                $minimums[$index],
+                floor($scaledQty / $package) * $package
+            );
         }
         $balancedTotal = 0.0;
         foreach ($balanced as $index => $qty) {
             $balancedTotal += $qty * max(0, (float) ($approvedUnitPricesUzs[$index] ?? 0));
         }
 
-        // Bir dona qo'shish/ayirish va ikki mahsulotni o'zaro almashtirish orqali
-        // eng yaqin butun kombinatsiyani topamiz. Har qadam farqni kamaytiradi.
+        // Karobka qo'shish yoki bir karobkani boshqa mahsulot karobkasiga
+        // almashtirish orqali to'lovdan oshmaydigan eng yaqin summani topamiz.
         for ($iteration = 0; $iteration < 1000; $iteration++) {
-            $currentDifference = abs($grossPaymentUzs - $balancedTotal);
+            $currentDifference = $grossPaymentUzs - $balancedTotal;
             $bestDifference = $currentDifference;
             $bestChanges = [];
 
             foreach ($balanced as $index => $qty) {
                 $price = max(0, (float) ($approvedUnitPricesUzs[$index] ?? 0));
                 $package = $packages[$index];
-                foreach ([-1, 1] as $packageChange) {
-                    $change = $packageChange * $package;
-                    if ($price <= 0
-                        || $qty + $change < $minimums[$index]) {
-                        continue;
-                    }
-                    $difference = abs($grossPaymentUzs - ($balancedTotal + $change * $price));
-                    if ($difference + 0.000001 < $bestDifference) {
-                        $bestDifference = $difference;
-                        $bestChanges = [[$index, $change]];
-                    }
+                $change = $package;
+                $candidateTotal = $balancedTotal + $change * $price;
+                if ($price <= 0 || $candidateTotal > $grossPaymentUzs + 0.000001) {
+                    continue;
+                }
+                $difference = $grossPaymentUzs - $candidateTotal;
+                if ($difference + 0.000001 < $bestDifference) {
+                    $bestDifference = $difference;
+                    $bestChanges = [[$index, $change]];
                 }
             }
 
@@ -775,11 +825,15 @@ class CheckoutMonthExport implements FromView, WithStyles
                         continue;
                     }
                     $rightChange = $packages[$right];
-                    $difference = abs($grossPaymentUzs - (
+                    $candidateTotal = (
                         $balancedTotal
                         + $leftChange * $leftPrice
                         + $rightChange * $rightPrice
-                    ));
+                    );
+                    if ($candidateTotal > $grossPaymentUzs + 0.000001) {
+                        continue;
+                    }
+                    $difference = $grossPaymentUzs - $candidateTotal;
                     if ($difference + 0.000001 < $bestDifference) {
                         $bestDifference = $difference;
                         $bestChanges = [[$left, $leftChange], [$right, $rightChange]];

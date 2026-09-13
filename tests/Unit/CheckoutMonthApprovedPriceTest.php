@@ -131,7 +131,9 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         foreach ($quantities as $index => $qty) {
             $approvedTotal += $qty * $prices[$index];
         }
-        $this->assertLessThan(1, abs(1500 - $approvedTotal / 11900));
+        $this->assertLessThan(2, abs(1500 - $approvedTotal / 11900));
+        $this->assertLessThanOrEqual(1500, $approvedTotal / 11900);
+        $this->assertCount(6, array_filter($quantities, fn (float $qty) => $qty > 0));
         $this->assertLessThanOrEqual(72, max($quantities));
         foreach ($quantities as $index => $qty) {
             $this->assertSame(0.0, fmod($qty, (float) $packages[$index]));
