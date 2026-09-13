@@ -128,6 +128,23 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $this->assertSame(160.0, $venoxCash);
     }
 
+    public function test_monthly_export_line_cells_are_real_excel_formulas(): void
+    {
+        $this->assertSame([
+            'markup_percent' => '=IFERROR((H3-I3)/I3,"")',
+            'approved_total_usd' => '=G3*H3',
+            'factory_total_usd' => '=G3*I3',
+        ], CheckoutMonthExport::lineExcelFormulas(3));
+    }
+
+    public function test_monthly_export_client_totals_are_real_excel_formulas(): void
+    {
+        $this->assertSame([
+            'closing_debt_usd' => '=E3+SUM(K3:K5)-M3-N3',
+            'venox_cash_usd' => '=SUM(K3:K5)-SUM(L3:L5)',
+        ], CheckoutMonthExport::clientExcelFormulas(3, 5));
+    }
+
     public function test_displayed_paid_total_is_converted_to_uzs_with_report_rate(): void
     {
         $totalUzs = CheckoutMonthExport::paidTotalUzs(234325435 / 11078, 11078);

@@ -454,9 +454,11 @@ class CheckoutMonthExport implements FromView, WithStyles
                 $row['unit_prices'],
                 $row['factory_prices']
             );
+            $firstRowIndex = count($rows);
             $startRow = count($rows) + 3;
 
             if (empty($row['products'])) {
+                $clientFormulas = static::clientExcelFormulas($startRow, $startRow);
                 $rows[] = [
                     'date' => collect($row['dates'])->unique()->implode("\n"),
                     'client' => $row['client'],
@@ -468,12 +470,17 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'unit_price_usd' => '',
                     'factory_price_usd' => null,
                     'markup_percent' => null,
+                    'markup_percent_formula' => null,
                     'approved_total_usd' => null,
+                    'approved_total_usd_formula' => null,
                     'factory_total_usd' => null,
+                    'factory_total_usd_formula' => null,
                     'paid_usd' => $row['paid_usd'],
                     'closing_debt_usd' => $row['closing_debt_usd'],
+                    'closing_debt_usd_formula' => $clientFormulas['closing_debt_usd'],
                     'bonus_expense_usd' => $row['bonus_expense_usd'],
                     'venox_cash_usd' => null,
+                    'venox_cash_usd_formula' => null,
                 ];
 
                 continue;
@@ -484,6 +491,8 @@ class CheckoutMonthExport implements FromView, WithStyles
                 $unitPrice = (float) $row['unit_prices'][$index];
                 $factoryPrice = (float) $row['factory_prices'][$index];
                 $first = $index === 0;
+                $excelRow = count($rows) + 3;
+                $lineFormulas = static::lineExcelFormulas($excelRow);
 
                 $rows[] = [
                     'date' => $first ? collect($row['dates'])->unique()->implode("\n") : null,
@@ -496,16 +505,24 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'unit_price_usd' => $unitPrice,
                     'factory_price_usd' => $factoryPrice,
                     'markup_percent' => $row['markup_percentages'][$index],
+                    'markup_percent_formula' => $lineFormulas['markup_percent'],
                     'approved_total_usd' => $qty * $unitPrice,
+                    'approved_total_usd_formula' => $lineFormulas['approved_total_usd'],
                     'factory_total_usd' => $qty * $factoryPrice,
+                    'factory_total_usd_formula' => $lineFormulas['factory_total_usd'],
                     'paid_usd' => $first ? $row['paid_usd'] : null,
                     'closing_debt_usd' => $first ? $row['closing_debt_usd'] : null,
+                    'closing_debt_usd_formula' => null,
                     'bonus_expense_usd' => $first ? $row['bonus_expense_usd'] : null,
                     'venox_cash_usd' => $first ? $venoxCashUsd : null,
+                    'venox_cash_usd_formula' => null,
                 ];
             }
 
             $endRow = count($rows) + 2;
+            $clientFormulas = static::clientExcelFormulas($startRow, $endRow);
+            $rows[$firstRowIndex]['closing_debt_usd_formula'] = $clientFormulas['closing_debt_usd'];
+            $rows[$firstRowIndex]['venox_cash_usd_formula'] = $clientFormulas['venox_cash_usd'];
             if ($endRow > $startRow) {
                 foreach (['A', 'B', 'C', 'E', 'M', 'N', 'O', 'P'] as $column) {
                     $this->mergeRanges[] = $column . $startRow . ':' . $column . $endRow;
@@ -571,6 +588,36 @@ class CheckoutMonthExport implements FromView, WithStyles
         }
 
         return $total;
+    }
+
+    public static function lineExcelFormulas(int $row): array
+    {
+        return [
+            'markup_percent' => sprintf('=IFERROR((H%d-I%d)/I%d,"")', $row, $row, $row),
+            'approved_total_usd' => sprintf('=G%d*H%d', $row, $row),
+            'factory_total_usd' => sprintf('=G%d*I%d', $row, $row),
+        ];
+    }
+
+    public static function clientExcelFormulas(int $startRow, int $endRow): array
+    {
+        return [
+            'closing_debt_usd' => sprintf(
+                '=E%d+SUM(K%d:K%d)-M%d-N%d',
+                $startRow,
+                $startRow,
+                $endRow,
+                $startRow,
+                $startRow
+            ),
+            'venox_cash_usd' => sprintf(
+                '=SUM(K%d:K%d)-SUM(L%d:L%d)',
+                $startRow,
+                $endRow,
+                $startRow,
+                $endRow
+            ),
+        ];
     }
 
     /**

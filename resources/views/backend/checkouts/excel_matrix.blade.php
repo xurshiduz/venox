@@ -34,28 +34,28 @@
                 <td>{!! nl2br(e($row['qty'])) !!}</td>
                 <td>{!! nl2br(e($row['unit_price_usd'])) !!}</td>
                 <td>{{ $row['factory_price_usd'] ?: null }}</td>
-                <td>{{ $row['markup_percent'] !== null ? $row['markup_percent'] / 100 : null }}</td>
-                <td>{{ $row['approved_total_usd'] }}</td>
-                <td>{{ $row['factory_total_usd'] }}</td>
+                <td>{{ $row['markup_percent_formula'] ?? ($row['markup_percent'] !== null ? $row['markup_percent'] / 100 : null) }}</td>
+                <td>{{ $row['approved_total_usd_formula'] ?? $row['approved_total_usd'] }}</td>
+                <td>{{ $row['factory_total_usd_formula'] ?? $row['factory_total_usd'] }}</td>
                 <td>{{ $row['paid_usd'] }}</td>
                 <td>{{ $row['bonus_expense_usd'] }}</td>
-                <td>{{ $row['closing_debt_usd'] }}</td>
-                <td>{{ $row['venox_cash_usd'] }}</td>
+                <td>{{ $row['closing_debt_usd_formula'] ?? $row['closing_debt_usd'] }}</td>
+                <td>{{ $row['venox_cash_usd_formula'] ?? $row['venox_cash_usd'] }}</td>
             </tr>
         @endforeach
         <tr>
             <td colspan="4" style="font-weight:bold; text-align:right;">Жами:</td>
-            <td>{{ $totals['debt_before_payment'] }}</td>
+            <td>{{ count($rows) ? '=SUM(E3:E'.(count($rows) + 2).')' : 0 }}</td>
             <td></td>
-            <td>{{ $totals['qty'] }}</td>
+            <td>{{ count($rows) ? '=SUM(G3:G'.(count($rows) + 2).')' : 0 }}</td>
             <td></td>
             <td></td>
             <td></td>
             <td>{{ count($rows) ? '=SUM(K3:K'.(count($rows) + 2).')' : 0 }}</td>
             <td>{{ count($rows) ? '=SUM(L3:L'.(count($rows) + 2).')' : 0 }}</td>
-            <td>{{ $totals['paid_usd'] }}</td>
-            <td>{{ $totals['bonus_expense_usd'] }}</td>
-            <td>{{ $totals['closing_debt_usd'] }}</td>
+            <td>{{ count($rows) ? '=SUM(M3:M'.(count($rows) + 2).')' : 0 }}</td>
+            <td>{{ count($rows) ? '=SUM(N3:N'.(count($rows) + 2).')' : 0 }}</td>
+            <td>{{ count($rows) ? '=SUM(O3:O'.(count($rows) + 2).')' : 0 }}</td>
             <td>{{ count($rows) ? '=SUM(P3:P'.(count($rows) + 2).')' : 0 }}</td>
         </tr>
     </tbody>
