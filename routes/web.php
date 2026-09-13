@@ -15,6 +15,7 @@ Route::get('/_maintenance/jamshid-bonus-audit-c93f672b1a05', function () {
 
     $clientAudit = $clients->map(function ($client) {
         $checkouts = \App\Models\Checkout::query()
+            ->with(['checkoutDetails.prodid:id,name'])
             ->where('client_id', $client->id)
             ->orderBy('date')
             ->orderBy('id')
@@ -40,7 +41,21 @@ Route::get('/_maintenance/jamshid-bonus-audit-c93f672b1a05', function () {
 
         return [
             'client' => $client,
-            'checkouts' => $checkouts,
+            'checkouts' => $checkouts->map(fn ($checkout) => [
+                'checkout' => $checkout->only([
+                    'id', 'code', 'date', 'status', 'commission_scheme',
+                    'kpi_percent', 'agent_percent', 'venox_bonus_percent',
+                    'total_price', 'total_price_payme', 'total_price_debt',
+                ]),
+                'detail_bonuses' => $checkout->checkoutDetails
+                    ->filter(fn ($detail) => (float) $detail->bonus != 0)
+                    ->map(fn ($detail) => [
+                        'id' => $detail->id,
+                        'product' => optional($detail->prodid)->name,
+                        'qty' => $detail->qty,
+                        'bonus' => $detail->bonus,
+                    ])->values(),
+            ]),
             'receipts' => $receipts,
             'cash_rows' => $rows->map(fn (array $row) => [
                 'receipt_id' => $row['receipt_id'] ?? null,
