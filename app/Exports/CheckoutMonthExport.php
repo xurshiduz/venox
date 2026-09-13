@@ -365,6 +365,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                         'name' => $productName,
                         'agent' => $allocationRow['agent'] ?? '—',
                         'qty' => (float) ($allocatedProduct['qty'] ?? 0),
+                        'package_qty' => static::approvedPackageQuantity($productName),
                         'unit_price_usd' => $unitPriceUsd,
                         'unit_price_uzs' => $unitPriceUzs,
                         'factory_price_usd' => $factoryPriceUsd,
@@ -372,6 +373,17 @@ class CheckoutMonthExport implements FromView, WithStyles
                     ];
                 }
             }
+
+            $clientAllocationProducts = collect($clientAllocationProducts)
+                ->groupBy(fn (array $product) => $product['name'] . '|' . $product['agent'])
+                ->map(function (Collection $sameProducts): array {
+                    $product = $sameProducts->first();
+                    $product['qty'] = (float) $sameProducts->sum('qty');
+
+                    return $product;
+                })
+                ->values()
+                ->all();
 
             // Har bir mijoz kesimida tasdiqlangan jami gross to'lovga eng yaqin
             // bo'lsin. Gross = Excelda ko'rinadigan net to'lov + Venox bonus.
@@ -382,7 +394,8 @@ class CheckoutMonthExport implements FromView, WithStyles
             $balancedQuantities = static::balanceApprovedQuantities(
                 collect($clientAllocationProducts)->pluck('qty')->all(),
                 collect($clientAllocationProducts)->pluck('unit_price_uzs')->all(),
-                $grossClientPaymentUzs
+                $grossClientPaymentUzs,
+                collect($clientAllocationProducts)->pluck('package_qty')->all()
             );
 
             foreach ($clientAllocationProducts as $index => $allocationProduct) {
@@ -676,7 +689,8 @@ class CheckoutMonthExport implements FromView, WithStyles
     public static function balanceApprovedQuantities(
         iterable $quantities,
         array $approvedUnitPricesUzs,
-        float $grossPaymentUzs
+        float $grossPaymentUzs,
+        array $packageQuantities = []
     ): array {
         $quantities = array_values(collect($quantities)->map(fn ($qty) => max(0, (float) $qty))->all());
         $approvedTotal = 0.0;
@@ -691,7 +705,26 @@ class CheckoutMonthExport implements FromView, WithStyles
 
         $factor = $grossPaymentUzs / $approvedTotal;
         $scaled = array_map(fn (float $qty) => $qty * $factor, $quantities);
-        $balanced = array_map(fn (float $qty) => (float) round($qty), $scaled);
+        $minimums = [];
+        $maximums = [];
+        $packages = [];
+        $balanced = [];
+        foreach ($scaled as $index => $scaledQty) {
+            $package = max(1, (int) round((float) ($packageQuantities[$index] ?? 1)));
+            $packages[$index] = $package;
+            $originalQty = (float) ($quantities[$index] ?? 0);
+            $minimums[$index] = $originalQty > 0 ? (float) $package : 0.0;
+            // Haqiqiy FIFO miqdoridan ko'pi bilan ikki qo'shimcha karobka.
+            $maximums[$index] = max(
+                $minimums[$index],
+                (float) ((ceil($originalQty / $package) + 2) * $package)
+            );
+            $nearestPackageQty = round($scaledQty / $package) * $package;
+            $balanced[$index] = (float) min(
+                $maximums[$index],
+                max($minimums[$index], $nearestPackageQty)
+            );
+        }
         $balancedTotal = 0.0;
         foreach ($balanced as $index => $qty) {
             $balancedTotal += $qty * max(0, (float) ($approvedUnitPricesUzs[$index] ?? 0));
@@ -706,8 +739,12 @@ class CheckoutMonthExport implements FromView, WithStyles
 
             foreach ($balanced as $index => $qty) {
                 $price = max(0, (float) ($approvedUnitPricesUzs[$index] ?? 0));
-                foreach ([-1, 1] as $change) {
-                    if ($price <= 0 || $qty + $change < 0) {
+                $package = $packages[$index];
+                foreach ([-1, 1] as $packageChange) {
+                    $change = $packageChange * $package;
+                    if ($price <= 0
+                        || $qty + $change < $minimums[$index]
+                        || $qty + $change > $maximums[$index]) {
                         continue;
                     }
                     $difference = abs($grossPaymentUzs - ($balancedTotal + $change * $price));
@@ -721,7 +758,8 @@ class CheckoutMonthExport implements FromView, WithStyles
             $count = count($balanced);
             for ($left = 0; $left < $count; $left++) {
                 $leftPrice = max(0, (float) ($approvedUnitPricesUzs[$left] ?? 0));
-                if ($balanced[$left] <= 0 || $leftPrice <= 0) {
+                $leftChange = -$packages[$left];
+                if ($balanced[$left] + $leftChange < $minimums[$left] || $leftPrice <= 0) {
                     continue;
                 }
                 for ($right = 0; $right < $count; $right++) {
@@ -732,10 +770,18 @@ class CheckoutMonthExport implements FromView, WithStyles
                     if ($rightPrice <= 0) {
                         continue;
                     }
-                    $difference = abs($grossPaymentUzs - ($balancedTotal - $leftPrice + $rightPrice));
+                    $rightChange = $packages[$right];
+                    if ($balanced[$right] + $rightChange > $maximums[$right]) {
+                        continue;
+                    }
+                    $difference = abs($grossPaymentUzs - (
+                        $balancedTotal
+                        + $leftChange * $leftPrice
+                        + $rightChange * $rightPrice
+                    ));
                     if ($difference + 0.000001 < $bestDifference) {
                         $bestDifference = $difference;
-                        $bestChanges = [[$left, -1], [$right, 1]];
+                        $bestChanges = [[$left, $leftChange], [$right, $rightChange]];
                     }
                 }
             }
@@ -750,6 +796,28 @@ class CheckoutMonthExport implements FromView, WithStyles
         }
 
         return $balanced;
+    }
+
+    /** Package sizes from the supplied BOSS price workbook. */
+    public static function approvedPackageQuantity(string $productName): int
+    {
+        $normalized = mb_strtolower($productName, 'UTF-8');
+        $normalized = strtr($normalized, ['л' => 'l']);
+        $normalized = preg_replace('/[^a-z0-9]+/u', '', $normalized) ?: '';
+
+        if (str_contains($normalized, '208l') || str_contains($normalized, '20l')) {
+            return 1;
+        }
+        if (str_contains($normalized, '1l')) {
+            return 12;
+        }
+        if (str_contains($normalized, '3l')
+            || str_contains($normalized, '4l')
+            || str_contains($normalized, '5l')) {
+            return 4;
+        }
+
+        return 1;
     }
 
     /** Both approved prices must be explicitly entered and greater than zero. */

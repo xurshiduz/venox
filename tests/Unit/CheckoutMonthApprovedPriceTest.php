@@ -115,6 +115,34 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $this->assertLessThanOrEqual(100000, abs(450000 - $nearest[0] * 200000));
     }
 
+    public function test_mirzoxid_like_mix_stays_within_real_carton_sizes(): void
+    {
+        $prices = [207000, 207500, 197000, 176000, 49000, 283000];
+        $packages = [4, 4, 4, 4, 12, 4];
+        $quantities = CheckoutMonthExport::balanceApprovedQuantities(
+            [20, 12, 12, 12, 46, 16],
+            $prices,
+            2000 * 11900,
+            $packages
+        );
+
+        $this->assertSame([28.0, 16.0, 16.0, 20.0, 48.0, 20.0], $quantities);
+        $approvedTotal = 0.0;
+        foreach ($quantities as $index => $qty) {
+            $approvedTotal += $qty * $prices[$index];
+        }
+        $this->assertEqualsWithDelta(2000 * 11900, $approvedTotal, 0.000001);
+        foreach ($quantities as $index => $qty) {
+            $this->assertSame(0.0, fmod($qty, (float) $packages[$index]));
+        }
+    }
+
+    /** @dataProvider packageQuantityProvider */
+    public function test_package_quantity_comes_from_the_boss_workbook_sizes(string $name, int $expected): void
+    {
+        $this->assertSame($expected, CheckoutMonthExport::approvedPackageQuantity($name));
+    }
+
     public function test_only_explicit_positive_sale_and_factory_prices_are_exportable(): void
     {
         $this->assertTrue(CheckoutMonthExport::hasCompleteApprovedPrices([
@@ -241,6 +269,18 @@ class CheckoutMonthApprovedPriceTest extends TestCase
             ['998770561836', '77 056 18 36'],
             ['12345', '12345'],
             [null, ''],
+        ];
+    }
+
+    public function packageQuantityProvider(): array
+    {
+        return [
+            ['Venox 5W-30 Molygreen 4L', 4],
+            ['Venox 10W-40 Premium 3 л', 4],
+            ['Venox Dexron 5L', 4],
+            ['Venox ATF III 1L', 12],
+            ['Venox 15W-40 20L', 1],
+            ['Venox 10W-40 SN 208 Л', 1],
         ];
     }
 }
