@@ -435,7 +435,6 @@
                                                 <div class="col-lg-3 col-md-6">
                                                     <label class="form-label mb-1">KPI + Venox bonus jami (%)</label>
                                                     <input type="number" min="0" max="92" step="0.01" class="form-control commission-bonus-total-input" value="{{ $bonusTotalPercent }}">
-                                                    <small class="text-soft">Kiritilsa: KPI 5%, qolgan qismi Venox bonus.</small>
                                                 </div>
                                                 <div class="col-lg-2 col-md-6">
                                                     <label class="form-label mb-1">Avtomatik taqsimot</label>
