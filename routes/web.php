@@ -4,6 +4,64 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 
+Route::get('/_maintenance/jamshid-bonus-audit-c93f672b1a05', function () {
+    $clients = \App\Models\Client::query()
+        ->where(function ($query) {
+            $query->where('name', 'like', '%Jamshid%')
+                ->orWhere('name', 'like', '%gulbozor%')
+                ->orWhere('name', 'like', '%bitonka%');
+        })
+        ->get(['id', 'name']);
+
+    return response()->json($clients->map(function ($client) {
+        $checkouts = \App\Models\Checkout::query()
+            ->where('client_id', $client->id)
+            ->orderBy('date')
+            ->orderBy('id')
+            ->get([
+                'id', 'code', 'date', 'status', 'commission_scheme',
+                'kpi_percent', 'agent_percent', 'venox_bonus_percent',
+                'total_price', 'total_price_payme', 'total_price_debt',
+            ]);
+        $receipts = \App\Models\CashReceipt::query()
+            ->where('client_id', $client->id)
+            ->where('status', 1)
+            ->orderBy('date')
+            ->orderBy('id')
+            ->get(['id', 'checkout_id', 'date', 'price', 'currency_type', 'currency_type_price']);
+        $rows = app(\App\Services\AccountingCashReportService::class)->rows([
+            'from' => '2000-01-01',
+            'to' => now()->toDateString(),
+            'scheme' => '',
+            'product_id' => null,
+            'client_ids' => [$client->id],
+            'include_purchase_cost' => false,
+        ]);
+
+        return [
+            'client' => $client,
+            'checkouts' => $checkouts,
+            'receipts' => $receipts,
+            'cash_rows' => $rows->map(fn (array $row) => [
+                'receipt_id' => $row['receipt_id'] ?? null,
+                'checkout_id' => $row['checkout_id'] ?? null,
+                'date' => $row['date'] ?? null,
+                'payment_usd' => $row['payment_usd'] ?? null,
+                'scheme' => $row['scheme'] ?? null,
+                'venox_percent' => $row['venox_percent'] ?? null,
+                'venox' => $row['venox'] ?? null,
+                'contract_bonus_usd' => $row['contract_bonus_usd'] ?? null,
+            ]),
+            'bonus_transactions' => \App\Models\ContractBonusTransaction::query()
+                ->where('client_id', $client->id)
+                ->where('status', true)
+                ->orderBy('transaction_date')
+                ->orderBy('id')
+                ->get(['id', 'cash_receipt_id', 'checkout_id', 'transaction_date', 'type', 'direction', 'amount_usd']),
+        ];
+    }));
+});
+
 Route::get('/checkout_today_send_public', 'Backend\CheckoutController@today_send')->name('checkout_today_send_public');
 
 Route::group(
