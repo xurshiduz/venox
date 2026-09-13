@@ -3,12 +3,15 @@
 namespace App\Exports;
 
 use App\Models\CashReceipt;
+use App\Models\CashExpenditure;
+use App\Models\CashExpenditureType;
 use App\Models\Checkin;
 use App\Models\CheckinDetail;
 use App\Models\Checkout;
 use App\Models\Client;
 use App\Models\ContractBonusTransaction;
 use App\Models\Currency;
+use App\Models\Product;
 use App\Services\AccountingCashReportService;
 use App\Services\ApprovedProductPriceService;
 use Carbon\Carbon;
@@ -73,7 +76,9 @@ class CheckoutMonthExport implements FromView, WithStyles
         $accounting = app(AccountingCashReportService::class);
         $approvedPriceService = app(ApprovedProductPriceService::class);
         $clientPayments = [];
+        $clientGrossPayments = [];
         $clientPaymentDates = [];
+        $linkedBonusExpensesByClient = [];
 
         $payments = CashReceipt::query()
             ->where('status', 1)
@@ -84,16 +89,56 @@ class CheckoutMonthExport implements FromView, WithStyles
             ->orderBy('id')
             ->get();
 
+        $linkedBonusExpensesByReceipt = CashExpenditure::query()
+            ->whereIn(
+                'cash_expenditure_types',
+                CashExpenditureType::query()->get(['id', 'name'])
+                    ->filter(fn (CashExpenditureType $type) => $type->supportsBonusSource())
+                    ->pluck('id')
+            )
+            ->whereIn('source_cash_receipt_id', $payments->pluck('id'))
+            ->get(['source_cash_receipt_id', 'price'])
+            ->groupBy('source_cash_receipt_id');
+
         $paymentClientIds = $payments->map(function ($payment) {
             return $payment->client_id ?: optional($payment->checkout)->client_id;
         });
+        $checkoutClientIds = static::mergeReportClientIds($checkouts->pluck('client_id'), []);
         $clientIds = static::mergeReportClientIds(
-            $checkouts->pluck('client_id'),
+            $checkoutClientIds,
             $paymentClientIds
         );
         $clientsById = Client::whereIn('id', $clientIds)
             ->get()
             ->keyBy(fn ($client) => (string) $client->id);
+        $paymentOnlyClientIds = static::mergeReportClientIds([], $paymentClientIds)
+            ->diff($checkoutClientIds)
+            ->values();
+        $paymentAllocationRows = collect();
+        $allocatedProductsById = collect();
+
+        if ($paymentOnlyClientIds->isNotEmpty()) {
+            // AccountingCashReportService eski, shartnomaga bog'lanmagan to'lovlarni
+            // mijozning avvalgi savdolariga FIFO bo'yicha taqsimlab beradi.
+            $paymentAllocationRows = $accounting->rows([
+                'from' => $periodStart->toDateString(),
+                'to' => $periodEnd->toDateString(),
+                'scheme' => null,
+                'product_id' => null,
+            ])->filter(function (array $row) use ($paymentOnlyClientIds) {
+                return $paymentOnlyClientIds->contains((int) ($row['client_id'] ?? 0));
+            })->groupBy(fn (array $row) => (string) $row['client_id']);
+
+            $allocatedProductIds = $paymentAllocationRows
+                ->collapse()
+                ->flatMap(fn (array $row) => collect($row['products'] ?? [])->pluck('id'))
+                ->filter()
+                ->unique()
+                ->values();
+            $allocatedProductsById = Product::whereIn('id', $allocatedProductIds)
+                ->get()
+                ->keyBy(fn ($product) => (string) $product->id);
+        }
 
         foreach ($payments as $payment) {
             $clientId = $payment->client_id ?: optional($payment->checkout)->client_id;
@@ -116,7 +161,11 @@ class CheckoutMonthExport implements FromView, WithStyles
                     (float) ($payment->currency_type_price ?: Currency::usdRateForDate($payment->date ?: $payment->created_at)),
                     (string) $payment->comment
                 );
-            $clientPayments[$key] = ($clientPayments[$key] ?? 0) + $usd;
+            $linkedNative = (float) collect($linkedBonusExpensesByReceipt->get($payment->id, []))->sum('price');
+            $paymentBreakdown = static::paymentBreakdownUsd((float) $payment->price, $usd, $linkedNative);
+            $clientGrossPayments[$key] = ($clientGrossPayments[$key] ?? 0) + $paymentBreakdown['gross_usd'];
+            $clientPayments[$key] = ($clientPayments[$key] ?? 0) + $paymentBreakdown['net_usd'];
+            $linkedBonusExpensesByClient[$key] = ($linkedBonusExpensesByClient[$key] ?? 0) + $paymentBreakdown['bonus_usd'];
             $clientPaymentDates[$key][] = Carbon::parse($payment->date ?: $payment->created_at)->format('d.m.Y');
         }
 
@@ -130,11 +179,15 @@ class CheckoutMonthExport implements FromView, WithStyles
             ->selectRaw('client_id, SUM(amount_usd) as total_amount')
             ->groupBy('client_id')
             ->pluck('total_amount', 'client_id');
+        foreach ($linkedBonusExpensesByClient as $clientKey => $amount) {
+            $clientBonusExpenses[$clientKey] = (float) ($clientBonusExpenses[$clientKey] ?? 0) + $amount;
+        }
         $groupedRows = [];
 
         foreach ($checkouts as $checkout) {
             $clientKey = (string) $checkout->client_id;
             $paid = (float) ($clientPayments[$clientKey] ?? 0);
+            $grossPaid = (float) ($clientGrossPayments[$clientKey] ?? 0);
             $closing = (float) ($closingDebts[$clientKey] ?? 0);
 
             if (!isset($groupedRows[$clientKey])) {
@@ -154,6 +207,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'total_usd' => 0,
                     'actual_total_usd' => 0,
                     'paid_usd' => $paid,
+                    'gross_paid_usd' => $grossPaid,
                     'closing_debt_usd' => $closing,
                     'bonus_expense_usd' => (float) ($clientBonusExpenses[$clientKey] ?? 0),
                 ];
@@ -293,20 +347,77 @@ class CheckoutMonthExport implements FromView, WithStyles
             }
 
             $client = $clientsById->get($clientKey);
+            $products = [];
+            $agents = [];
+            $quantities = [];
+            $unitPrices = [];
+            $factoryPrices = [];
+            $markupPercentages = [];
+            $approvedTotalUsd = 0;
+
+            foreach ($paymentAllocationRows->get($clientKey, collect()) as $allocationRow) {
+                $allocationDate = $allocationRow['date'] ?? $periodEnd;
+                foreach ($allocationRow['products'] ?? [] as $allocatedProduct) {
+                    $productName = (string) ($allocatedProduct['name'] ?? 'Noma\'lum mahsulot');
+                    $product = $allocatedProductsById->get((string) ($allocatedProduct['id'] ?? ''));
+                    $productCurrencyType = $product && $product->currency_type
+                        ? (int) $product->currency_type
+                        : 1;
+                    $approvedPrices = $approvedPriceService->pricesFor($productName);
+                    $catalogRate = Currency::usdRateForDate($allocationDate);
+                    $unitPriceUsd = isset($approvedPrices['sale_uzs'])
+                        ? Currency::documentAmountToUsd(
+                            (float) $approvedPrices['sale_uzs'],
+                            2,
+                            $approvedPriceService->usdRate()
+                        )
+                        : static::catalogUnitPriceUsd(
+                            (float) ($product->price ?? 0),
+                            $productCurrencyType,
+                            0,
+                            $catalogRate,
+                            $allocationDate
+                        );
+                    $factoryPriceUsd = isset($approvedPrices['factory_uzs'])
+                        ? Currency::documentAmountToUsd(
+                            (float) $approvedPrices['factory_uzs'],
+                            2,
+                            $approvedPriceService->usdRate()
+                        )
+                        : static::catalogUnitPriceUsd(
+                            (float) ($product->tan_price ?? 0),
+                            $productCurrencyType,
+                            0,
+                            $catalogRate,
+                            $allocationDate
+                        );
+                    $qty = (float) ($allocatedProduct['qty'] ?? 0);
+
+                    $products[] = $productName;
+                    $agents[] = $allocationRow['agent'] ?? '—';
+                    $quantities[] = $qty;
+                    $unitPrices[] = $unitPriceUsd;
+                    $factoryPrices[] = $factoryPriceUsd;
+                    $markupPercentages[] = Currency::markupPercent($factoryPriceUsd, $unitPriceUsd);
+                    $approvedTotalUsd += $qty * $unitPriceUsd;
+                }
+            }
+
             $groupedRows[$clientKey] = [
                 'dates' => collect($clientPaymentDates[$clientKey] ?? [])->unique()->values()->all(),
                 'client' => $client->name ?? 'Noma\'lum mijoz',
                 'client_phone' => $client->phone ?? null,
                 'debt_before_payment' => 0,
-                'products' => [],
-                'agents' => [],
-                'quantities' => [],
-                'unit_prices' => [],
-                'factory_prices' => [],
-                'markup_percentages' => [],
-                'total_usd' => 0,
+                'products' => $products,
+                'agents' => $agents,
+                'quantities' => $quantities,
+                'unit_prices' => $unitPrices,
+                'factory_prices' => $factoryPrices,
+                'markup_percentages' => $markupPercentages,
+                'total_usd' => $approvedTotalUsd,
                 'actual_total_usd' => 0,
                 'paid_usd' => (float) ($clientPayments[$clientKey] ?? 0),
+                'gross_paid_usd' => (float) ($clientGrossPayments[$clientKey] ?? 0),
                 'closing_debt_usd' => (float) ($closingDebts[$clientKey] ?? 0),
                 'bonus_expense_usd' => (float) ($clientBonusExpenses[$clientKey] ?? 0),
             ];
@@ -317,7 +428,7 @@ class CheckoutMonthExport implements FromView, WithStyles
             // Qoldiq qarz = oldingi qarz + davrdagi sotuvlar - davrdagi to'lovlar.
             // Shu tenglamadan davr boshidagi qarzni tiklaymiz.
             $row['debt_before_payment'] = $row['closing_debt_usd']
-                + $row['paid_usd']
+                + $row['gross_paid_usd']
                 - $row['actual_total_usd'];
             $startRow = count($rows) + 3;
 
@@ -383,7 +494,7 @@ class CheckoutMonthExport implements FromView, WithStyles
             'totals' => [
                 'debt_before_payment' => collect($groupedRows)->sum(fn ($row) =>
                     (float) $row['closing_debt_usd']
-                    + (float) $row['paid_usd']
+                    + (float) $row['gross_paid_usd']
                     - (float) $row['actual_total_usd']
                 ),
                 'qty' => collect($groupedRows)->sum(fn ($row) => collect($row['quantities'])->sum()),
@@ -403,6 +514,26 @@ class CheckoutMonthExport implements FromView, WithStyles
             ->filter()
             ->unique()
             ->values();
+    }
+
+    /**
+     * A linked "Основной" expense reduces only the payment displayed in the
+     * monthly report. The gross receipt remains available for debt accounting.
+     */
+    public static function paymentBreakdownUsd(float $grossNative, float $grossUsd, float $linkedBonusNative): array
+    {
+        if ($grossNative <= 0 || $grossUsd <= 0) {
+            return ['gross_usd' => $grossUsd, 'net_usd' => $grossUsd, 'bonus_usd' => 0.0];
+        }
+
+        $linkedBonusNative = min(max(0, $linkedBonusNative), $grossNative);
+        $bonusUsd = $grossUsd * ($linkedBonusNative / $grossNative);
+
+        return [
+            'gross_usd' => $grossUsd,
+            'net_usd' => $grossUsd - $bonusUsd,
+            'bonus_usd' => $bonusUsd,
+        ];
     }
 
     /**

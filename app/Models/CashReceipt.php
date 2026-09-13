@@ -50,4 +50,9 @@ class CashReceipt extends Model
     {
         return $this->belongsTo(Checkout::class, 'checkout_id');
     }
+
+    public function linkedBonusExpenses()
+    {
+        return $this->hasMany(CashExpenditure::class, 'source_cash_receipt_id');
+    }
 }

@@ -50,6 +50,16 @@ class CashExpenditure extends Model
     {
         return $this->belongsTo('App\Models\Client', 'supplier_id');
     }
+
+    public function bonusClient()
+    {
+        return $this->belongsTo(Client::class, 'bonus_client_id');
+    }
+
+    public function sourceReceipt()
+    {
+        return $this->belongsTo(CashReceipt::class, 'source_cash_receipt_id');
+    }
     
     public function countout()
     {

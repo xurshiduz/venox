@@ -4,12 +4,20 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class CashExpenditureType extends Model
 {
     use HasFactory; 
 
     protected $guarded = [];
+
+    public function supportsBonusSource(): bool
+    {
+        $name = Str::lower(trim((string) $this->name));
+
+        return Str::contains($name, ['основн', 'osnovn', 'osnoyn', 'asosiy', 'асосий']);
+    }
 
     public function details()
     { 

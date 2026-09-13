@@ -8,6 +8,7 @@ use App\Models\CashExpenditureType;
 use Illuminate\Http\Request; 
 use App\Models\Checkout;
 use App\Models\Client;
+use App\Models\CashReceipt;
 use App\Models\Setting;
 use App\Models\CashReceiptType;
 use App\Models\User;
@@ -17,6 +18,8 @@ use Auth;
 use Str;
 use Carbon\Carbon;
 use App\Exports\Export;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Excel;
 
 class CashExController extends Controller
@@ -95,6 +98,12 @@ class CashExController extends Controller
         $contracts = CashExpenditureType::where('type', 1)->get();
         $types = CashReceiptType::all();
         $suppliers = Client::whereNotNull('is_supplier')->get();
+        $clients = Client::orderBy('name')->get(['id', 'name', 'phone']);
+        $mainExpenditureTypeIds = $contracts
+            ->filter(fn (CashExpenditureType $type) => $type->supportsBonusSource())
+            ->pluck('id')
+            ->map(fn ($typeId) => (int) $typeId)
+            ->all();
         
         if(Auth::user()->hasAnyRole('admin|report')){
             $employees = User::orderBy('id', 'desc')->get(); 
@@ -105,31 +114,164 @@ class CashExController extends Controller
         if($id) {
             $item = CashExpenditure::where('code', $id)->first();
         }
+
+        $selectedBonusClientId = old('bonus_client_id', optional($item)->bonus_client_id);
+        $sourcePayments = collect();
+        $selectedExpenditureTypeId = (int) old('cash_expenditure_types', optional($item)->cash_expenditure_types);
+        if ($selectedBonusClientId && in_array($selectedExpenditureTypeId, $mainExpenditureTypeIds, true)) {
+            $selectedBonusClient = Client::find($selectedBonusClientId);
+            if ($selectedBonusClient) {
+                $sourcePayments = $this->bonusPaymentOptions($selectedBonusClient, optional($item)->id);
+            }
+        }
         
-        return view('backend.cash_expenditures.form', compact('item', 'contracts', 'types', 'suppliers', 'employees'));
+        return view('backend.cash_expenditures.form', compact(
+            'item',
+            'contracts',
+            'types',
+            'suppliers',
+            'employees',
+            'clients',
+            'sourcePayments',
+            'mainExpenditureTypeIds'
+        ));
     }
 
     public function save(Request $request, $id = null)
     {
-        $data = $request->all();
-        $data['date'] = Carbon::parse($request->date)->format('Y-m-d');
+        $validated = $request->validate([
+            'date' => ['required', 'date'],
+            'cash_expenditure_types' => ['required', 'integer', 'exists:cash_expenditure_types,id'],
+            'cash_receipt_type_id' => ['required', 'integer', 'exists:cash_receipt_types,id'],
+            'price' => ['required', 'numeric', 'gt:0'],
+            'comment' => ['nullable', 'string'],
+            'supplier_id' => ['nullable', 'integer', 'exists:clients,id'],
+            'employee_id' => ['nullable', 'integer', 'exists:users,id'],
+            'bonus_client_id' => ['nullable', 'integer', 'exists:clients,id', 'required_with:source_cash_receipt_id'],
+            'source_cash_receipt_id' => ['nullable', 'integer', 'required_with:bonus_client_id'],
+        ]);
+
+        $item = $id ? CashExpenditure::where('code', $id)->firstOrFail() : null;
+        $expenditureType = CashExpenditureType::findOrFail($validated['cash_expenditure_types']);
+        $isMainExpenditure = $expenditureType->supportsBonusSource();
+
+        if ($isMainExpenditure && (empty($validated['bonus_client_id']) || empty($validated['source_cash_receipt_id']))) {
+            throw ValidationException::withMessages([
+                'bonus_client_id' => 'Основной xarajat uchun mijozni tanlang.',
+                'source_cash_receipt_id' => 'Основной xarajat uchun qaysi to‘lovdan kamayishini tanlang.',
+            ]);
+        }
+
+        $data = [
+            'date' => Carbon::parse($validated['date'])->format('Y-m-d'),
+            'cash_expenditure_types' => $validated['cash_expenditure_types'],
+            'cash_receipt_type_id' => $validated['cash_receipt_type_id'],
+            'price' => (float) $validated['price'],
+            'comment' => $validated['comment'] ?? null,
+            'supplier_id' => $validated['supplier_id'] ?? null,
+            'employee_id' => $validated['employee_id'] ?? null,
+            // Faqat "Основной" turi mijoz bonusiga ta'sir qiladi.
+            'bonus_client_id' => $isMainExpenditure ? $validated['bonus_client_id'] : null,
+            'source_cash_receipt_id' => $isMainExpenditure ? $validated['source_cash_receipt_id'] : null,
+        ];
+
+        DB::transaction(function () use (&$item, $data) {
+            if ($data['source_cash_receipt_id']) {
+                $receipt = CashReceipt::with('checkout')
+                    ->whereKey($data['source_cash_receipt_id'])
+                    ->where('status', 1)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $receipt) {
+                    throw ValidationException::withMessages([
+                        'source_cash_receipt_id' => 'Tanlangan to‘lov faol emas yoki topilmadi.',
+                    ]);
+                }
+
+                $receiptClientId = $receipt->client_id ?: optional($receipt->checkout)->client_id;
+                if ((int) $receiptClientId !== (int) $data['bonus_client_id']) {
+                    throw ValidationException::withMessages([
+                        'source_cash_receipt_id' => 'Tanlangan to‘lov ushbu mijozga tegishli emas.',
+                    ]);
+                }
+
+                $alreadyAllocated = (float) CashExpenditure::where('source_cash_receipt_id', $receipt->id)
+                    ->when($item, fn ($query) => $query->where('id', '!=', $item->id))
+                    ->sum('price');
+
+                if ($alreadyAllocated + (float) $data['price'] > (float) $receipt->price + 0.0001) {
+                    throw ValidationException::withMessages([
+                        'price' => 'Bonus summasi tanlangan to‘lovning qolgan summasidan oshmasligi kerak.',
+                    ]);
+                }
+            }
+
+            if ($item) {
+                $item->update($data);
+            } else {
+                $data['code'] = Str::uuid();
+                $data['user_id'] = Auth::id();
+                $data['store_id'] = Auth::user()->store_id;
+                $item = CashExpenditure::create($data);
+            }
+        });
 
         if ($id) {
-            $item = CashExpenditure::where('code', $id)->first();
-            if($item) {
-                $item->update($data);
-                $request->session()->flash('update_cash', trans('backend.post_update'));
-            }
+            $request->session()->flash('update_cash', trans('backend.post_update'));
         } else {
-            $data['code'] = Str::uuid();
-            $data['user_id'] = Auth::id();
-            $data['store_id'] = Auth::user()->store_id;
-            
-            $item = CashExpenditure::create($data);
             $request->session()->flash('success_cash', trans('backend.post_create'));
         }
 
         return redirect()->action('Backend\CashExController@index');
+    }
+
+    public function clientPayments(Request $request, Client $client)
+    {
+        $excludeExpenseId = (int) $request->input('exclude_expense_id') ?: null;
+
+        return response()->json([
+            'payments' => $this->bonusPaymentOptions($client, $excludeExpenseId)->values(),
+        ]);
+    }
+
+    private function bonusPaymentOptions(Client $client, ?int $excludeExpenseId = null)
+    {
+        return CashReceipt::query()
+            ->where('status', 1)
+            ->where(function ($query) use ($client) {
+                $query->where('client_id', $client->id)
+                    ->orWhere(function ($checkoutQuery) use ($client) {
+                        $checkoutQuery->whereNull('client_id')
+                            ->whereHas('checkout', fn ($query) => $query->where('client_id', $client->id));
+                    });
+            })
+            ->with(['checkout:id,client_id,number_work,currency_type', 'tname:id,name'])
+            ->withSum(['linkedBonusExpenses as allocated_bonus' => function ($query) use ($excludeExpenseId) {
+                $query->when($excludeExpenseId, fn ($expenseQuery) => $expenseQuery->where('id', '!=', $excludeExpenseId));
+            }], 'price')
+            ->orderByDesc('date')
+            ->orderByDesc('id')
+            ->get()
+            ->map(function (CashReceipt $receipt) {
+                $currencyType = optional($receipt->checkout)->currency_type ?: $receipt->currency_type;
+                $currency = (int) $currencyType === 1 ? 'USD' : 'UZS';
+                $allocated = (float) ($receipt->allocated_bonus ?? 0);
+                $available = max(0, (float) $receipt->price - $allocated);
+                $document = optional($receipt->checkout)->number_work;
+                $label = Carbon::parse($receipt->date ?: $receipt->created_at)->format('d.m.Y')
+                    . ' | ' . number_format((float) $receipt->price, 2, '.', ' ') . ' ' . $currency
+                    . ($receipt->tname ? ' | ' . $receipt->tname->name : '')
+                    . ($document ? ' | №' . $document : '')
+                    . ($allocated > 0 ? ' | bonus: ' . number_format($allocated, 2, '.', ' ') : '');
+
+                return [
+                    'id' => $receipt->id,
+                    'label' => $label,
+                    'available' => $available,
+                    'currency' => $currency,
+                ];
+            });
     }
 
     public function delete(Request $request, $id = null)

@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Exports\CheckoutMonthExport;
+use App\Models\CashExpenditureType;
 use App\Services\ApprovedProductPriceService;
 use PHPUnit\Framework\TestCase;
 
@@ -64,6 +65,31 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $clientIds = CheckoutMonthExport::mergeReportClientIds([10, 20], [20, 148]);
 
         $this->assertSame([10, 20, 148], $clientIds->all());
+    }
+
+    public function test_main_expense_is_removed_from_displayed_payment_without_changing_debt_payment(): void
+    {
+        $breakdown = CheckoutMonthExport::paymentBreakdownUsd(2000, 2000, 500);
+
+        $this->assertSame(2000.0, $breakdown['gross_usd']);
+        $this->assertSame(1500.0, $breakdown['net_usd']);
+        $this->assertSame(500.0, $breakdown['bonus_usd']);
+
+        // Qarz formulasi sof 1 500 emas, asl 2 000 to'lovdan foydalanadi.
+        $saleUsd = 3000;
+        $closingDebtUsd = 1000;
+        $openingDebtUsd = $closingDebtUsd + $breakdown['gross_usd'] - $saleUsd;
+
+        $this->assertSame(0.0, $openingDebtUsd);
+    }
+
+    public function test_only_main_expense_type_supports_payment_bonus_link(): void
+    {
+        $main = new CashExpenditureType(['name' => 'Основной']);
+        $other = new CashExpenditureType(['name' => 'Транспорт']);
+
+        $this->assertTrue($main->supportsBonusSource());
+        $this->assertFalse($other->supportsBonusSource());
     }
 
     public function approvedPriceProvider(): array
