@@ -4,6 +4,50 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 
+Route::get('/_maintenance/bonus-payment-diagnostic-7ea6f1803d4c', function () {
+    $clients = \App\Models\Client::query()
+        ->where('name', 'like', '%mirzohid%')
+        ->get(['id', 'name']);
+
+    $result = [];
+    foreach ($clients as $client) {
+        try {
+            $payments = \App\Models\CashReceipt::query()
+                ->where('status', 1)
+                ->where('client_id', $client->id)
+                ->with(['checkout:id,client_id,number_work,currency_type', 'tname:id,name'])
+                ->withSum('linkedBonusExpenses as allocated_bonus', 'price')
+                ->orderByDesc('date')
+                ->orderByDesc('id')
+                ->get();
+            $result[] = [
+                'client_id' => $client->id,
+                'name' => $client->name,
+                'payment_count' => $payments->count(),
+                'payments' => $payments->take(10)->map(fn ($payment) => [
+                    'id' => $payment->id,
+                    'date' => $payment->date,
+                    'price' => $payment->price,
+                    'status' => $payment->status,
+                    'allocated_bonus' => $payment->allocated_bonus,
+                ])->values(),
+            ];
+        } catch (\Throwable $exception) {
+            $result[] = [
+                'client_id' => $client->id,
+                'name' => $client->name,
+                'error' => $exception->getMessage(),
+            ];
+        }
+    }
+
+    return response()->json([
+        'main_types' => \App\Models\CashExpenditureType::query()->get(['id', 'name'])
+            ->map(fn ($type) => ['id' => $type->id, 'name' => $type->name, 'supports_bonus' => $type->supportsBonusSource()]),
+        'clients' => $result,
+    ]);
+});
+
 Route::get('/checkout_today_send_public', 'Backend\CheckoutController@today_send')->name('checkout_today_send_public');
 
 Route::group(
