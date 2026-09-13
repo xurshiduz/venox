@@ -1,7 +1,7 @@
 <table>
     <thead>
         <tr>
-            <th colspan="14" style="font-weight:bold; font-size:14px; text-align:left;">{{ $periodLabel }} оралиғидаги мижозлар ҳисоботи (USD)</th>
+            <th colspan="15" style="font-weight:bold; font-size:14px; text-align:left;">{{ $periodLabel }} оралиғидаги мижозлар ҳисоботи (USD)</th>
         </tr>
         <tr>
             <th>Сана</th>
@@ -14,7 +14,8 @@
             <th>Сотув Нархи</th>
             <th>Завод нархи</th>
             <th>Устига қўйилган фоиз (%)</th>
-            <th>Жами Сумма</th>
+            <th>Тасдиқланган прайс бўйича жами</th>
+            <th>Жами Сумма (реал сотув)</th>
             <th>Тўланган</th>
             <th>Қолдиқ Қарз</th>
             <th>Мижоз учун сарфланган бонус</th>
@@ -33,7 +34,8 @@
                 <td>{!! nl2br(e($row['unit_price_usd'])) !!}</td>
                 <td>{{ $row['factory_price_usd'] ?: null }}</td>
                 <td>{{ $row['markup_percent'] !== null ? $row['markup_percent'] / 100 : null }}</td>
-                <td>{{ $row['total_usd'] }}</td>
+                <td>{{ $row['approved_total_usd'] }}</td>
+                <td>{{ $row['actual_total_usd'] }}</td>
                 <td>{{ $row['paid_usd'] }}</td>
                 <td>{{ $row['closing_debt_usd'] }}</td>
                 <td>{{ $row['bonus_expense_usd'] }}</td>
@@ -48,6 +50,7 @@
             <td></td>
             <td></td>
             <td>{{ count($rows) ? '=SUM(K3:K'.(count($rows) + 2).')' : 0 }}</td>
+            <td>{{ count($rows) ? '=SUM(L3:L'.(count($rows) + 2).')' : 0 }}</td>
             <td>{{ $totals['paid_usd'] }}</td>
             <td>{{ $totals['closing_debt_usd'] }}</td>
             <td>{{ $totals['bonus_expense_usd'] }}</td>

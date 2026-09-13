@@ -93,6 +93,26 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $this->assertSame(0.0, $openingDebtUsd);
     }
 
+    public function test_report_separates_approved_total_from_actual_debt_total(): void
+    {
+        $totals = CheckoutMonthExport::reportLineTotalsUsd(10, 65, 53);
+
+        $this->assertSame(650.0, $totals['approved_total_usd']);
+        $this->assertSame(530.0, $totals['actual_total_usd']);
+
+        // Ravshanali 2 misolida qarz faqat real savdo summasi bilan tenglashadi.
+        $this->assertSame(5743.0, 720.0 + 5023.0 - 0.0);
+        $this->assertNotSame(5743.0, 720.0 + 5360.840336 - 0.0);
+    }
+
+    public function test_payment_only_product_allocation_does_not_create_a_sale_total(): void
+    {
+        $totals = CheckoutMonthExport::reportLineTotalsUsd(10, 65, null);
+
+        $this->assertSame(650.0, $totals['approved_total_usd']);
+        $this->assertNull($totals['actual_total_usd']);
+    }
+
     public function test_only_main_expense_type_supports_payment_bonus_link(): void
     {
         $main = new CashExpenditureType(['name' => 'Основной']);

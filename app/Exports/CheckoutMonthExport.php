@@ -205,7 +205,8 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'unit_prices' => [],
                     'factory_prices' => [],
                     'markup_percentages' => [],
-                    'total_usd' => 0,
+                    'actual_line_totals_usd' => [],
+                    'approved_total_usd' => 0,
                     'actual_total_usd' => 0,
                     'paid_usd' => $paid,
                     'gross_paid_usd' => $grossPaid,
@@ -323,8 +324,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                         $checkout->date ?: $checkout->created_at
                     );
 
-                $actualTotalUsd = $actualUnitPriceUsd * $qty;
-                $totalUsd = $unitPriceUsd * $qty;
+                $lineTotals = static::reportLineTotalsUsd($qty, $unitPriceUsd, $actualUnitPriceUsd);
                 $markupPercent = Currency::markupPercent($factoryPriceUsd, $unitPriceUsd);
 
                 $groupedRows[$clientKey]['products'][] = $detail->prodid->name ?? 'Noma\'lum mahsulot';
@@ -333,8 +333,9 @@ class CheckoutMonthExport implements FromView, WithStyles
                 $groupedRows[$clientKey]['unit_prices'][] = $unitPriceUsd;
                 $groupedRows[$clientKey]['factory_prices'][] = $factoryPriceUsd;
                 $groupedRows[$clientKey]['markup_percentages'][] = $markupPercent;
-                $groupedRows[$clientKey]['total_usd'] += $totalUsd;
-                $groupedRows[$clientKey]['actual_total_usd'] += $actualTotalUsd;
+                $groupedRows[$clientKey]['actual_line_totals_usd'][] = $lineTotals['actual_total_usd'];
+                $groupedRows[$clientKey]['approved_total_usd'] += $lineTotals['approved_total_usd'];
+                $groupedRows[$clientKey]['actual_total_usd'] += $lineTotals['actual_total_usd'];
             }
         }
 
@@ -354,6 +355,7 @@ class CheckoutMonthExport implements FromView, WithStyles
             $unitPrices = [];
             $factoryPrices = [];
             $markupPercentages = [];
+            $actualLineTotalsUsd = [];
             $approvedTotalUsd = 0;
 
             foreach ($paymentAllocationRows->get($clientKey, collect()) as $allocationRow) {
@@ -400,7 +402,9 @@ class CheckoutMonthExport implements FromView, WithStyles
                     $unitPrices[] = $unitPriceUsd;
                     $factoryPrices[] = $factoryPriceUsd;
                     $markupPercentages[] = Currency::markupPercent($factoryPriceUsd, $unitPriceUsd);
-                    $approvedTotalUsd += $qty * $unitPriceUsd;
+                    $lineTotals = static::reportLineTotalsUsd($qty, $unitPriceUsd, null);
+                    $actualLineTotalsUsd[] = $lineTotals['actual_total_usd'];
+                    $approvedTotalUsd += $lineTotals['approved_total_usd'];
                 }
             }
 
@@ -415,7 +419,8 @@ class CheckoutMonthExport implements FromView, WithStyles
                 'unit_prices' => $unitPrices,
                 'factory_prices' => $factoryPrices,
                 'markup_percentages' => $markupPercentages,
-                'total_usd' => $approvedTotalUsd,
+                'actual_line_totals_usd' => $actualLineTotalsUsd,
+                'approved_total_usd' => $approvedTotalUsd,
                 'actual_total_usd' => 0,
                 'paid_usd' => (float) ($clientPayments[$clientKey] ?? 0),
                 'gross_paid_usd' => (float) ($clientGrossPayments[$clientKey] ?? 0),
@@ -445,7 +450,8 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'unit_price_usd' => '',
                     'factory_price_usd' => null,
                     'markup_percent' => null,
-                    'total_usd' => null,
+                    'approved_total_usd' => null,
+                    'actual_total_usd' => null,
                     'paid_usd' => $row['paid_usd'],
                     'closing_debt_usd' => $row['closing_debt_usd'],
                     'bonus_expense_usd' => $row['bonus_expense_usd'],
@@ -471,7 +477,8 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'unit_price_usd' => $unitPrice,
                     'factory_price_usd' => $factoryPrice,
                     'markup_percent' => $row['markup_percentages'][$index],
-                    'total_usd' => $qty * $unitPrice,
+                    'approved_total_usd' => $qty * $unitPrice,
+                    'actual_total_usd' => $row['actual_line_totals_usd'][$index] ?? null,
                     'paid_usd' => $first ? $row['paid_usd'] : null,
                     'closing_debt_usd' => $first ? $row['closing_debt_usd'] : null,
                     'bonus_expense_usd' => $first ? $row['bonus_expense_usd'] : null,
@@ -480,7 +487,7 @@ class CheckoutMonthExport implements FromView, WithStyles
 
             $endRow = count($rows) + 2;
             if ($endRow > $startRow) {
-                foreach (['A', 'B', 'C', 'E', 'L', 'M', 'N'] as $column) {
+                foreach (['A', 'B', 'C', 'E', 'M', 'N', 'O'] as $column) {
                     $this->mergeRanges[] = $column . $startRow . ':' . $column . $endRow;
                 }
             }
@@ -534,6 +541,23 @@ class CheckoutMonthExport implements FromView, WithStyles
             'gross_usd' => $grossUsd,
             'net_usd' => $grossUsd - $bonusUsd,
             'bonus_usd' => $bonusUsd,
+        ];
+    }
+
+    /**
+     * Keep the BOSS-approved price total visible for price control, while the
+     * debt reconciliation total always follows the actual checkout contract.
+     * Payment-only allocation rows have no sale in the selected period, so
+     * their actual total is intentionally null.
+     */
+    public static function reportLineTotalsUsd(
+        float $qty,
+        float $approvedUnitPriceUsd,
+        ?float $actualUnitPriceUsd
+    ): array {
+        return [
+            'approved_total_usd' => $qty * $approvedUnitPriceUsd,
+            'actual_total_usd' => $actualUnitPriceUsd === null ? null : $qty * $actualUnitPriceUsd,
         ];
     }
 
@@ -618,7 +642,7 @@ class CheckoutMonthExport implements FromView, WithStyles
         $lastRow = max(3, $this->rowCount + 3);
         $sheet->setShowGridlines(false);
         $sheet->freezePane('A3');
-        $sheet->setAutoFilter('A2:N' . max(2, $this->rowCount + 2));
+        $sheet->setAutoFilter('A2:O' . max(2, $this->rowCount + 2));
         $sheet->getDefaultRowDimension()->setRowHeight(44);
         $sheet->getRowDimension(1)->setRowHeight(28);
         $sheet->getRowDimension(2)->setRowHeight(48);
@@ -631,22 +655,22 @@ class CheckoutMonthExport implements FromView, WithStyles
             $sheet->mergeCells($range);
         }
 
-        foreach (['A' => 13, 'B' => 28, 'C' => 19, 'D' => 24, 'E' => 20, 'F' => 52, 'G' => 15, 'H' => 16, 'I' => 16, 'J' => 20, 'K' => 18, 'L' => 17, 'M' => 18, 'N' => 22] as $column => $width) {
+        foreach (['A' => 13, 'B' => 28, 'C' => 19, 'D' => 24, 'E' => 20, 'F' => 52, 'G' => 15, 'H' => 16, 'I' => 16, 'J' => 20, 'K' => 23, 'L' => 20, 'M' => 17, 'N' => 18, 'O' => 22] as $column => $width) {
             $sheet->getColumnDimension($column)->setWidth($width);
         }
 
-        $sheet->getStyle('A1:N' . $lastRow)->getAlignment()
+        $sheet->getStyle('A1:O' . $lastRow)->getAlignment()
             ->setVertical(Alignment::VERTICAL_CENTER)
             ->setHorizontal(Alignment::HORIZONTAL_CENTER)
             ->setWrapText(true);
-        $sheet->getStyle('A2:N2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-        $sheet->getStyle('A2:N2')->getFont()->setBold(true)->getColor()->setRGB('000000');
-        $sheet->getStyle('A2:N' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('C9C9C9');
+        $sheet->getStyle('A2:O2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('A2:O2')->getFont()->setBold(true)->getColor()->setRGB('000000');
+        $sheet->getStyle('A2:O' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('C9C9C9');
         $sheet->getStyle('G3:G' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.###');
         $sheet->getStyle('E3:E' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
         $sheet->getStyle('H3:I' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
         $sheet->getStyle('J3:J' . $lastRow)->getNumberFormat()->setFormatCode('0.00%');
-        $sheet->getStyle('K3:N' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
-        $sheet->getStyle('A' . $lastRow . ':N' . $lastRow)->getFont()->setBold(true);
+        $sheet->getStyle('K3:O' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
+        $sheet->getStyle('A' . $lastRow . ':O' . $lastRow)->getFont()->setBold(true);
     }
 }
