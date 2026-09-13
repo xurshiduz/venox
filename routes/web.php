@@ -17,8 +17,14 @@ Route::get('/_maintenance/bonus-payment-diagnostic-7ea6f1803d4c', function () {
         try {
             $payments = \App\Models\CashReceipt::query()
                 ->where('status', 1)
-                ->where('client_id', $client->id)
-                ->with(['checkout:id,client_id,number_work,currency_type', 'tname:id,name'])
+                ->where(function ($query) use ($client) {
+                    $query->where('client_id', $client->id)
+                        ->orWhere(function ($checkoutQuery) use ($client) {
+                            $checkoutQuery->whereNull('client_id')
+                                ->whereHas('checkout', fn ($query) => $query->where('client_id', $client->id));
+                        });
+                })
+                ->with(['checkout:id,client_id,number_work,currency_type', 'tname:id,name_uz,name_ru'])
                 ->withSum('linkedBonusExpenses as allocated_bonus', 'price')
                 ->orderByDesc('date')
                 ->orderByDesc('id')
@@ -71,6 +77,23 @@ Route::get('/_maintenance/bonus-payment-diagnostic-7ea6f1803d4c', function () {
                 'checkout_client' => optional(optional($payment->checkout)->supid)->name,
                 'date' => $payment->date,
                 'price' => $payment->price,
+            ])->values(),
+        'near_2000_receipts' => \App\Models\CashReceipt::query()
+            ->where('status', 1)
+            ->whereBetween('price', [1900, 2100])
+            ->with(['clientname:id,name', 'checkout:id,client_id,number_work', 'checkout.supid:id,name'])
+            ->orderByDesc('date')
+            ->get(['id', 'client_id', 'checkout_id', 'date', 'price', 'comment'])
+            ->map(fn ($payment) => [
+                'id' => $payment->id,
+                'client_id' => $payment->client_id,
+                'client' => optional($payment->clientname)->name,
+                'checkout_id' => $payment->checkout_id,
+                'checkout_client_id' => optional($payment->checkout)->client_id,
+                'checkout_client' => optional(optional($payment->checkout)->supid)->name,
+                'date' => $payment->date,
+                'price' => $payment->price,
+                'comment' => $payment->comment,
             ])->values(),
     ]);
 });

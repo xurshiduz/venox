@@ -246,7 +246,7 @@ class CashExController extends Controller
                             ->whereHas('checkout', fn ($query) => $query->where('client_id', $client->id));
                     });
             })
-            ->with(['checkout:id,client_id,number_work,currency_type', 'tname:id,name'])
+            ->with(['checkout:id,client_id,number_work,currency_type', 'tname:id,name_uz,name_ru'])
             ->withSum(['linkedBonusExpenses as allocated_bonus' => function ($query) use ($excludeExpenseId) {
                 $query->when($excludeExpenseId, fn ($expenseQuery) => $expenseQuery->where('id', '!=', $excludeExpenseId));
             }], 'price')
