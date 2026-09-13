@@ -39,6 +39,8 @@ use App\Models\User;
 use App\Models\Unit;
 
 use Carbon\Carbon;
+use Dompdf\Dompdf;
+use Dompdf\Options;
 use Excel;
 use Auth;
 use Str;
@@ -53,11 +55,7 @@ class CheckoutController extends Controller
     {
         $user = Auth::user();
 
-        $validatedFilters = $request->validate([
-            'agent_id' => ['nullable', 'integer', 'exists:users,id'],
-            'date_from' => ['nullable', 'date_format:Y-m-d'],
-            'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
-        ]);
+        $validatedFilters = $this->validateCheckoutListFilters($request);
         $selectedAgent = isset($validatedFilters['agent_id'])
             ? (int) $validatedFilters['agent_id']
             : null;
@@ -65,25 +63,8 @@ class CheckoutController extends Controller
         $dateTo = $validatedFilters['date_to'] ?? null;
     
         $query = Checkout::where('type_id', 1);
-    
-        $query->when($user->hasAnyRole('admin|cashier|select_manager'), function ($q) use ($ctypeAlias) {
-            if ($ctypeAlias) {
-                $ctype = CheckType::where('alias', $ctypeAlias)->firstOrFail();
-                $q->where('checkout_tip_id', $ctype->id);
-            }
-        })->when($user->hasRole('dealer_admin'), function ($q) use ($user) {
-            $q->where('dealer_id', $user->dealer_id);
-        })->when($user->hasRole('sale') && !$user->hasAnyRole('admin|cashier|select_manager|dealer_admin'), function ($q) use ($user) {
-            $q->where('manager_id', $user->id);
-        });
-
-        $query->when($selectedAgent, function ($q) use ($selectedAgent) {
-            $q->where('manager_id', $selectedAgent);
-        })->when($dateFrom, function ($q) use ($dateFrom) {
-            $q->whereDate('date', '>=', $dateFrom);
-        })->when($dateTo, function ($q) use ($dateTo) {
-            $q->whereDate('date', '<=', $dateTo);
-        });
+        $this->applyCheckoutAccessScope($query, $user, $ctypeAlias);
+        $this->applyCheckoutListFilters($query, $selectedAgent, $dateFrom, $dateTo);
     
         // Ma'lumotlarni saralash va sahifalash
         $data = $query->orderByDesc('date')
@@ -118,6 +99,88 @@ class CheckoutController extends Controller
         ];
     
         return view('backend.checkouts.index', $viewData);
+    }
+
+    public function downloadFilteredPdf(Request $request)
+    {
+        $validatedFilters = $this->validateCheckoutListFilters($request);
+        $ctypeAlias = $request->validate([
+            'ctype_alias' => ['nullable', 'string', 'max:64'],
+        ])['ctype_alias'] ?? null;
+        $selectedAgent = isset($validatedFilters['agent_id'])
+            ? (int) $validatedFilters['agent_id']
+            : null;
+        $dateFrom = $validatedFilters['date_from'] ?? null;
+        $dateTo = $validatedFilters['date_to'] ?? null;
+
+        $query = Checkout::where('type_id', 1);
+        $this->applyCheckoutAccessScope($query, Auth::user(), $ctypeAlias);
+        $this->applyCheckoutListFilters($query, $selectedAgent, $dateFrom, $dateTo);
+
+        $data = $query->with([
+                'supid:id,name',
+                'managerid:id,name',
+                'currencytypeid:id,name',
+                'payments' => fn ($paymentQuery) => $paymentQuery->where('status', 1),
+            ])
+            ->withCount('details')
+            ->orderByDesc('date')
+            ->orderByDesc('created_at')
+            ->get();
+        $selectedAgentName = $selectedAgent
+            ? optional(User::find($selectedAgent))->name
+            : null;
+
+        $options = new Options();
+        $options->set('defaultFont', 'DejaVu Sans');
+        $options->set('isRemoteEnabled', false);
+        $pdf = new Dompdf($options);
+        $pdf->loadHtml(view('backend.checkouts.filtered_pdf', compact(
+            'data', 'selectedAgentName', 'dateFrom', 'dateTo'
+        ))->render(), 'UTF-8');
+        $pdf->setPaper('A4', 'landscape');
+        $pdf->render();
+
+        $filename = 'sotuvlar_' . ($dateFrom ?: 'boshidan') . '_' . ($dateTo ?: now()->format('Y-m-d')) . '.pdf';
+
+        return response($pdf->output(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ]);
+    }
+
+    private function validateCheckoutListFilters(Request $request): array
+    {
+        return $request->validate([
+            'agent_id' => ['nullable', 'integer', 'exists:users,id'],
+            'date_from' => ['nullable', 'date_format:Y-m-d'],
+            'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
+        ]);
+    }
+
+    private function applyCheckoutAccessScope($query, $user, ?string $ctypeAlias): void
+    {
+        $query->when($user->hasAnyRole('admin|cashier|select_manager'), function ($q) use ($ctypeAlias) {
+            if ($ctypeAlias) {
+                $ctype = CheckType::where('alias', $ctypeAlias)->firstOrFail();
+                $q->where('checkout_tip_id', $ctype->id);
+            }
+        })->when($user->hasRole('dealer_admin'), function ($q) use ($user) {
+            $q->where('dealer_id', $user->dealer_id);
+        })->when($user->hasRole('sale') && !$user->hasAnyRole('admin|cashier|select_manager|dealer_admin'), function ($q) use ($user) {
+            $q->where('manager_id', $user->id);
+        });
+    }
+
+    private function applyCheckoutListFilters($query, ?int $selectedAgent, ?string $dateFrom, ?string $dateTo): void
+    {
+        $query->when($selectedAgent, function ($q) use ($selectedAgent) {
+            $q->where('manager_id', $selectedAgent);
+        })->when($dateFrom, function ($q) use ($dateFrom) {
+            $q->whereDate('date', '>=', $dateFrom);
+        })->when($dateTo, function ($q) use ($dateTo) {
+            $q->whereDate('date', '<=', $dateTo);
+        });
     }
     
     public function exportDebts()

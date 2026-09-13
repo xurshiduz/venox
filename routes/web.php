@@ -312,6 +312,7 @@ Route::group(
         Route::get('/checkout_yesterday_send', 'Backend\CheckoutController@yesterday_send')->name('checkout_yesterday_send');
         Route::get('/checkout_calculateCost', 'Backend\CheckoutController@calculateCost')->name('checkout_calculateCost');
         
+        Route::get('/checkouts/pdf', 'Backend\CheckoutController@downloadFilteredPdf')->name('checkouts_pdf');
         Route::get('/checkouts/{ctypeAlias?}', 'Backend\CheckoutController@index')->name('checkouts_index');
         Route::get('/checkout_debtors', 'Backend\CheckoutController@debtors')->name('checkout_debtors_index');
         Route::get('/checkout_debtors_excel', 'Backend\CheckoutController@debtors_excel')->name('checkout_debtors_excel');
