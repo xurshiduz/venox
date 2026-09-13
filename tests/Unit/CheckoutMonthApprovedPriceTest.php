@@ -59,6 +59,13 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $this->assertEqualsWithDelta(16.13445378, 192000 / $service->usdRate(), 0.00000001);
     }
 
+    public function test_monthly_report_includes_clients_that_only_have_cash_receipts(): void
+    {
+        $clientIds = CheckoutMonthExport::mergeReportClientIds([10, 20], [20, 148]);
+
+        $this->assertSame([10, 20, 148], $clientIds->all());
+    }
+
     public function approvedPriceProvider(): array
     {
         return [

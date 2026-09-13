@@ -13,6 +13,7 @@ use App\Services\AccountingCashReportService;
 use App\Services\ApprovedProductPriceService;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromView;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
@@ -69,20 +70,38 @@ class CheckoutMonthExport implements FromView, WithStyles
             ->get()
             ->groupBy('product_id');
 
-        $clientIds = $checkouts->pluck('client_id')->filter()->unique()->values();
         $accounting = app(AccountingCashReportService::class);
         $approvedPriceService = app(ApprovedProductPriceService::class);
         $clientPayments = [];
+        $clientPaymentDates = [];
 
         $payments = CashReceipt::query()
             ->where('status', 1)
-            ->whereIn('client_id', $clientIds)
-            ->whereBetween('date', [$periodStart->toDateString(), $periodEnd->toDateString()])
-            ->with('checkout:id,currency_type,currency_type_price')
+            ->whereDate('date', '>=', $periodStart->toDateString())
+            ->whereDate('date', '<=', $periodEnd->toDateString())
+            ->with('checkout:id,client_id,currency_type,currency_type_price')
+            ->orderBy('date')
+            ->orderBy('id')
             ->get();
 
+        $paymentClientIds = $payments->map(function ($payment) {
+            return $payment->client_id ?: optional($payment->checkout)->client_id;
+        });
+        $clientIds = static::mergeReportClientIds(
+            $checkouts->pluck('client_id'),
+            $paymentClientIds
+        );
+        $clientsById = Client::whereIn('id', $clientIds)
+            ->get()
+            ->keyBy(fn ($client) => (string) $client->id);
+
         foreach ($payments as $payment) {
-            $key = (string) $payment->client_id;
+            $clientId = $payment->client_id ?: optional($payment->checkout)->client_id;
+            if (! $clientId) {
+                continue;
+            }
+
+            $key = (string) $clientId;
             $usd = $payment->checkout
                 ? $accounting->paymentAmountToUsd(
                     (float) $payment->price,
@@ -98,6 +117,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                     (string) $payment->comment
                 );
             $clientPayments[$key] = ($clientPayments[$key] ?? 0) + $usd;
+            $clientPaymentDates[$key][] = Carbon::parse($payment->date ?: $payment->created_at)->format('d.m.Y');
         }
 
         $closingDebts = $this->clientDebtTotalsUsd($clientIds->map(fn ($id) => (string) $id)->all(), $periodEnd);
@@ -263,6 +283,35 @@ class CheckoutMonthExport implements FromView, WithStyles
             }
         }
 
+        // Savdoga biriktirilmagan ("za dolg") to'lovlar ham hisobotda ko'rinishi
+        // kerak. Shu davrda savdosi bo'lmagan to'lov mijozlari uchun mahsulotsiz
+        // alohida guruh yaratamiz; aks holda ular clientIds filtri sabab yo'qoladi.
+        foreach ($paymentClientIds->filter()->unique() as $paymentClientId) {
+            $clientKey = (string) $paymentClientId;
+            if (isset($groupedRows[$clientKey])) {
+                continue;
+            }
+
+            $client = $clientsById->get($clientKey);
+            $groupedRows[$clientKey] = [
+                'dates' => collect($clientPaymentDates[$clientKey] ?? [])->unique()->values()->all(),
+                'client' => $client->name ?? 'Noma\'lum mijoz',
+                'client_phone' => $client->phone ?? null,
+                'debt_before_payment' => 0,
+                'products' => [],
+                'agents' => [],
+                'quantities' => [],
+                'unit_prices' => [],
+                'factory_prices' => [],
+                'markup_percentages' => [],
+                'total_usd' => 0,
+                'actual_total_usd' => 0,
+                'paid_usd' => (float) ($clientPayments[$clientKey] ?? 0),
+                'closing_debt_usd' => (float) ($closingDebts[$clientKey] ?? 0),
+                'bonus_expense_usd' => (float) ($clientBonusExpenses[$clientKey] ?? 0),
+            ];
+        }
+
         $rows = [];
         foreach ($groupedRows as $row) {
             // Qoldiq qarz = oldingi qarz + davrdagi sotuvlar - davrdagi to'lovlar.
@@ -271,6 +320,28 @@ class CheckoutMonthExport implements FromView, WithStyles
                 + $row['paid_usd']
                 - $row['actual_total_usd'];
             $startRow = count($rows) + 3;
+
+            if (empty($row['products'])) {
+                $rows[] = [
+                    'date' => collect($row['dates'])->unique()->implode("\n"),
+                    'client' => $row['client'],
+                    'client_phone' => $row['client_phone'],
+                    'agent' => '—',
+                    'debt_before_payment' => $row['debt_before_payment'],
+                    'product' => '',
+                    'qty' => '',
+                    'unit_price_usd' => '',
+                    'factory_price_usd' => null,
+                    'markup_percent' => null,
+                    'total_usd' => null,
+                    'paid_usd' => $row['paid_usd'],
+                    'closing_debt_usd' => $row['closing_debt_usd'],
+                    'bonus_expense_usd' => $row['bonus_expense_usd'],
+                ];
+
+                continue;
+            }
+
             foreach ($row['products'] as $index => $product) {
                 $qty = (float) $row['quantities'][$index];
                 $unitPrice = (float) $row['unit_prices'][$index];
@@ -321,6 +392,17 @@ class CheckoutMonthExport implements FromView, WithStyles
                 'bonus_expense_usd' => $clientIds->sum(fn ($id) => (float) ($clientBonusExpenses[(string) $id] ?? 0)),
             ],
         ]);
+    }
+
+    public static function mergeReportClientIds(iterable $checkoutClientIds, iterable $paymentClientIds): Collection
+    {
+        return collect($checkoutClientIds)
+            ->merge(collect($paymentClientIds))
+            ->filter(fn ($id) => $id !== null && $id !== '')
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
     }
 
     /**
