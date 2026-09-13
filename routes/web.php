@@ -6,7 +6,10 @@ use Illuminate\Support\Facades\Log;
 
 Route::get('/_maintenance/bonus-payment-diagnostic-7ea6f1803d4c', function () {
     $clients = \App\Models\Client::query()
-        ->where('name', 'like', '%mirzohid%')
+        ->where(function ($query) {
+            $query->where('name', 'like', '%mirzohid%')
+                ->orWhere('name', 'like', '%algoritm%');
+        })
         ->get(['id', 'name']);
 
     $result = [];
@@ -45,6 +48,30 @@ Route::get('/_maintenance/bonus-payment-diagnostic-7ea6f1803d4c', function () {
         'main_types' => \App\Models\CashExpenditureType::query()->get(['id', 'name'])
             ->map(fn ($type) => ['id' => $type->id, 'name' => $type->name, 'supports_bonus' => $type->supportsBonusSource()]),
         'clients' => $result,
+        'matching_receipts' => \App\Models\CashReceipt::query()
+            ->where('status', 1)
+            ->where(function ($query) {
+                $query->whereHas('clientname', function ($clientQuery) {
+                    $clientQuery->where('name', 'like', '%mirzohid%')
+                        ->orWhere('name', 'like', '%algoritm%');
+                })->orWhereHas('checkout.supid', function ($clientQuery) {
+                    $clientQuery->where('name', 'like', '%mirzohid%')
+                        ->orWhere('name', 'like', '%algoritm%');
+                });
+            })
+            ->with(['clientname:id,name', 'checkout:id,client_id,number_work', 'checkout.supid:id,name'])
+            ->orderByDesc('date')
+            ->get(['id', 'client_id', 'checkout_id', 'date', 'price', 'status'])
+            ->map(fn ($payment) => [
+                'id' => $payment->id,
+                'client_id' => $payment->client_id,
+                'client' => optional($payment->clientname)->name,
+                'checkout_id' => $payment->checkout_id,
+                'checkout_client_id' => optional($payment->checkout)->client_id,
+                'checkout_client' => optional(optional($payment->checkout)->supid)->name,
+                'date' => $payment->date,
+                'price' => $payment->price,
+            ])->values(),
     ]);
 });
 
