@@ -458,6 +458,7 @@
                                                 </div>
                                             </div>
                                             <small class="text-soft d-block mt-2">Zavod ulushi boshlang‘ich narxga nisbatan hisoblanadi: chegirmadan keyingi summa − KPI − Agent − Venox bonus.</small>
+                                            <small class="text-warning d-block mt-1">Shartnoma jamg‘armasiga tushishi uchun “Shartnoma” turini tanlang. O‘zgartirishlar avtomatik saqlanadi.</small>
                                         </div>
                                     </div>
                                     
@@ -755,21 +756,33 @@
         });
     });
 
-    $('.apply-commission-btn').click(function(e) {
-        e.preventDefault();
-        var btn = $(this);
-        var originalButtonHtml = btn.html();
+    var commissionSaveTimer = null;
+    var commissionSaveInFlight = false;
+    var commissionSavePending = false;
+    var commissionButtonDefaultHtml = $('.apply-commission-btn').html();
+
+    function saveCommission(showValidationAlert) {
+        var btn = $('.apply-commission-btn');
         var scheme = $('.commission-scheme').val();
         var kpi = parseFloat($('.commission-kpi-input').val()) || 0;
         var agent = parseFloat($('.commission-agent-input').val()) || 0;
         var venox = parseFloat($('.commission-venox-input').val()) || 0;
 
         if (!scheme) {
-            alert('KPI va bonus hisoblash turini tanlang.');
+            if (showValidationAlert) {
+                alert('KPI va bonus hisoblash turini tanlang.');
+            }
             return;
         }
 
+        if (commissionSaveInFlight) {
+            commissionSavePending = true;
+            return;
+        }
+
+        commissionSaveInFlight = true;
         btn.prop('disabled', true);
+        btn.html('<span>Saqlanmoqda...</span>');
         $.ajax({
             type: 'POST',
             url: '{{ route("checkout_commission_scheme") }}',
@@ -787,7 +800,9 @@
                     $('.commission-factory').text(data.factory_percent);
                     btn.html('<i class="fa fa-check"></i> Saqlandi');
                     setTimeout(function() {
-                        btn.html(originalButtonHtml);
+                        if (!commissionSaveInFlight && !commissionSavePending) {
+                            btn.html(commissionButtonDefaultHtml);
+                        }
                     }, 1800);
                 }
             },
@@ -795,17 +810,47 @@
                 var message = xhr.responseJSON && xhr.responseJSON.message
                     ? xhr.responseJSON.message
                     : 'Hisoblash turini saqlashda xatolik yuz berdi.';
-                alert(message);
+                btn.html('<span>Saqlashda xato</span>');
+                if (showValidationAlert) {
+                    alert(message);
+                }
             },
             complete: function() {
+                commissionSaveInFlight = false;
                 btn.prop('disabled', false);
+                if (commissionSavePending) {
+                    commissionSavePending = false;
+                    saveCommission(false);
+                }
             }
         });
+    }
+
+    function scheduleCommissionSave() {
+        commissionSavePending = true;
+        clearTimeout(commissionSaveTimer);
+        commissionSaveTimer = setTimeout(function() {
+            if (commissionSaveInFlight) {
+                return;
+            }
+            commissionSavePending = false;
+            saveCommission(false);
+        }, 650);
+    }
+
+    $('.apply-commission-btn').click(function(e) {
+        e.preventDefault();
+        clearTimeout(commissionSaveTimer);
+        commissionSavePending = false;
+        saveCommission(true);
     });
 
     $('.commission-kpi-input, .commission-agent-input, .commission-venox-input').on('input', function() {
         updateFactoryPercent();
+        scheduleCommissionSave();
     });
+
+    $('.commission-scheme').on('change', scheduleCommissionSave);
     
     $('.bonus_change').change(function() {
         var _ = $(this),

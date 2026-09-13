@@ -11,13 +11,21 @@ use Illuminate\Validation\ValidationException;
 
 class ContractBonusService
 {
-    public function syncAccruals(): void
+    public function syncAccruals(array $clientIds = []): void
     {
+        $clientIds = collect($clientIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+
         $rows = app(AccountingCashReportService::class)->rows([
             'from' => '2000-01-01',
             'to' => now()->toDateString(),
             'scheme' => '',
             'product_id' => null,
+            'client_ids' => $clientIds->all(),
+            'include_purchase_cost' => false,
         ]);
 
         $activeReceiptIds = [];
@@ -46,6 +54,7 @@ class ContractBonusService
         }
 
         ContractBonusTransaction::where('type', 'accrual')
+            ->when($clientIds->isNotEmpty(), fn ($query) => $query->whereIn('client_id', $clientIds->all()))
             ->when($activeReceiptIds, fn ($query) => $query->whereNotIn('cash_receipt_id', array_unique($activeReceiptIds)))
             ->when(! $activeReceiptIds, fn ($query) => $query)
             ->update(['status' => false]);

@@ -1470,6 +1470,10 @@ class CheckoutController extends Controller
             'venox_bonus_percent' => $validated['venox_bonus_percent'],
         ]);
 
+        // Saqlangan foiz Shartnoma jamg'armasida darhol ko'rinsin. Faqat shu
+        // mijoz qayta hisoblanadi; boshqa mijozlarning bonuslari o'zgarmaydi.
+        app(ContractBonusService::class)->syncAccruals([(int) $checkout->client_id]);
+
         return response()->json([
             'status' => 'success',
             'label' => $schemes[$validated['scheme']],
