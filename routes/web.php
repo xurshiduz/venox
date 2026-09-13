@@ -4,18 +4,6 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 
-Route::get('/_maintenance/cash-exp-bonus-source-32cfbe7ab924', function () {
-    Artisan::call('migrate', [
-        '--path' => 'database/migrations/2026_09_13_120000_add_bonus_source_to_cash_expenditures_table.php',
-        '--force' => true,
-    ]);
-
-    return response()->json([
-        'ok' => true,
-        'output' => trim(Artisan::output()),
-    ]);
-});
-
 Route::get('/checkout_today_send_public', 'Backend\CheckoutController@today_send')->name('checkout_today_send_public');
 
 Route::group(
