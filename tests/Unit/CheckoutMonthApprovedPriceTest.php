@@ -83,7 +83,7 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $this->assertSame($expected, CheckoutMonthExport::formatPhoneForExcel($phone));
     }
 
-    public function test_only_venox_bonus_is_removed_from_displayed_payment(): void
+    public function test_kpi_and_venox_bonus_are_removed_from_displayed_payment(): void
     {
         $breakdown = CheckoutMonthExport::paymentBreakdownUsd(2000, 500);
 
@@ -258,18 +258,52 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         ], CheckoutMonthExport::lineExcelFormulas(3, 207000, 192000));
     }
 
-    public function test_saved_period_venox_bonus_is_used_when_linked_checkout_has_zero_bonus(): void
+    public function test_saved_period_commission_bonus_is_used_when_linked_checkout_has_zero_bonus(): void
     {
-        $linked = new Checkout(['id' => 10, 'date' => '2026-09-10', 'venox_bonus_percent' => 0]);
-        $savedBonus = new Checkout(['id' => 11, 'date' => '2026-09-11', 'venox_bonus_percent' => 25]);
+        $linked = new Checkout(['id' => 10, 'date' => '2026-09-10', 'kpi_percent' => 0, 'venox_bonus_percent' => 0]);
+        $savedBonus = new Checkout(['id' => 11, 'date' => '2026-09-11', 'kpi_percent' => 5, 'venox_bonus_percent' => 15]);
 
-        $resolved = CheckoutMonthExport::venoxBonusCheckout(
+        $resolved = CheckoutMonthExport::commissionBonusCheckout(
             $linked,
             [$linked, $savedBonus],
             '2026-09-11'
         );
 
         $this->assertSame($savedBonus, $resolved);
+    }
+
+    /** @dataProvider commissionSchemeProvider */
+    public function test_kpi_and_venox_bonus_apply_to_every_commission_scheme(string $scheme): void
+    {
+        $checkout = new Checkout([
+            'commission_scheme' => $scheme,
+            'kpi_percent' => 5,
+            'agent_percent' => 8,
+            'venox_bonus_percent' => 15,
+        ]);
+
+        $this->assertSame(20.0, CheckoutMonthExport::reportBonusPercent($checkout));
+        $this->assertSame(200.0, CheckoutMonthExport::reportBonusAmountUsd(1000, $checkout));
+    }
+
+    public function commissionSchemeProvider(): array
+    {
+        return [
+            ['special'],
+            ['contract'],
+            ['venox_bonus'],
+        ];
+    }
+
+    public function test_fifo_report_bonus_combines_kpi_and_venox_amounts(): void
+    {
+        $bonus = CheckoutMonthExport::reportBonusAmountUsd(100, null, [
+            'kpi' => 5,
+            'venox' => 15,
+            'agent_amount' => 8,
+        ]);
+
+        $this->assertSame(20.0, $bonus);
     }
 
     public function test_monthly_export_client_totals_are_real_excel_formulas(): void
