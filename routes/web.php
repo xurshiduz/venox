@@ -4,18 +4,6 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 
-Route::get('/_maintenance/approved-prices-5f47c8629d31', function () {
-    Artisan::call('migrate', [
-        '--path' => 'database/migrations/2026_09_13_130000_create_approved_product_prices_tables.php',
-        '--force' => true,
-    ]);
-
-    return response()->json([
-        'ok' => true,
-        'output' => trim(Artisan::output()),
-    ]);
-});
-
 Route::get('/checkout_today_send_public', 'Backend\CheckoutController@today_send')->name('checkout_today_send_public');
 
 Route::group(
