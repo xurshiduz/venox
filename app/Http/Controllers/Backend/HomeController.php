@@ -197,7 +197,7 @@ class HomeController extends Controller
     $clientid = $request->client_id;
     
     // 1. O'tgan davr uchun ma'lumotlar
-    $prev_checkouts = Checkout::where('client_id', $clientid)->where('date', '<', $from)->get();
+    $prev_checkouts = Checkout::where('status', 1)->where('client_id', $clientid)->where('date', '<', $from)->get();
     $prev_cashs = CashReceipt::where('status', 1)->where('client_id', $clientid)->where('date', '<', $from)->get();
     $prev_checkins = Checkin::where('status', 1)->where('client_id', $clientid)->where('date', '<', $from)->get();
     
@@ -223,9 +223,9 @@ class HomeController extends Controller
     $start_saldo = $initial_balance + $sum_prev_debets - $sum_prev_credits; 
 
     // 2. Tanlangan oraliqdagi operatsiyalar
-    $checkouts = Checkout::where('client_id', $clientid)->whereBetween('date', [$from, $to])->get();
+    $checkouts = Checkout::with('checktypeid')->where('status', 1)->where('client_id', $clientid)->whereBetween('date', [$from, $to])->get();
     $cashs = CashReceipt::where('status', 1)->where('client_id', $clientid)->whereBetween('date', [$from, $to])->get();
-    $checkins = Checkin::where('status', 1)->where('client_id', $clientid)->whereBetween('date', [$from, $to])->get();
+    $checkins = Checkin::with('typeid')->where('status', 1)->where('client_id', $clientid)->whereBetween('date', [$from, $to])->get();
     
     // Tanlangan oraliq uchun pul chiqimlari
     $cash_expenditures = CashExpenditure::where('supplier_id', $clientid)

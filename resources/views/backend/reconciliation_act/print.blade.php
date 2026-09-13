@@ -121,6 +121,9 @@
                         <tr>
 							@php
 								$isReturnedCheckout = $item instanceof \App\Models\Checkout && (int) $item->checkout_tip_id === 2;
+								$checkinTypeName = $item instanceof \App\Models\Checkin
+									? optional($item->typeid)->name
+									: null;
 								$cashExpenditureName = $item instanceof \App\Models\CashExpenditure
 									? optional($item->cename)->name
 									: null;
@@ -130,7 +133,7 @@
                                 @if($item instanceof \App\Models\Checkout)
                                     {{ $isReturnedCheckout ? 'Возврат товара' : (optional($item->checktypeid)->name ?: 'Продажа') }}
                                 @elseif($item instanceof \App\Models\Checkin)
-                                    Возврат товара
+                                    {{ $checkinTypeName ?: 'Поступление товара' }}
                                 @elseif($item instanceof \App\Models\CashExpenditure)
                                     {{ $cashExpenditureName ?: 'Выдача денежных средств' }}
                                 @else
@@ -141,7 +144,7 @@
                                 @if(isset($item->checkout_tip_id)) 
                                     <a target="_blank" href="{{ route('checkout_form', ['id' => $item->code, 'view' => 'full']) }}" style="text-decoration: none; color: #000;"> {{ $isReturnedCheckout ? 'Возврат товара; накладная' : 'Накладная - счет фактура' }} №{{ $item->number_work }};</a>
                                 @elseif(isset($item->step)) 
-                                    <a target="_blank" href="{{ route('checkin_form', ['id' => $item->code, 'view' => 'full']) }}" style="text-decoration: none; color: #000;"> Возврат товара ИД; с/ф №{{ $item->number_work }} <b>({{ $item->reference }})</b>;</a>
+                                    <a target="_blank" href="{{ route('checkin_form', ['id' => $item->code, 'view' => 'full']) }}" style="text-decoration: none; color: #000;"> {{ $checkinTypeName ?: 'Поступление товара' }} ИД; с/ф №{{ $item->number_work }} <b>({{ $item->reference }})</b>;</a>
                                 @elseif(isset($item->cash_expenditure_types))
                                     {{-- Pul chiqimi nomlanishi (Расходный кассовый ордер) --}}
                                     <a target="_blank" href="{{ route('cash_expenditure_form', ['id' => $item->code]) }}" style="text-decoration: none; color: #000;"> Расходный кассовый ордер №{{ $item->id }}; {{ $cashExpenditureName ?: 'Выдача денежных средств' }}</a>

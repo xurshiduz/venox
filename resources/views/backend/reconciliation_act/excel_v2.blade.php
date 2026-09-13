@@ -25,6 +25,9 @@
         $pos = 0;
         foreach ($data as $item) {
             $isReturnedCheckout = $item instanceof \App\Models\Checkout && (int) $item->checkout_tip_id === 2;
+            $checkinTypeName = $item instanceof \App\Models\Checkin
+                ? optional($item->typeid)->name
+                : null;
             $cashExpenditureName = $item instanceof \App\Models\CashExpenditure
                 ? optional($item->cename)->name
                 : null;
@@ -57,7 +60,7 @@
                 @if($item instanceof \App\Models\Checkout)
                     {{ $isReturnedCheckout ? 'Возврат товара' : (optional($item->checktypeid)->name ?: 'Продажа') }}
                 @elseif($item instanceof \App\Models\Checkin)
-                    Возврат товара
+                    {{ $checkinTypeName ?: 'Поступление товара' }}
                 @elseif($item instanceof \App\Models\CashExpenditure)
                     {{ $cashExpenditureName ?: 'Выдача денежных средств' }}
                 @else
@@ -68,7 +71,7 @@
                 @if($item instanceof \App\Models\Checkout)
                     {{ $isReturnedCheckout ? 'Возврат товара; накладная' : 'Накладная - счет фактура' }} №{{ $item->number_work }};
                 @elseif($item instanceof \App\Models\Checkin)
-                    Возврат товара ИД; с/ф №{{ $item->number_work }} ({{ $item->reference }});
+                    {{ $checkinTypeName ?: 'Поступление товара' }} ИД; с/ф №{{ $item->number_work }} ({{ $item->reference }});
                 @elseif($item instanceof \App\Models\CashExpenditure)
                     Расходный кассовый ордер №{{ $item->id }}; {{ $cashExpenditureName ?: 'Выдача денежных средств' }}
                 @else
