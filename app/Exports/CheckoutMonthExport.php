@@ -125,6 +125,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                 'to' => $periodEnd->toDateString(),
                 'scheme' => null,
                 'product_id' => null,
+                'client_ids' => $paymentOnlyClientIds->all(),
             ])->filter(function (array $row) use ($paymentOnlyClientIds) {
                 return $paymentOnlyClientIds->contains((int) ($row['client_id'] ?? 0));
             })->groupBy(fn (array $row) => (string) $row['client_id']);

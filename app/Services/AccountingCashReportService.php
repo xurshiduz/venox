@@ -14,9 +14,13 @@ class AccountingCashReportService
 
     public function rows(array $filters): Collection
     {
+        $filterClientIds = collect($filters['client_ids'] ?? [])->filter()->unique()->values();
         $receipts = CashReceipt::query()
             ->where('status', 1)
             ->where('date', '<=', $filters['to'])
+            ->when($filterClientIds->isNotEmpty(), function ($query) use ($filterClientIds) {
+                $query->whereIn('client_id', $filterClientIds);
+            })
             ->with(['clientname', 'uname', 'checkout.managerid', 'checkout.supid', 'checkout.details.prodid.unitid', 'checkout.details.checkid'])
             ->orderBy('date')
             ->orderBy('id')
