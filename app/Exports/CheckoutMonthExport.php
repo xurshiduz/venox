@@ -703,10 +703,23 @@ class CheckoutMonthExport implements FromView, WithStyles
             return $quantities;
         }
 
-        $factor = $grossPaymentUzs / $approvedTotal;
-        $scaled = array_map(fn (float $qty) => $qty * $factor, $quantities);
+        // Bitta eski katta qator butun summani yutib yubormasligi uchun to'lovni
+        // mahsulotlarning tarixiy karobka soni ildiziga mutanosib taqsimlaymiz.
+        // Bu tarixiy tarkibni saqlaydi, lekin 95/21 kabi keskin nisbatni yumshatadi.
+        $weights = [];
+        foreach ($quantities as $index => $qty) {
+            $package = max(1, (int) round((float) ($packageQuantities[$index] ?? 1)));
+            $weights[$index] = sqrt(max(1, $qty / $package));
+        }
+        $weightTotal = array_sum($weights);
+        $scaled = [];
+        foreach ($quantities as $index => $qty) {
+            $price = max(0, (float) ($approvedUnitPricesUzs[$index] ?? 0));
+            $scaled[$index] = $price > 0 && $weightTotal > 0
+                ? ($grossPaymentUzs * $weights[$index] / $weightTotal) / $price
+                : $qty;
+        }
         $minimums = [];
-        $maximums = [];
         $packages = [];
         $balanced = [];
         foreach ($scaled as $index => $scaledQty) {
@@ -714,16 +727,8 @@ class CheckoutMonthExport implements FromView, WithStyles
             $packages[$index] = $package;
             $originalQty = (float) ($quantities[$index] ?? 0);
             $minimums[$index] = $originalQty > 0 ? (float) $package : 0.0;
-            // Haqiqiy FIFO miqdoridan ko'pi bilan ikki qo'shimcha karobka.
-            $maximums[$index] = max(
-                $minimums[$index],
-                (float) ((ceil($originalQty / $package) + 2) * $package)
-            );
             $nearestPackageQty = round($scaledQty / $package) * $package;
-            $balanced[$index] = (float) min(
-                $maximums[$index],
-                max($minimums[$index], $nearestPackageQty)
-            );
+            $balanced[$index] = (float) max($minimums[$index], $nearestPackageQty);
         }
         $balancedTotal = 0.0;
         foreach ($balanced as $index => $qty) {
@@ -743,8 +748,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                 foreach ([-1, 1] as $packageChange) {
                     $change = $packageChange * $package;
                     if ($price <= 0
-                        || $qty + $change < $minimums[$index]
-                        || $qty + $change > $maximums[$index]) {
+                        || $qty + $change < $minimums[$index]) {
                         continue;
                     }
                     $difference = abs($grossPaymentUzs - ($balancedTotal + $change * $price));
@@ -771,9 +775,6 @@ class CheckoutMonthExport implements FromView, WithStyles
                         continue;
                     }
                     $rightChange = $packages[$right];
-                    if ($balanced[$right] + $rightChange > $maximums[$right]) {
-                        continue;
-                    }
                     $difference = abs($grossPaymentUzs - (
                         $balancedTotal
                         + $leftChange * $leftPrice

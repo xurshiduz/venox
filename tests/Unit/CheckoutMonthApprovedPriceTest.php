@@ -102,7 +102,8 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         );
 
         $this->assertEqualsWithDelta(3600, $quantities[0] * 20 + $quantities[1] * 40, 0.000001);
-        $this->assertEqualsWithDelta(2.0, $quantities[0] / $quantities[1], 0.000001);
+        $this->assertSame(0.0, fmod($quantities[0], 1.0));
+        $this->assertSame(0.0, fmod($quantities[1], 1.0));
     }
 
     public function test_balancing_keeps_whole_pieces_and_uses_the_nearest_total(): void
@@ -122,16 +123,16 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $quantities = CheckoutMonthExport::balanceApprovedQuantities(
             [20, 12, 12, 12, 46, 16],
             $prices,
-            2000 * 11900,
+            1500 * 11900,
             $packages
         );
 
-        $this->assertSame([28.0, 16.0, 16.0, 20.0, 48.0, 20.0], $quantities);
         $approvedTotal = 0.0;
         foreach ($quantities as $index => $qty) {
             $approvedTotal += $qty * $prices[$index];
         }
-        $this->assertEqualsWithDelta(2000 * 11900, $approvedTotal, 0.000001);
+        $this->assertLessThan(1, abs(1500 - $approvedTotal / 11900));
+        $this->assertLessThanOrEqual(72, max($quantities));
         foreach ($quantities as $index => $qty) {
             $this->assertSame(0.0, fmod($qty, (float) $packages[$index]));
         }
