@@ -27,6 +27,7 @@ class CheckoutMonthExport implements FromView, WithStyles
     protected $rowCount = 0;
     protected $rowLineCounts = [];
     protected $mergeRanges = [];
+    protected $clientRowRanges = [];
 
     public function __construct($startDate, $endDate)
     {
@@ -39,6 +40,7 @@ class CheckoutMonthExport implements FromView, WithStyles
         $this->rowCount = 0;
         $this->rowLineCounts = [];
         $this->mergeRanges = [];
+        $this->clientRowRanges = [];
 
         $periodStart = Carbon::parse($this->startDate)->startOfDay();
         $periodEnd = Carbon::parse($this->endDate)->endOfDay();
@@ -73,7 +75,8 @@ class CheckoutMonthExport implements FromView, WithStyles
 
         $accounting = app(AccountingCashReportService::class);
         $approvedPriceService = app(ApprovedProductPriceService::class);
-        $reportUsdRate = $approvedPriceService->usdRate();
+        // Hisobot yaratilgan paytdagi tizimning amaldagi USD kursi.
+        $reportUsdRate = Currency::usdRate();
         $clientPayments = [];
         $clientPaymentDates = [];
         $paymentBonusExpensesByClient = [];
@@ -322,12 +325,12 @@ class CheckoutMonthExport implements FromView, WithStyles
                 $unitPriceUsd = Currency::documentAmountToUsd(
                     $unitPriceUzs,
                     2,
-                    $approvedPriceService->usdRate()
+                    $reportUsdRate
                 );
                 $factoryPriceUsd = Currency::documentAmountToUsd(
                     $factoryPriceUzs,
                     2,
-                    $approvedPriceService->usdRate()
+                    $reportUsdRate
                 );
 
                 $lineTotals = static::reportLineTotalsUsd($qty, $unitPriceUsd, $actualUnitPriceUsd);
@@ -385,12 +388,12 @@ class CheckoutMonthExport implements FromView, WithStyles
                     $unitPriceUsd = Currency::documentAmountToUsd(
                         $unitPriceUzs,
                         2,
-                        $approvedPriceService->usdRate()
+                        $reportUsdRate
                     );
                     $factoryPriceUsd = Currency::documentAmountToUsd(
                         $factoryPriceUzs,
                         2,
-                        $approvedPriceService->usdRate()
+                        $reportUsdRate
                     );
                     $clientAllocationProducts[] = [
                         'price_key' => (string) ($approvedPrices['code'] ?? $productName),
@@ -421,12 +424,12 @@ class CheckoutMonthExport implements FromView, WithStyles
                         $unitPriceUsd = Currency::documentAmountToUsd(
                             $unitPriceUzs,
                             2,
-                            $approvedPriceService->usdRate()
+                            $reportUsdRate
                         );
                         $factoryPriceUsd = Currency::documentAmountToUsd(
                             $factoryPriceUzs,
                             2,
-                            $approvedPriceService->usdRate()
+                            $reportUsdRate
                         );
                         $clientAllocationProducts[] = [
                             'price_key' => (string) ($approvedPrices['code'] ?? $productName),
@@ -588,6 +591,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'venox_cash_usd' => null,
                     'venox_cash_usd_formula' => null,
                 ];
+                $this->clientRowRanges[] = [$startRow, $startRow];
 
                 continue;
             }
@@ -600,7 +604,12 @@ class CheckoutMonthExport implements FromView, WithStyles
                 $factoryPriceUzs = (float) $row['factory_prices_uzs'][$index];
                 $first = $index === 0;
                 $excelRow = count($rows) + 3;
-                $lineFormulas = static::lineExcelFormulas($excelRow, $unitPriceUzs, $factoryPriceUzs);
+                $lineFormulas = static::lineExcelFormulas(
+                    $excelRow,
+                    $unitPriceUzs,
+                    $factoryPriceUzs,
+                    $reportUsdRate
+                );
 
                 $rows[] = [
                     'date' => $first ? collect($row['dates'])->unique()->implode("\n") : null,
@@ -633,6 +642,7 @@ class CheckoutMonthExport implements FromView, WithStyles
             $clientFormulas = static::clientExcelFormulas($startRow, $endRow);
             $rows[$firstRowIndex]['closing_debt_usd_formula'] = $clientFormulas['closing_debt_usd'];
             $rows[$firstRowIndex]['venox_cash_usd_formula'] = $clientFormulas['venox_cash_usd'];
+            $this->clientRowRanges[] = [$startRow, $endRow];
             if ($endRow > $startRow) {
                 foreach (['A', 'B', 'C', 'E', 'M', 'N', 'O', 'P'] as $column) {
                     $this->mergeRanges[] = $column . $startRow . ':' . $column . $endRow;
@@ -643,11 +653,17 @@ class CheckoutMonthExport implements FromView, WithStyles
         $this->rowCount = count($rows);
         $this->rowLineCounts = array_fill(0, $this->rowCount, 1);
         $totalPaidUsd = $clientIds->sum(fn ($id) => (float) ($clientPayments[(string) $id] ?? 0));
+        $totalPaidUzs = static::paidTotalUzs($totalPaidUsd, $reportUsdRate);
         return view('backend.checkouts.excel_matrix', [
             'rows' => $rows,
             'periodLabel' => $periodStart->format('d.m.Y') . ' — ' . $periodEnd->format('d.m.Y'),
             'reportUsdRate' => $reportUsdRate,
-            'totalPaidUzs' => static::paidTotalUzs($totalPaidUsd, $reportUsdRate),
+            'totalPaidUzs' => $totalPaidUzs,
+            'reportTitle' => static::reportTitle(
+                $periodStart->format('d.m.Y') . ' — ' . $periodEnd->format('d.m.Y'),
+                $reportUsdRate,
+                $totalPaidUzs
+            ),
             'totals' => [
                 'debt_before_payment' => collect($groupedRows)->sum(fn ($row) =>
                     static::openingDebtUsd(
@@ -720,12 +736,15 @@ class CheckoutMonthExport implements FromView, WithStyles
     public static function lineExcelFormulas(
         int $row,
         float $unitPriceUzs = 0,
-        float $factoryPriceUzs = 0
+        float $factoryPriceUzs = 0,
+        float $usdRate = 1
     ): array
     {
+        $usdRate = $usdRate > 0 ? $usdRate : 1;
+
         return [
-            'unit_price_usd' => '=' . static::excelNumber($unitPriceUzs) . '/$Q$2',
-            'factory_price_usd' => '=' . static::excelNumber($factoryPriceUzs) . '/$Q$2',
+            'unit_price_usd' => '=' . static::excelNumber($unitPriceUzs) . '/' . static::excelNumber($usdRate),
+            'factory_price_usd' => '=' . static::excelNumber($factoryPriceUzs) . '/' . static::excelNumber($usdRate),
             'markup_percent' => sprintf('=IFERROR((H%d-I%d)/I%d,"")', $row, $row, $row),
             'approved_total_usd' => sprintf('=G%d*H%d', $row, $row),
             'factory_total_usd' => sprintf('=G%d*I%d', $row, $row),
@@ -1016,6 +1035,16 @@ class CheckoutMonthExport implements FromView, WithStyles
         return $paidUsd * $usdRate;
     }
 
+    public static function reportTitle(string $periodLabel, float $usdRate, float $totalPaidUzs): string
+    {
+        return sprintf(
+            '%s оралиғидаги мижозлар ҳисоботи (USD) — 1 USD = %s сўм — Жами тўланган = %s сўм',
+            $periodLabel,
+            number_format($usdRate, 0, '.', ' '),
+            number_format($totalPaidUzs, 0, '.', ' ')
+        );
+    }
+
     /**
      * Convert an approved product catalogue price to the report currency.
      * The calculated document/checkin price is retained only as a fallback
@@ -1110,27 +1139,53 @@ class CheckoutMonthExport implements FromView, WithStyles
             $sheet->mergeCells($range);
         }
 
-        foreach (['A' => 13, 'B' => 28, 'C' => 19, 'D' => 24, 'E' => 20, 'F' => 52, 'G' => 15, 'H' => 16, 'I' => 16, 'J' => 20, 'K' => 23, 'L' => 20, 'M' => 17, 'N' => 18, 'O' => 22, 'P' => 18, 'Q' => 18, 'R' => 26] as $column => $width) {
+        foreach (['A' => 13, 'B' => 28, 'C' => 19, 'D' => 24, 'E' => 20, 'F' => 52, 'G' => 15, 'H' => 16, 'I' => 16, 'J' => 20, 'K' => 23, 'L' => 20, 'M' => 17, 'N' => 22, 'O' => 22, 'P' => 18] as $column => $width) {
             $sheet->getColumnDimension($column)->setWidth($width);
         }
 
-        $sheet->getStyle('A1:R' . $lastRow)->getAlignment()
+        $sheet->getStyle('A1:P' . $lastRow)->getAlignment()
             ->setVertical(Alignment::VERTICAL_CENTER)
             ->setHorizontal(Alignment::HORIZONTAL_CENTER)
             ->setWrapText(true);
+        $sheet->getStyle('A1:P1')->getFill()
+            ->setFillType(Fill::FILL_SOLID)
+            ->getStartColor()->setRGB('1F4E3D');
+        $sheet->getStyle('A1:P1')->getFont()->setBold(true)->setSize(14)->getColor()->setRGB('FFFFFF');
         $sheet->getStyle('A2:P2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         $sheet->getStyle('A2:P2')->getFont()->setBold(true)->getColor()->setRGB('000000');
-        $sheet->getStyle('A2:P' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('C9C9C9');
+        $sheet->getStyle('A2:P2')->getFill()
+            ->setFillType(Fill::FILL_SOLID)
+            ->getStartColor()->setRGB('D9EAD3');
+        $sheet->getStyle('A2:P' . $lastRow)->getBorders()->getAllBorders()
+            ->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('7F8C8D');
+        $sheet->getStyle('A1:P' . $lastRow)->applyFromArray([
+            'borders' => [
+                'outline' => [
+                    'borderStyle' => Border::BORDER_MEDIUM,
+                    'color' => ['rgb' => '385D4A'],
+                ],
+            ],
+        ]);
+        foreach ($this->clientRowRanges as [$startRow, $endRow]) {
+            $sheet->getStyle('A' . $startRow . ':P' . $endRow)->applyFromArray([
+                'borders' => [
+                    'outline' => [
+                        'borderStyle' => Border::BORDER_MEDIUM,
+                        'color' => ['rgb' => '7F8C8D'],
+                    ],
+                ],
+            ]);
+        }
         $sheet->getStyle('G3:G' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.###');
         $sheet->getStyle('E3:E' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
         $sheet->getStyle('H3:I' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
         $sheet->getStyle('J3:J' . $lastRow)->getNumberFormat()->setFormatCode('0.00%');
         $sheet->getStyle('K3:P' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
         $sheet->getStyle('A' . $lastRow . ':P' . $lastRow)->getFont()->setBold(true);
-        $sheet->getStyle('Q1:R2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setWrapText(true);
-        $sheet->getStyle('Q1:R1')->getFont()->setBold(true);
-        $sheet->getStyle('Q1:R2')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('C9C9C9');
-        $sheet->getStyle('Q2:R2')->getNumberFormat()->setFormatCode('#,##0.00');
-        $sheet->getStyle('Q2')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFF2CC');
+        $sheet->getStyle('A' . $lastRow . ':P' . $lastRow)->getFill()
+            ->setFillType(Fill::FILL_SOLID)
+            ->getStartColor()->setRGB('D9EAD3');
+        $sheet->getStyle('A' . $lastRow . ':P' . $lastRow)->getBorders()->getTop()
+            ->setBorderStyle(Border::BORDER_MEDIUM)->getColor()->setRGB('385D4A');
     }
 }

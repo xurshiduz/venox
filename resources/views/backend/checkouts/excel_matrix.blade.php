@@ -1,9 +1,7 @@
 <table>
     <thead>
         <tr>
-            <th colspan="16" style="font-weight:bold; font-size:14px; text-align:left;">{{ $periodLabel }} оралиғидаги мижозлар ҳисоботи (USD) — курсни Q2 катакда ўзгартиринг</th>
-            <th>1 USD (сўм)</th>
-            <th>Жами тўланган (сўм)</th>
+            <th colspan="16" style="font-weight:bold; font-size:14px; text-align:center;">{{ $reportTitle }}</th>
         </tr>
         <tr>
             <th>Сана</th>
@@ -22,8 +20,6 @@
             <th>Бонус харажатлар (KPI + Venox bonus)</th>
             <th>Қолдиқ умумий қарз</th>
             <th>Venox касса</th>
-            <th>{{ $reportUsdRate }}</th>
-            <th>{{ count($rows) ? '=SUM(M3:M'.(count($rows) + 2).')*$Q$2' : 0 }}</th>
         </tr>
     </thead>
     <tbody>
@@ -45,8 +41,6 @@
                 <td>{{ $row['bonus_expense_usd'] }}</td>
                 <td>{{ $row['closing_debt_usd_formula'] ?? $row['closing_debt_usd'] }}</td>
                 <td>{{ $row['venox_cash_usd_formula'] ?? $row['venox_cash_usd'] }}</td>
-                <td></td>
-                <td></td>
             </tr>
         @endforeach
         <tr>
@@ -63,8 +57,6 @@
             <td>{{ count($rows) ? '=SUM(N3:N'.(count($rows) + 2).')' : 0 }}</td>
             <td>{{ count($rows) ? '=SUM(O3:O'.(count($rows) + 2).')' : 0 }}</td>
             <td>{{ count($rows) ? '=SUM(P3:P'.(count($rows) + 2).')' : 0 }}</td>
-            <td></td>
-            <td></td>
         </tr>
     </tbody>
 </table>
