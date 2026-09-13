@@ -59,23 +59,41 @@
                                   </thead>
                                   <tbody>
                                     @php($s = 0)
+                                    @php($unassignedSupplierPayments = 0)
                                     @foreach($contracts as $contract)
+                                    @php
+                                        $visibleDetails = $contract->details;
+                                        if (!Auth::user()->hasAnyRole('admin|report')) {
+                                            $visibleDetails = $visibleDetails->where('user_id', Auth::id());
+                                        }
+                                        if ($contract->name === 'Оплата поставщику') {
+                                            $unassignedSupplierPayments += $visibleDetails->whereNull('supplier_id')->sum('price');
+                                            $visibleDetails = $visibleDetails->whereNotNull('supplier_id');
+                                        }
+                                        $contractTotal = $visibleDetails->sum('price');
+                                        $s += $contractTotal;
+                                    @endphp
                                     <tr class="text-center">
                                         <td width="180px">{{ $contract->name }}</td>
                                         <td width="180px;">
                                           @hasanyrole('admin|report') 
-                                          @php($s += $contract->details->sum('price'))
                                           <a href="{{ route('cash_category_select', ['id' => $contract->code]) }}">
-                                          {{ number_format($contract->details->sum('price'), 0, '.', ' ') }} 
+                                          {{ number_format($contractTotal, 0, '.', ' ') }}
+                                          </a>
                                           @else 
-                                          @php($s += $contract->details->where('user_id', Auth::id())->sum('price'))
-                                          {{ number_format($contract->details->where('user_id', Auth::id())->sum('price'), 0, '.', ' ') }} 
-                                          </a> 
+                                          {{ number_format($contractTotal, 0, '.', ' ') }}
                                           @endhasanyrole сум
                                           
                                         </td>
                                     </tr>
                                     @endforeach
+                                    @if($unassignedSupplierPayments > 0)
+                                    @php($s += $unassignedSupplierPayments)
+                                    <tr class="text-center table-warning">
+                                        <td width="180px">Оплата поставщику — поставщик не указан</td>
+                                        <td width="180px">{{ number_format($unassignedSupplierPayments, 0, '.', ' ') }} сум</td>
+                                    </tr>
+                                    @endif
                                     <tr class="text-center">
                                         <td width="180px"><b>Итого</b></td>
                                         <td width="180px;"><b>{{ number_format($s, 0, '.', ' ') }} сум</b></td>

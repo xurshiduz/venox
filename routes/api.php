@@ -12,3 +12,6 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 
 Route::post('/factory_checkin_save', 'Api\CheckinController@apiCheckinSave')
     ->withoutMiddleware(['throttle:api']);
+
+Route::post('/factory-ledger/receipt', 'Api\FactoryLedgerController@receipt')
+    ->withoutMiddleware(['throttle:api']);

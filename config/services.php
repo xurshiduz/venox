@@ -30,4 +30,12 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'lidaz_factory' => [
+        'url' => env('LIDAZ_FACTORY_URL', 'https://sklad.simmaautostar.uz'),
+        'supplier_name' => env('LIDAZ_SUPPLIER_NAME', 'LIDAZ MCHJ'),
+        'expense_type_name' => env('LIDAZ_EXPENSE_TYPE_NAME', 'Оплата поставщику'),
+        'default_payment_type_id' => env('LIDAZ_DEFAULT_PAYMENT_TYPE_ID', 1),
+        'user_id' => env('LIDAZ_SYNC_USER_ID', 1),
+    ],
+
 ];

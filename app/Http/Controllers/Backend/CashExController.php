@@ -155,6 +155,12 @@ class CashExController extends Controller
         $expenditureType = CashExpenditureType::findOrFail($validated['cash_expenditure_types']);
         $isMainExpenditure = $expenditureType->supportsBonusSource();
 
+        if ($expenditureType->name === 'Оплата поставщику' && empty($validated['supplier_id'])) {
+            throw ValidationException::withMessages([
+                'supplier_id' => 'Оплата поставщику uchun yetkazib beruvchini tanlang.',
+            ]);
+        }
+
         if ($isMainExpenditure && (empty($validated['bonus_client_id']) || empty($validated['source_cash_receipt_id']))) {
             throw ValidationException::withMessages([
                 'bonus_client_id' => 'Основной xarajat uchun mijozni tanlang.',
