@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Log;
 Route::get('/_maintenance/checkout-bonus-audit-71b8c934ed20', function () {
     $checkout = \App\Models\Checkout::query()
         ->where('code', '4e0b3b52-283e-4307-a8e6-a6af16f8f7ef')
-        ->with(['details', 'payments' => fn ($query) => $query->where('status', 1), 'supid'])
+        ->with(['checkoutDetails', 'payments' => fn ($query) => $query->where('status', 1), 'supid'])
         ->firstOrFail();
 
     $cashRows = app(\App\Services\AccountingCashReportService::class)->rows([
@@ -34,7 +34,7 @@ Route::get('/_maintenance/checkout-bonus-audit-71b8c934ed20', function () {
             'total_price' => (float) $checkout->total_price,
             'total_price_payme' => (float) $checkout->total_price_payme,
             'total_price_debt' => (float) $checkout->total_price_debt,
-            'detail_bonus_total' => (float) $checkout->details->sum('bonus'),
+            'detail_bonus_total' => (float) $checkout->checkoutDetails->sum('bonus'),
         ],
         'receipts' => $checkout->payments->map(fn ($receipt) => [
             'id' => $receipt->id,
