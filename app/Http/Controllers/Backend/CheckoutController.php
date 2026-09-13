@@ -49,9 +49,20 @@ use Illuminate\Support\Facades\Schema;
 class CheckoutController extends Controller
 {
     
-    public function index($ctypeAlias = null)
+    public function index(Request $request, $ctypeAlias = null)
     {
         $user = Auth::user();
+
+        $validatedFilters = $request->validate([
+            'agent_id' => ['nullable', 'integer', 'exists:users,id'],
+            'date_from' => ['nullable', 'date_format:Y-m-d'],
+            'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
+        ]);
+        $selectedAgent = isset($validatedFilters['agent_id'])
+            ? (int) $validatedFilters['agent_id']
+            : null;
+        $dateFrom = $validatedFilters['date_from'] ?? null;
+        $dateTo = $validatedFilters['date_to'] ?? null;
     
         $query = Checkout::where('type_id', 1);
     
@@ -65,11 +76,20 @@ class CheckoutController extends Controller
         })->when($user->hasRole('sale') && !$user->hasAnyRole('admin|cashier|select_manager|dealer_admin'), function ($q) use ($user) {
             $q->where('manager_id', $user->id);
         });
+
+        $query->when($selectedAgent, function ($q) use ($selectedAgent) {
+            $q->where('manager_id', $selectedAgent);
+        })->when($dateFrom, function ($q) use ($dateFrom) {
+            $q->whereDate('date', '>=', $dateFrom);
+        })->when($dateTo, function ($q) use ($dateTo) {
+            $q->whereDate('date', '<=', $dateTo);
+        });
     
         // Ma'lumotlarni saralash va sahifalash
         $data = $query->orderByDesc('date')
                        ->orderByDesc('created_at')
-                       ->paginate(35);
+                       ->paginate(35)
+                       ->appends($request->query());
     
         // View uchun kerakli o'zgaruvchilarni tayyorlash
         $ctypes = CheckType::where('status', 1)->get();
@@ -91,6 +111,10 @@ class CheckoutController extends Controller
             'sdata' => null,
             'fromdate' => Carbon::now()->subDay()->format('d.m.Y'),
             'todate' => Carbon::now()->format('d.m.Y'),
+            'selectedAgent' => $selectedAgent,
+            'dateFrom' => $dateFrom,
+            'dateTo' => $dateTo,
+            'ctypeAlias' => $ctypeAlias,
         ];
     
         return view('backend.checkouts.index', $viewData);

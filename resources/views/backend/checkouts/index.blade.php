@@ -50,6 +50,37 @@
                 </div>
             @endforeach
         </div>
+        <div class="card mb-3">
+            <div class="card-inner py-3">
+                <form method="GET" action="{{ route('checkouts_index', ['ctypeAlias' => $ctypeAlias]) }}">
+                    <div class="row gy-2 align-items-end">
+                        <div class="col-lg-4 col-md-6">
+                            <label class="form-label mb-1">Agent</label>
+                            <select class="form-select js-select2" name="agent_id" data-search="on">
+                                <option value="">Barcha agentlar</option>
+                                @foreach($managers as $manager)
+                                    <option value="{{ $manager->id }}" @if((int) $selectedAgent === (int) $manager->id) selected @endif>{{ $manager->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-lg-3 col-md-6">
+                            <label class="form-label mb-1">Boshlanish sanasi</label>
+                            <input type="date" class="form-control" name="date_from" value="{{ $dateFrom }}">
+                        </div>
+                        <div class="col-lg-3 col-md-6">
+                            <label class="form-label mb-1">Tugash sanasi</label>
+                            <input type="date" class="form-control" name="date_to" value="{{ $dateTo }}">
+                        </div>
+                        <div class="col-lg-2 col-md-6">
+                            <div class="d-flex" style="gap: 8px;">
+                                <button type="submit" class="btn btn-primary flex-grow-1">Ko‘rish</button>
+                                <a href="{{ route('checkouts_index', ['ctypeAlias' => $ctypeAlias]) }}" class="btn btn-outline-light">Tozalash</a>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
         @endif
         <div class="nk-content-inner">
             <div class="nk-content-body">
