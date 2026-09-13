@@ -120,6 +120,17 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $this->assertSame(120.0, $venoxCash);
     }
 
+    public function test_venox_cash_total_uses_matching_product_price_indexes(): void
+    {
+        $venoxCash = CheckoutMonthExport::venoxCashTotalUsd(
+            [10, 2],
+            [65, 100],
+            [53, 80]
+        );
+
+        $this->assertSame(160.0, $venoxCash);
+    }
+
     public function test_displayed_paid_total_is_converted_to_uzs_with_report_rate(): void
     {
         $totalUzs = CheckoutMonthExport::paidTotalUzs(234325435 / 11078, 11078);

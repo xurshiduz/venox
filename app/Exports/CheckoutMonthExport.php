@@ -437,13 +437,11 @@ class CheckoutMonthExport implements FromView, WithStyles
             $row['debt_before_payment'] = $row['closing_debt_usd']
                 + $row['gross_paid_usd']
                 - $row['actual_total_usd'];
-            $venoxCashUsd = collect($row['quantities'])->sum(function ($qty, $index) use ($row) {
-                return static::venoxCashUsd(
-                    (float) $qty,
-                    (float) ($row['unit_prices'][$index] ?? 0),
-                    (float) ($row['factory_prices'][$index] ?? 0)
-                );
-            });
+            $venoxCashUsd = static::venoxCashTotalUsd(
+                $row['quantities'],
+                $row['unit_prices'],
+                $row['factory_prices']
+            );
             $startRow = count($rows) + 3;
 
             if (empty($row['products'])) {
@@ -541,6 +539,23 @@ class CheckoutMonthExport implements FromView, WithStyles
     public static function venoxCashUsd(float $qty, float $saleUnitPriceUsd, float $factoryUnitPriceUsd): float
     {
         return $qty * ($saleUnitPriceUsd - $factoryUnitPriceUsd);
+    }
+
+    public static function venoxCashTotalUsd(
+        iterable $quantities,
+        array $saleUnitPricesUsd,
+        array $factoryUnitPricesUsd
+    ): float {
+        $total = 0.0;
+        foreach ($quantities as $index => $qty) {
+            $total += static::venoxCashUsd(
+                (float) $qty,
+                (float) ($saleUnitPricesUsd[$index] ?? 0),
+                (float) ($factoryUnitPricesUsd[$index] ?? 0)
+            );
+        }
+
+        return $total;
     }
 
     /**
