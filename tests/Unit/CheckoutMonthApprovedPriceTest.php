@@ -120,6 +120,13 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $this->assertSame(120.0, $venoxCash);
     }
 
+    public function test_displayed_paid_total_is_converted_to_uzs_with_report_rate(): void
+    {
+        $totalUzs = CheckoutMonthExport::paidTotalUzs(234325435 / 11078, 11078);
+
+        $this->assertEqualsWithDelta(234325435, $totalUzs, 0.01);
+    }
+
     public function test_only_main_expense_type_supports_payment_bonus_link(): void
     {
         $main = new CashExpenditureType(['name' => 'Основной']);

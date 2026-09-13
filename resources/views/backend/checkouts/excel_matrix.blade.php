@@ -1,7 +1,7 @@
 <table>
     <thead>
         <tr>
-            <th colspan="16" style="font-weight:bold; font-size:14px; text-align:left;">{{ $periodLabel }} оралиғидаги мижозлар ҳисоботи (USD)</th>
+            <th colspan="16" style="font-weight:bold; font-size:14px; text-align:left;">{{ $periodLabel }} оралиғидаги мижозлар ҳисоботи (USD) — 1 USD = {{ number_format($reportUsdRate, 0, '.', ' ') }} сўм; жами тўланган = {{ number_format($totalPaidUzs, 0, '.', ' ') }} сўм</th>
         </tr>
         <tr>
             <th>Сана</th>

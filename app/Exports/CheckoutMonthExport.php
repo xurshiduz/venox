@@ -505,10 +505,14 @@ class CheckoutMonthExport implements FromView, WithStyles
 
         $this->rowCount = count($rows);
         $this->rowLineCounts = array_fill(0, $this->rowCount, 1);
+        $totalPaidUsd = $clientIds->sum(fn ($id) => (float) ($clientPayments[(string) $id] ?? 0));
+        $reportUsdRate = Currency::usdRate();
 
         return view('backend.checkouts.excel_matrix', [
             'rows' => $rows,
             'periodLabel' => $periodStart->format('d.m.Y') . ' — ' . $periodEnd->format('d.m.Y'),
+            'reportUsdRate' => $reportUsdRate,
+            'totalPaidUzs' => static::paidTotalUzs($totalPaidUsd, $reportUsdRate),
             'totals' => [
                 'debt_before_payment' => collect($groupedRows)->sum(fn ($row) =>
                     (float) $row['closing_debt_usd']
@@ -516,7 +520,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                     - (float) $row['actual_total_usd']
                 ),
                 'qty' => collect($groupedRows)->sum(fn ($row) => collect($row['quantities'])->sum()),
-                'paid_usd' => $clientIds->sum(fn ($id) => (float) ($clientPayments[(string) $id] ?? 0)),
+                'paid_usd' => $totalPaidUsd,
                 'closing_debt_usd' => $clientIds->sum(fn ($id) => (float) ($closingDebts[(string) $id] ?? 0)),
                 'bonus_expense_usd' => $clientIds->sum(fn ($id) => (float) ($clientBonusExpenses[(string) $id] ?? 0)),
             ],
@@ -574,6 +578,12 @@ class CheckoutMonthExport implements FromView, WithStyles
             'approved_total_usd' => $qty * $approvedUnitPriceUsd,
             'actual_total_usd' => $actualUnitPriceUsd === null ? null : $qty * $actualUnitPriceUsd,
         ];
+    }
+
+    /** Convert the displayed net payment total to UZS with the report rate. */
+    public static function paidTotalUzs(float $paidUsd, float $usdRate): float
+    {
+        return $paidUsd * $usdRate;
     }
 
     /**
