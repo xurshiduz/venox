@@ -113,6 +113,13 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $this->assertNull($totals['actual_total_usd']);
     }
 
+    public function test_venox_cash_is_quantity_times_sale_and_factory_price_difference(): void
+    {
+        $venoxCash = CheckoutMonthExport::venoxCashUsd(10, 65, 53);
+
+        $this->assertSame(120.0, $venoxCash);
+    }
+
     public function test_only_main_expense_type_supports_payment_bonus_link(): void
     {
         $main = new CashExpenditureType(['name' => 'Основной']);

@@ -1,7 +1,7 @@
 <table>
     <thead>
         <tr>
-            <th colspan="15" style="font-weight:bold; font-size:14px; text-align:left;">{{ $periodLabel }} оралиғидаги мижозлар ҳисоботи (USD)</th>
+            <th colspan="16" style="font-weight:bold; font-size:14px; text-align:left;">{{ $periodLabel }} оралиғидаги мижозлар ҳисоботи (USD)</th>
         </tr>
         <tr>
             <th>Сана</th>
@@ -19,6 +19,7 @@
             <th>Тўланган</th>
             <th>Қолдиқ Қарз</th>
             <th>Мижоз учун сарфланган бонус</th>
+            <th>Venox касса</th>
         </tr>
     </thead>
     <tbody>
@@ -39,6 +40,7 @@
                 <td>{{ $row['paid_usd'] }}</td>
                 <td>{{ $row['closing_debt_usd'] }}</td>
                 <td>{{ $row['bonus_expense_usd'] }}</td>
+                <td>{{ $row['venox_cash_usd'] }}</td>
             </tr>
         @endforeach
         <tr>
@@ -54,6 +56,7 @@
             <td>{{ $totals['paid_usd'] }}</td>
             <td>{{ $totals['closing_debt_usd'] }}</td>
             <td>{{ $totals['bonus_expense_usd'] }}</td>
+            <td>{{ count($rows) ? '=SUM(P3:P'.(count($rows) + 2).')' : 0 }}</td>
         </tr>
     </tbody>
 </table>

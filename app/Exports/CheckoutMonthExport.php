@@ -436,6 +436,13 @@ class CheckoutMonthExport implements FromView, WithStyles
             $row['debt_before_payment'] = $row['closing_debt_usd']
                 + $row['gross_paid_usd']
                 - $row['actual_total_usd'];
+            $venoxCashUsd = collect($row['quantities'])->sum(function ($qty, $index) use ($row) {
+                return static::venoxCashUsd(
+                    (float) $qty,
+                    (float) ($row['unit_prices'][$index] ?? 0),
+                    (float) ($row['factory_prices'][$index] ?? 0)
+                );
+            });
             $startRow = count($rows) + 3;
 
             if (empty($row['products'])) {
@@ -455,6 +462,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'paid_usd' => $row['paid_usd'],
                     'closing_debt_usd' => $row['closing_debt_usd'],
                     'bonus_expense_usd' => $row['bonus_expense_usd'],
+                    'venox_cash_usd' => null,
                 ];
 
                 continue;
@@ -482,12 +490,13 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'paid_usd' => $first ? $row['paid_usd'] : null,
                     'closing_debt_usd' => $first ? $row['closing_debt_usd'] : null,
                     'bonus_expense_usd' => $first ? $row['bonus_expense_usd'] : null,
+                    'venox_cash_usd' => $first ? $venoxCashUsd : null,
                 ];
             }
 
             $endRow = count($rows) + 2;
             if ($endRow > $startRow) {
-                foreach (['A', 'B', 'C', 'E', 'M', 'N', 'O'] as $column) {
+                foreach (['A', 'B', 'C', 'E', 'M', 'N', 'O', 'P'] as $column) {
                     $this->mergeRanges[] = $column . $startRow . ':' . $column . $endRow;
                 }
             }
@@ -522,6 +531,11 @@ class CheckoutMonthExport implements FromView, WithStyles
             ->filter()
             ->unique()
             ->values();
+    }
+
+    public static function venoxCashUsd(float $qty, float $saleUnitPriceUsd, float $factoryUnitPriceUsd): float
+    {
+        return $qty * ($saleUnitPriceUsd - $factoryUnitPriceUsd);
     }
 
     /**
@@ -642,7 +656,7 @@ class CheckoutMonthExport implements FromView, WithStyles
         $lastRow = max(3, $this->rowCount + 3);
         $sheet->setShowGridlines(false);
         $sheet->freezePane('A3');
-        $sheet->setAutoFilter('A2:O' . max(2, $this->rowCount + 2));
+        $sheet->setAutoFilter('A2:P' . max(2, $this->rowCount + 2));
         $sheet->getDefaultRowDimension()->setRowHeight(44);
         $sheet->getRowDimension(1)->setRowHeight(28);
         $sheet->getRowDimension(2)->setRowHeight(48);
@@ -655,22 +669,22 @@ class CheckoutMonthExport implements FromView, WithStyles
             $sheet->mergeCells($range);
         }
 
-        foreach (['A' => 13, 'B' => 28, 'C' => 19, 'D' => 24, 'E' => 20, 'F' => 52, 'G' => 15, 'H' => 16, 'I' => 16, 'J' => 20, 'K' => 23, 'L' => 20, 'M' => 17, 'N' => 18, 'O' => 22] as $column => $width) {
+        foreach (['A' => 13, 'B' => 28, 'C' => 19, 'D' => 24, 'E' => 20, 'F' => 52, 'G' => 15, 'H' => 16, 'I' => 16, 'J' => 20, 'K' => 23, 'L' => 20, 'M' => 17, 'N' => 18, 'O' => 22, 'P' => 18] as $column => $width) {
             $sheet->getColumnDimension($column)->setWidth($width);
         }
 
-        $sheet->getStyle('A1:O' . $lastRow)->getAlignment()
+        $sheet->getStyle('A1:P' . $lastRow)->getAlignment()
             ->setVertical(Alignment::VERTICAL_CENTER)
             ->setHorizontal(Alignment::HORIZONTAL_CENTER)
             ->setWrapText(true);
-        $sheet->getStyle('A2:O2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-        $sheet->getStyle('A2:O2')->getFont()->setBold(true)->getColor()->setRGB('000000');
-        $sheet->getStyle('A2:O' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('C9C9C9');
+        $sheet->getStyle('A2:P2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('A2:P2')->getFont()->setBold(true)->getColor()->setRGB('000000');
+        $sheet->getStyle('A2:P' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('C9C9C9');
         $sheet->getStyle('G3:G' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.###');
         $sheet->getStyle('E3:E' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
         $sheet->getStyle('H3:I' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
         $sheet->getStyle('J3:J' . $lastRow)->getNumberFormat()->setFormatCode('0.00%');
-        $sheet->getStyle('K3:O' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
-        $sheet->getStyle('A' . $lastRow . ':O' . $lastRow)->getFont()->setBold(true);
+        $sheet->getStyle('K3:P' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
+        $sheet->getStyle('A' . $lastRow . ':P' . $lastRow)->getFont()->setBold(true);
     }
 }
