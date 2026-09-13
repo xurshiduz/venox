@@ -9,7 +9,7 @@
 @php
     $actualFrom = $dateFrom ?: optional($data->sortBy('date')->first())->date;
     $actualTo = $dateTo ?: optional($data->sortByDesc('date')->first())->date;
-    $details = $data->pluck('details')->flatten();
+    $details = $data->pluck('checkoutDetails')->filter()->flatten();
 @endphp
 <br><h1 class="title-order">ПРОДАЖА @if($actualFrom || $actualTo) от {{ $actualFrom ? \Carbon\Carbon::parse($actualFrom)->format('d.m.y') : 'начала' }}г. до {{ $actualTo ? \Carbon\Carbon::parse($actualTo)->format('d.m.y') : 'сегодня' }}г.@endif</h1>
 <p class="filter-line">Менеджер: <b>{{ $selectedAgentName ?: 'Все' }}</b></p>
@@ -24,20 +24,20 @@
 @forelse($data->groupBy('currency_type') as $currencyRows)
 @php($currencyName=optional($currencyRows->first()->currencytypeid)->name ?: 'Валюта')
 <tr><td width="55%">Итого сумма ({{ $currencyName }})</td><td><b>{{ number_format((float)$currencyRows->sum('total_price'),2,'.',' ') }}</b></td></tr>
-<tr><td>Итого себестоимость ({{ $currencyName }})</td><td>{{ number_format((float)$currencyRows->sum(fn($c)=>$c->details->sum(fn($d)=>(float)$d->tan_price*(float)$d->qty)),2,'.',' ') }}</td></tr>
+<tr><td>Итого себестоимость ({{ $currencyName }})</td><td>{{ number_format((float)$currencyRows->sum(fn($c)=>optional($c->checkoutDetails)->sum(fn($d)=>(float)$d->tan_price*(float)$d->qty) ?: 0),2,'.',' ') }}</td></tr>
 @empty<tr><td>Итого сумма</td><td>0.00</td></tr>@endforelse
 </table></div>
 <table><thead><tr><th style="width:27%">Наименование товаров (работ, услуг)</th><th>Кол-во</th><th>Цена</th><th>Себестоимость</th><th>Разница</th><th>Итого сумма</th><th>Итого себ-сть</th><th>Итого разница</th></tr><tr>@for($i=1;$i<=8;$i++)<th>{{ $i }}</th>@endfor</tr></thead><tbody>
 @forelse($data as $item)
 <tr class="contract-row"><td colspan="8"><b>Договор:</b> {{ $item->number_work ?: 'Чер. #'.$item->id }} от {{ \Carbon\Carbon::parse($item->date)->format('d.m.Y') }} &nbsp; <b>Менеджер:</b> {{ optional($item->managerid)->name ?: '—' }} &nbsp; <b>Клиент:</b> {{ optional($item->supid)->name ?: '—' }} @if(optional($item->currencytypeid)->name)&nbsp; <b>Валюта:</b> {{ $item->currencytypeid->name }}@endif</td></tr>
-@forelse($item->details as $detail)
+@forelse(($item->checkoutDetails ?: collect()) as $detail)
 @php($cost=(float)$detail->tan_price) @php($price=(float)$detail->price) @php($qty=(float)$detail->qty) @php($total=(float)$detail->total_price) @php($costTotal=$cost*$qty)
 <tr><td>{{ optional($detail->prodid)->name ?: '—' }}</td><td class="center">{{ number_format($qty,2,'.',' ') }}</td><td class="number">{{ number_format($price,2,'.',' ') }}</td><td class="number">{{ $cost?number_format($cost,2,'.',' '):'' }}</td><td class="number">{{ $cost?number_format($price-$cost,2,'.',' '):'' }}</td><td class="number">{{ number_format($total,2,'.',' ') }}</td><td class="number">{{ $cost?number_format($costTotal,2,'.',' '):'' }}</td><td class="number">{{ $cost?number_format($total-$costTotal,2,'.',' '):'' }}</td></tr>
 @empty<tr><td colspan="8" class="center">Товары не найдены</td></tr>@endforelse
 @empty<tr><td colspan="8" class="center">По выбранному фильтру данные не найдены.</td></tr>@endforelse
 </tbody></table>
 @foreach($data->groupBy('currency_type') as $currencyRows)
-@php($currencyName=optional($currencyRows->first()->currencytypeid)->name ?: 'Валюта') @php($sales=(float)$currencyRows->sum('total_price')) @php($cost=(float)$currencyRows->sum(fn($c)=>$c->details->sum(fn($d)=>(float)$d->tan_price*(float)$d->qty)))
+@php($currencyName=optional($currencyRows->first()->currencytypeid)->name ?: 'Валюта') @php($sales=(float)$currencyRows->sum('total_price')) @php($cost=(float)$currencyRows->sum(fn($c)=>optional($c->checkoutDetails)->sum(fn($d)=>(float)$d->tan_price*(float)$d->qty) ?: 0))
 <table class="signatures"><tr><td width="50%">Руководитель: ____________________</td><td>Итого сумма ({{ $currencyName }}): {{ number_format($sales,2,'.',' ') }}</td></tr><tr><td>Главный бухгалтер: ____________________</td><td>Итого себ-сть: {{ number_format($cost,2,'.',' ') }}</td></tr><tr><td><b>М.П.</b></td><td>Итого разница: {{ number_format($sales-$cost,2,'.',' ') }}</td></tr></table>
 @endforeach
 </div>
