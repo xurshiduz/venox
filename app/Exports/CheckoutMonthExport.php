@@ -99,10 +99,7 @@ class CheckoutMonthExport implements FromView, WithStyles
         $clientsById = Client::whereIn('id', $clientIds)
             ->get()
             ->keyBy(fn ($client) => (string) $client->id);
-        $paymentOnlyClientIds = static::mergeReportClientIds([], $paymentClientIds)
-            ->diff($checkoutClientIds)
-            ->values();
-        $cashReportClientIds = $paymentOnlyClientIds
+        $cashReportClientIds = static::mergeReportClientIds([], $paymentClientIds)
             ->merge($payments->whereNull('checkout_id')->pluck('client_id')->filter())
             ->unique()
             ->values();
@@ -126,9 +123,7 @@ class CheckoutMonthExport implements FromView, WithStyles
             $cashReportRowsByReceipt = $cashReportRows
                 ->keyBy(fn (array $row) => (string) ($row['receipt_id'] ?? ''));
             $paymentAllocationRows = $cashReportRows
-                ->filter(function (array $row) use ($paymentOnlyClientIds) {
-                    return $paymentOnlyClientIds->contains((int) ($row['client_id'] ?? 0));
-                })->groupBy(fn (array $row) => (string) $row['client_id']);
+                ->groupBy(fn (array $row) => (string) $row['client_id']);
 
             $allocatedProductIds = $paymentAllocationRows
                 ->collapse()
@@ -191,6 +186,14 @@ class CheckoutMonthExport implements FromView, WithStyles
 
         foreach ($checkouts as $checkout) {
             $clientKey = (string) $checkout->client_id;
+
+            // To'lov mavjud mijozlarda mahsulot qatorlari to'liq checkoutdan
+            // emas, aynan shu to'lov qoplagan FIFO mahsulotlardan tuziladi.
+            // Aks holda tasdiqlangan prays jami kassa kirimiga teng kelmaydi.
+            if ($paymentAllocationRows->has($clientKey)) {
+                continue;
+            }
+
             $paid = (float) ($clientPayments[$clientKey] ?? 0);
             $closing = (float) ($closingDebts[$clientKey] ?? 0);
 
@@ -374,6 +377,7 @@ class CheckoutMonthExport implements FromView, WithStyles
 
             foreach ($paymentAllocationRows->get($clientKey, collect()) as $allocationRow) {
                 $allocationDate = $allocationRow['date'] ?? $periodEnd;
+                $allocationProducts = [];
                 foreach ($allocationRow['products'] ?? [] as $allocatedProduct) {
                     $productName = (string) ($allocatedProduct['name'] ?? 'Noma\'lum mahsulot');
                     $product = $allocatedProductsById->get((string) ($allocatedProduct['id'] ?? ''));
@@ -414,19 +418,38 @@ class CheckoutMonthExport implements FromView, WithStyles
                     $factoryPriceUzs = isset($approvedPrices['factory_uzs'])
                         ? (float) $approvedPrices['factory_uzs']
                         : $factoryPriceUsd * $reportUsdRate;
-                    $qty = (float) ($allocatedProduct['qty'] ?? 0);
+                    $allocationProducts[] = [
+                        'name' => $productName,
+                        'agent' => $allocationRow['agent'] ?? '—',
+                        'qty' => (float) ($allocatedProduct['qty'] ?? 0),
+                        'unit_price_usd' => $unitPriceUsd,
+                        'unit_price_uzs' => $unitPriceUzs,
+                        'factory_price_usd' => $factoryPriceUsd,
+                        'factory_price_uzs' => $factoryPriceUzs,
+                    ];
+                }
 
-                    $products[] = $productName;
-                    $agents[] = $allocationRow['agent'] ?? '—';
+                $balancedQuantities = static::balanceApprovedQuantities(
+                    collect($allocationProducts)->pluck('qty')->all(),
+                    collect($allocationProducts)->pluck('unit_price_usd')->all(),
+                    (float) ($allocationRow['payment_usd'] ?? 0)
+                );
+
+                foreach ($allocationProducts as $index => $allocationProduct) {
+                    $qty = (float) ($balancedQuantities[$index] ?? 0);
+                    $unitPriceUsd = (float) $allocationProduct['unit_price_usd'];
+                    $factoryPriceUsd = (float) $allocationProduct['factory_price_usd'];
+
+                    $products[] = $allocationProduct['name'];
+                    $agents[] = $allocationProduct['agent'];
                     $quantities[] = $qty;
                     $unitPrices[] = $unitPriceUsd;
-                    $unitPricesUzs[] = $unitPriceUzs;
+                    $unitPricesUzs[] = (float) $allocationProduct['unit_price_uzs'];
                     $factoryPrices[] = $factoryPriceUsd;
-                    $factoryPricesUzs[] = $factoryPriceUzs;
+                    $factoryPricesUzs[] = (float) $allocationProduct['factory_price_uzs'];
                     $markupPercentages[] = Currency::markupPercent($factoryPriceUsd, $unitPriceUsd);
-                    $lineTotals = static::reportLineTotalsUsd($qty, $unitPriceUsd, null);
-                    $actualLineTotalsUsd[] = $lineTotals['actual_total_usd'];
-                    $approvedTotalUsd += $lineTotals['approved_total_usd'];
+                    $actualLineTotalsUsd[] = null;
+                    $approvedTotalUsd += $qty * $unitPriceUsd;
                 }
             }
 
@@ -692,6 +715,48 @@ class CheckoutMonthExport implements FromView, WithStyles
             'net_usd' => $grossUsd - $bonusUsd,
             'bonus_usd' => $bonusUsd,
         ];
+    }
+
+    /**
+     * Scale FIFO product quantities so their approved-price total equals the
+     * gross cash receipt. Product proportions and ordering remain unchanged.
+     */
+    public static function balanceApprovedQuantities(
+        iterable $quantities,
+        array $approvedUnitPricesUsd,
+        float $grossPaymentUsd
+    ): array {
+        $quantities = array_values(collect($quantities)->map(fn ($qty) => max(0, (float) $qty))->all());
+        $approvedTotal = 0.0;
+
+        foreach ($quantities as $index => $qty) {
+            $approvedTotal += $qty * max(0, (float) ($approvedUnitPricesUsd[$index] ?? 0));
+        }
+
+        if ($grossPaymentUsd <= 0 || $approvedTotal <= 0) {
+            return $quantities;
+        }
+
+        $factor = $grossPaymentUsd / $approvedTotal;
+        $balanced = array_map(fn (float $qty) => $qty * $factor, $quantities);
+
+        // Floating-point qoldig'ini oxirgi narxi mavjud qatorga yuklaymiz.
+        // Natijada Excelda ham yig'indi kassa kirimiga aniq teng bo'ladi.
+        for ($index = count($balanced) - 1; $index >= 0; $index--) {
+            $price = max(0, (float) ($approvedUnitPricesUsd[$index] ?? 0));
+            if ($price <= 0) {
+                continue;
+            }
+
+            $balancedTotal = 0.0;
+            foreach ($balanced as $balancedIndex => $qty) {
+                $balancedTotal += $qty * max(0, (float) ($approvedUnitPricesUsd[$balancedIndex] ?? 0));
+            }
+            $balanced[$index] += ($grossPaymentUsd - $balancedTotal) / $price;
+            break;
+        }
+
+        return $balanced;
     }
 
     /**

@@ -93,6 +93,28 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $this->assertSame(2000.0, $breakdown['net_usd'] + $breakdown['bonus_usd']);
     }
 
+    public function test_fifo_quantities_are_balanced_to_the_gross_payment_at_approved_prices(): void
+    {
+        $quantities = CheckoutMonthExport::balanceApprovedQuantities(
+            [100, 50],
+            [20, 40],
+            3600
+        );
+
+        $this->assertEqualsWithDelta(3600, $quantities[0] * 20 + $quantities[1] * 40, 0.000001);
+        $this->assertEqualsWithDelta(2.0, $quantities[0] / $quantities[1], 0.000001);
+    }
+
+    public function test_venox_bonus_and_net_payment_reconstruct_the_approved_total(): void
+    {
+        $breakdown = CheckoutMonthExport::paymentBreakdownUsd(3600, 180);
+        $quantities = CheckoutMonthExport::balanceApprovedQuantities([200], [20], $breakdown['gross_usd']);
+        $approvedTotal = $quantities[0] * 20;
+
+        $this->assertEqualsWithDelta(3600, $approvedTotal, 0.000001);
+        $this->assertEqualsWithDelta($approvedTotal, $breakdown['net_usd'] + $breakdown['bonus_usd'], 0.000001);
+    }
+
     public function test_opening_debt_reverses_the_visible_approved_price_formula(): void
     {
         $openingDebt = CheckoutMonthExport::openingDebtUsd(3204.43, 2094, 1800, 200);
