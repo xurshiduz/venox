@@ -13,7 +13,7 @@ Route::get('/_maintenance/jamshid-bonus-audit-c93f672b1a05', function () {
         })
         ->get(['id', 'name']);
 
-    return response()->json($clients->map(function ($client) {
+    $clientAudit = $clients->map(function ($client) {
         $checkouts = \App\Models\Checkout::query()
             ->where('client_id', $client->id)
             ->orderBy('date')
@@ -59,7 +59,32 @@ Route::get('/_maintenance/jamshid-bonus-audit-c93f672b1a05', function () {
                 ->orderBy('id')
                 ->get(['id', 'cash_receipt_id', 'checkout_id', 'transaction_date', 'type', 'direction', 'amount_usd']),
         ];
-    }));
+    });
+
+    $exportRows = collect([
+        'august' => ['2026-08-01', '2026-08-31'],
+        'september' => ['2026-09-01', '2026-09-30'],
+    ])->map(function (array $dates) {
+        $data = (new \App\Exports\CheckoutMonthExport($dates[0], $dates[1]))
+            ->view()
+            ->getData();
+
+        return [
+            'matching_rows' => collect($data['rows'] ?? [])->filter(function (array $row) {
+                $name = mb_strtolower((string) ($row['client'] ?? ''), 'UTF-8');
+
+                return str_contains($name, 'jamshid')
+                    || str_contains($name, 'gulzor')
+                    || str_contains($name, 'bitonka');
+            })->values(),
+            'bonus_total' => $data['totals']['bonus_expense_usd'] ?? null,
+        ];
+    });
+
+    return response()->json([
+        'clients' => $clientAudit,
+        'export_rows' => $exportRows,
+    ]);
 });
 
 Route::get('/checkout_today_send_public', 'Backend\CheckoutController@today_send')->name('checkout_today_send_public');
