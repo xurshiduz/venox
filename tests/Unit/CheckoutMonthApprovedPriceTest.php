@@ -250,12 +250,12 @@ class CheckoutMonthApprovedPriceTest extends TestCase
     public function test_monthly_export_line_cells_are_real_excel_formulas(): void
     {
         $this->assertSame([
-            'unit_price_usd' => '=207000/11078',
-            'factory_price_usd' => '=192000/11078',
+            'unit_price_usd' => '=207000/$Q$2',
+            'factory_price_usd' => '=192000/$Q$2',
             'markup_percent' => '=IFERROR((H3-I3)/I3,"")',
             'approved_total_usd' => '=G3*H3',
             'factory_total_usd' => '=G3*I3',
-        ], CheckoutMonthExport::lineExcelFormulas(3, 207000, 192000, 11078));
+        ], CheckoutMonthExport::lineExcelFormulas(3, 207000, 192000));
     }
 
     public function test_saved_period_commission_bonus_is_used_when_linked_checkout_has_zero_bonus(): void
@@ -319,16 +319,6 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $totalUzs = CheckoutMonthExport::paidTotalUzs(234325435 / 11078, 11078);
 
         $this->assertEqualsWithDelta(234325435, $totalUzs, 0.01);
-    }
-
-    public function test_report_title_contains_current_rate_and_paid_total_in_uzs(): void
-    {
-        $title = CheckoutMonthExport::reportTitle('01.09.2026 — 30.09.2026', 11078, 234325435);
-
-        $this->assertSame(
-            '01.09.2026 — 30.09.2026 оралиғидаги мижозлар ҳисоботи (USD) — 1 USD = 11 078 сўм — Жами тўланган = 234 325 435 сўм',
-            $title
-        );
     }
 
     public function approvedPriceProvider(): array
