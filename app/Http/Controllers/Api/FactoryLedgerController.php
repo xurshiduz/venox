@@ -81,7 +81,7 @@ class FactoryLedgerController extends Controller
             // Adopt the existing manual import instead of duplicating it.
             if (! $expense) {
                 $expense = CashExpenditure::query()
-                    ->whereNull('source_system')
+                    ->when($hasSourceColumns, fn ($query) => $query->whereNull('source_system'))
                     ->where('supplier_id', $supplier->id)
                     ->where('cash_expenditure_types', $expenseType->id)
                     ->whereDate('date', $date)
