@@ -41,6 +41,20 @@ class Checkout extends Model
         return $this->hasMany(ContractBonusTransaction::class, 'checkout_id');
     }
 
+    public function returns()
+    {
+        return $this->hasMany(Returns::class, 'checkout_id');
+    }
+
+    public function reconciliationTotal()
+    {
+        $returnedTotal = $this->relationLoaded('returns')
+            ? $this->returns->sum(fn ($return) => $return->sumtotal())
+            : $this->returns()->get()->sum(fn ($return) => $return->sumtotal());
+
+        return (float) $this->sumtotal() + (float) $returnedTotal;
+    }
+
     public function warid()
     {
         return $this->belongsTo('App\Models\Warehouse', 'warehouse_id');

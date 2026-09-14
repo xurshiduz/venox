@@ -37,9 +37,19 @@
             $clientCredit = null;
 
             if ($item instanceof \App\Models\Checkout) {
-                $companyDebit = $item->sumtotal();
-                $clientCredit = $companyDebit;
-                $nak += $companyDebit;
+                if ($isReturnedCheckout) {
+                    $companyCredit = $item->sumtotal();
+                    $clientDebit = $companyCredit;
+                    $pos += $companyCredit;
+                } else {
+                    $companyDebit = $item->reconciliationTotal();
+                    $clientCredit = $companyDebit;
+                    $nak += $companyDebit;
+                }
+            } elseif ($item instanceof \App\Models\Returns) {
+                $companyCredit = $item->sumtotal();
+                $clientDebit = $companyCredit;
+                $pos += $companyCredit;
             } elseif ($item instanceof \App\Models\Checkin) {
                 $companyCredit = $item->sumtotal();
                 $clientDebit = $companyCredit;
@@ -59,6 +69,8 @@
             <td style="text-align: center; font-weight: bold;">
                 @if($item instanceof \App\Models\Checkout)
                     {{ $isReturnedCheckout ? 'Возврат товара' : (optional($item->checktypeid)->name ?: 'Продажа') }}
+                @elseif($item instanceof \App\Models\Returns)
+                    Возврат товара
                 @elseif($item instanceof \App\Models\Checkin)
                     {{ $checkinTypeName ?: 'Поступление товара' }}
                 @elseif($item instanceof \App\Models\CashExpenditure)
@@ -70,6 +82,8 @@
             <td>
                 @if($item instanceof \App\Models\Checkout)
                     {{ $isReturnedCheckout ? 'Возврат товара; накладная' : 'Накладная - счет фактура' }} №{{ $item->number_work }};
+                @elseif($item instanceof \App\Models\Returns)
+                    Возврат товара по накладной №{{ $item->number_doc }}; {{ optional($item->prodid)->name }} — {{ number_format((float) $item->qty, 2, '.', ' ') }}
                 @elseif($item instanceof \App\Models\Checkin)
                     {{ $checkinTypeName ?: 'Поступление товара' }} ИД; с/ф №{{ $item->number_work }} ({{ $item->reference }});
                 @elseif($item instanceof \App\Models\CashExpenditure)

@@ -10,6 +10,16 @@ class Returns extends Model
     use HasFactory;
     
     protected $guarded = [];
+
+    public function sumtotal()
+    {
+        return (float) $this->qty * (float) $this->price;
+    }
+
+    public function checkout()
+    {
+        return $this->belongsTo(Checkout::class, 'checkout_id');
+    }
     
     public function checkdetid()
     {

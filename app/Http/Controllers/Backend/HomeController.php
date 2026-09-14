@@ -28,6 +28,7 @@ use App\Models\DisplayOrder;
 use App\Models\CashReceipt;
 use App\Models\Warehouse;
 use App\Models\Checkout;
+use App\Models\Returns;
 use App\Models\Currency;
 use App\Models\History;
 use App\Models\Product;
@@ -197,9 +198,14 @@ class HomeController extends Controller
     $clientid = $request->client_id;
     
     // 1. O'tgan davr uchun ma'lumotlar
-    $prev_checkouts = Checkout::where('status', 1)->where('client_id', $clientid)->where('date', '<', $from)->get();
+    $prev_checkouts = Checkout::with('returns')->where('status', 1)->where('client_id', $clientid)->where('date', '<', $from)->get();
     $prev_cashs = CashReceipt::where('status', 1)->where('client_id', $clientid)->where('date', '<', $from)->get();
     $prev_checkins = Checkin::where('status', 1)->where('client_id', $clientid)->where('date', '<', $from)->get();
+    $prev_returns = Returns::whereHas('checkout', function ($query) use ($clientid) {
+            $query->where('client_id', $clientid)->where('status', 1);
+        })
+        ->whereDate('created_at', '<', $from)
+        ->get();
     
     // O'tgan davr uchun pul chiqimlari (CashExpenditure)
     $prev_cash_expenditures = CashExpenditure::where('supplier_id', $clientid)
@@ -209,12 +215,15 @@ class HomeController extends Controller
     
     // Summalarni hisoblash
     // Sotuvlar va mijozga berilgan pullar (Debet)
-    $sum_prev_debets = $prev_checkouts->sum(function($item) { return $item->sumtotal(); }) 
+    $sum_prev_debets = $prev_checkouts->where('checkout_tip_id', '!=', 2)
+                     ->sum(function($item) { return $item->reconciliationTotal(); })
                      + $prev_cash_expenditures->sum('price'); 
 
     // To'lovlar va vozvratlar (Kredit)
     $sum_prev_credits = $prev_cashs->sum('price') 
-                      + $prev_checkins->sum(function($item) { return $item->sumtotal(); }); 
+                      + $prev_checkins->sum(function($item) { return $item->sumtotal(); })
+                      + $prev_checkouts->where('checkout_tip_id', 2)->sum(function($item) { return $item->sumtotal(); })
+                      + $prev_returns->sum(function($item) { return $item->sumtotal(); });
     
     // --- YANGI QO'SHILGAN QISM: Boshlang'ich qarz ---
     $initial_balance = $client->balance ? (float)$client->balance : 0;
@@ -223,9 +232,18 @@ class HomeController extends Controller
     $start_saldo = $initial_balance + $sum_prev_debets - $sum_prev_credits; 
 
     // 2. Tanlangan oraliqdagi operatsiyalar
-    $checkouts = Checkout::with('checktypeid')->where('status', 1)->where('client_id', $clientid)->whereBetween('date', [$from, $to])->get();
+    $checkouts = Checkout::with(['checktypeid', 'returns'])->where('status', 1)->where('client_id', $clientid)->whereBetween('date', [$from, $to])->get();
     $cashs = CashReceipt::where('status', 1)->where('client_id', $clientid)->whereBetween('date', [$from, $to])->get();
     $checkins = Checkin::with('typeid')->where('status', 1)->where('client_id', $clientid)->whereBetween('date', [$from, $to])->get();
+    $returns = Returns::with(['checkout', 'prodid'])
+        ->whereHas('checkout', function ($query) use ($clientid) {
+            $query->where('client_id', $clientid)->where('status', 1);
+        })
+        ->whereBetween('created_at', [Carbon::parse($from)->startOfDay(), Carbon::parse($to)->endOfDay()])
+        ->get()
+        ->each(function ($return) {
+            $return->setAttribute('date', $return->created_at->format('Y-m-d'));
+        });
     
     // Tanlangan oraliq uchun pul chiqimlari
     $cash_expenditures = CashExpenditure::where('supplier_id', $clientid)
@@ -236,6 +254,7 @@ class HomeController extends Controller
     // Barcha ma'lumotlarni birlashtirish va sana bo'yicha tartiblash
     $data = $checkouts->concat($cashs)
                       ->concat($checkins)
+                      ->concat($returns)
                       ->concat($cash_expenditures)
                       ->sortBy('date');
     

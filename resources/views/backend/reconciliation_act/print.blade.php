@@ -98,11 +98,14 @@
                                 $amount = 0;
                                 $is_debit = false; // Sotuvmi yoki chiqim?
 
-                                if(isset($item->checkout_tip_id)) {
-                                    // Checkout (Sotuv) -> Debet
+                                if($item instanceof \App\Models\Checkout) {
+                                    $isReturnedCheckout = (int) $item->checkout_tip_id === 2;
+                                    $amount = $isReturnedCheckout ? $item->sumtotal() : $item->reconciliationTotal();
+                                    $is_debit = !$isReturnedCheckout;
+                                    $is_debit ? $period_debet += $amount : $period_credit += $amount;
+                                } elseif($item instanceof \App\Models\Returns) {
                                     $amount = $item->sumtotal();
-                                    $is_debit = true;
-                                    $period_debet += $amount;
+                                    $period_credit += $amount;
                                 } elseif(isset($item->step)) {
                                     // Checkin (Vozvrat) -> Kredit
                                     $amount = $item->sumtotal();
@@ -132,6 +135,8 @@
                             <td style="padding: 0px 5px; text-align: center; font-weight: bold;">
                                 @if($item instanceof \App\Models\Checkout)
                                     {{ $isReturnedCheckout ? 'Возврат товара' : (optional($item->checktypeid)->name ?: 'Продажа') }}
+                                @elseif($item instanceof \App\Models\Returns)
+                                    Возврат товара
                                 @elseif($item instanceof \App\Models\Checkin)
                                     {{ $checkinTypeName ?: 'Поступление товара' }}
                                 @elseif($item instanceof \App\Models\CashExpenditure)
@@ -143,6 +148,8 @@
                             <td style="padding: 0px 5px;">
                                 @if(isset($item->checkout_tip_id)) 
                                     <a target="_blank" href="{{ route('checkout_form', ['id' => $item->code, 'view' => 'full']) }}" style="text-decoration: none; color: #000;"> {{ $isReturnedCheckout ? 'Возврат товара; накладная' : 'Накладная - счет фактура' }} №{{ $item->number_work }};</a>
+                                @elseif($item instanceof \App\Models\Returns)
+                                    Возврат товара по накладной №{{ $item->number_doc }}; {{ optional($item->prodid)->name }} — {{ number_format((float) $item->qty, 2, '.', ' ') }}
                                 @elseif(isset($item->step)) 
                                     <a target="_blank" href="{{ route('checkin_form', ['id' => $item->code, 'view' => 'full']) }}" style="text-decoration: none; color: #000;"> {{ $checkinTypeName ?: 'Поступление товара' }} ИД; с/ф №{{ $item->number_work }} <b>({{ $item->reference }})</b>;</a>
                                 @elseif(isset($item->cash_expenditure_types))
