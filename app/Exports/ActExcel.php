@@ -49,7 +49,9 @@ class ActExcel implements FromView, WithEvents
             ->where('date', '<', $from)
             ->get();
         $previousReturns = Returns::whereHas('checkout', function ($query) {
-                $query->where('client_id', $this->clientid)->where('status', 1);
+                // Qaytarish yozuvi asosiy nakladnoyning joriy statusidan
+                // qat'i nazar aktda va boshlang'ich saldoda qolishi kerak.
+                $query->where('client_id', $this->clientid);
             })
             ->whereDate('created_at', '<', $from)
             ->get();
@@ -78,7 +80,7 @@ class ActExcel implements FromView, WithEvents
         $checkins = Checkin::with('typeid')->where('status', 1)->where('client_id', $this->clientid)->whereBetween('date', [$this->from, $this->to])->get();
         $returns = Returns::with(['checkout', 'prodid'])
             ->whereHas('checkout', function ($query) {
-                $query->where('client_id', $this->clientid)->where('status', 1);
+                $query->where('client_id', $this->clientid);
             })
             ->whereBetween('created_at', [Carbon::parse($this->from)->startOfDay(), Carbon::parse($this->to)->endOfDay()])
             ->get()

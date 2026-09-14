@@ -202,7 +202,9 @@ class HomeController extends Controller
     $prev_cashs = CashReceipt::where('status', 1)->where('client_id', $clientid)->where('date', '<', $from)->get();
     $prev_checkins = Checkin::where('status', 1)->where('client_id', $clientid)->where('date', '<', $from)->get();
     $prev_returns = Returns::whereHas('checkout', function ($query) use ($clientid) {
-            $query->where('client_id', $clientid)->where('status', 1);
+            // Qaytarish alohida, saqlangan operatsiya hisoblanadi. Asosiy
+            // nakladnoyning keyingi statusi uni aktdan yashirmasligi kerak.
+            $query->where('client_id', $clientid);
         })
         ->whereDate('created_at', '<', $from)
         ->get();
@@ -237,7 +239,7 @@ class HomeController extends Controller
     $checkins = Checkin::with('typeid')->where('status', 1)->where('client_id', $clientid)->whereBetween('date', [$from, $to])->get();
     $returns = Returns::with(['checkout', 'prodid'])
         ->whereHas('checkout', function ($query) use ($clientid) {
-            $query->where('client_id', $clientid)->where('status', 1);
+            $query->where('client_id', $clientid);
         })
         ->whereBetween('created_at', [Carbon::parse($from)->startOfDay(), Carbon::parse($to)->endOfDay()])
         ->get()
