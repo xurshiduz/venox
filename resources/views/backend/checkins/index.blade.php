@@ -44,6 +44,7 @@
                                       <th width="150px">{{ trans('backend.table.data_add') }}</th>
                                       <th width="110px">{{ trans('backend.table.add_user') }}</th>
                                       <th width="50px">{{ trans('backend.table.delete') }}</th>
+                                      <th>Holati</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -62,7 +63,11 @@
                                        <td>{{ $item->details->count() }} </td>
                                        <td>{{ number_format($item->currency_type_price, 0, '.', ' ') }}</td>
                                        <td>
+                                           @if(!$item->source_system)
                                            <a href="{{ route('checkin_form', ['id' => $item->code])}}" style="text-decoration:underline;">{{ trans('backend.table.post_edit_short') }}</a>
+                                           @else
+                                           <span class="text-muted">LIDAZ</span>
+                                           @endif
                                            @if($item->file_excel) | <a href="{{ route('checkin_form', ['id' => $item->code])}}" style="text-decoration:underline;">EXCEL</a> @endif
                                        </td>
                                        <td>{{ $item->reference }} </td>
@@ -84,7 +89,26 @@
                                        </td>
                                       <td>{{ Carbon\Carbon::parse($item->date)->format('Y-m-d') . ' ' .  $item->created_at->format('H:i') }} </td>
                                       <td>{{ $item->userid ? $item->userid->name : null  }}</td>
-                                      <td><a href="{{ route('delete_checkin', ['id' => $item->code])}}" style="text-decoration:underline;">{{ trans('backend.table.delete') }}</a></td>
+                                      <td>
+                                          @if(!$item->source_system)
+                                          <a href="{{ route('delete_checkin', ['id' => $item->code])}}" style="text-decoration:underline;">{{ trans('backend.table.delete') }}</a>
+                                          @endif
+                                      </td>
+                                      <td>
+                                          @if($item->source_system === 'lidaz' && (int)$item->status === 0)
+                                              <a class="btn btn-sm btn-success" href="{{ route('checkin_done_status', ['id' => $item->code]) }}" onclick="return confirm('Jo‘natmani qabul qilib qoldiqqa qo‘shasizmi?')">Qabul qilish</a>
+                                              <a class="btn btn-sm btn-danger" href="{{ route('checkin_cancel_status', ['id' => $item->code]) }}" onclick="return confirm('Jo‘natmani rad etasizmi?')">Rad etish</a>
+                                          @elseif((int)$item->status === 1)
+                                              <span class="badge badge-success">Qabul qilingan</span>
+                                              @if($item->source_system === 'lidaz')
+                                                  <a class="btn btn-sm btn-outline-danger ml-1" href="{{ route('supplier_return_form', $item->code) }}">LIDAZga qaytarish</a>
+                                              @endif
+                                          @elseif((int)$item->status === 2)
+                                              <span class="badge badge-danger">Rad etilgan</span>
+                                          @else
+                                              <span class="badge badge-warning">Kutilmoqda</span>
+                                          @endif
+                                      </td>
                                     </tr>
                                     @endforeach
                                   </tbody>

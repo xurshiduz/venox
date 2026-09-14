@@ -28,6 +28,7 @@ use Carbon\Carbon;
 use Excel;
 use Auth;
 use Str;
+use DB;
 
 class CheckinController extends Controller
 {
@@ -556,7 +557,11 @@ class CheckinController extends Controller
     
     public function done_status($id = null)
     {
-        $item = Checkin::where('code',$id)->first();
+        return DB::transaction(function () use ($id) {
+        $item = Checkin::where('code',$id)->lockForUpdate()->firstOrFail();
+        if ((int) $item->status === 1) {
+            return redirect()->action('Backend\CheckinController@index');
+        }
         $data['status'] = 1;
         $year = Carbon::now()->format('Y');
         
@@ -575,15 +580,33 @@ class CheckinController extends Controller
         
         foreach($item->details as $det){
             $det->update(['status' => 1]);
+            if ($item->source_system === 'lidaz') {
+                $stock = WarehouseStock::lockForUpdate()->firstOrNew([
+                    'warehouse_id' => $det->warehouse_id,
+                    'product_id' => $det->product_id,
+                ]);
+                $newStock = (float) ($stock->stock ?? 0) + (float) $det->qty;
+                $stock->fill([
+                    'stock' => $newStock,
+                    'checkin_price' => $det->price,
+                    'checkout_price' => $det->prodid->price ?: ($det->prodid->checkoutdetails()->max('price') ?? 0),
+                    'checkin_total_price' => $det->price * $newStock,
+                    'checkout_total_price' => ($det->prodid->price ?: ($det->prodid->checkoutdetails()->max('price') ?? 0)) * $newStock,
+                ])->save();
+            }
         }
         
 
-        return redirect()->action('Backend\CheckinController@index');
+        return redirect()->action('Backend\CheckinController@index')->with('success', 'LIDAZ jo‘natmasi qabul qilindi va qoldiqqa qo‘shildi.');
+        });
     }
     
     public function cancel_status($id = null)
     {
-        $item = Checkin::where('code',$id)->first();
+        $item = Checkin::where('code',$id)->firstOrFail();
+        if ((int) $item->status === 1) {
+            return back()->with('error', 'Qabul qilingan hujjatni rad etib bo‘lmaydi.');
+        }
         $item->update(['status' => 2]);
         foreach($item->details as $det){
             $det->update(['status' => 2]);

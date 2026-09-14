@@ -265,6 +265,8 @@ Route::group(
         Route::get('/checkin_select/{id}/delete', 'Backend\CheckinController@delete')->name('checkin_delete');
         Route::get('/checkin_done/{id}/select', 'Backend\CheckinController@done_status')->name('checkin_done_status');
         Route::get('/checkin_cancel/{id}/select', 'Backend\CheckinController@cancel_status')->name('checkin_cancel_status');
+        Route::get('/checkin/{code}/supplier-return', 'Backend\SupplierReturnRequestController@form')->name('supplier_return_form');
+        Route::post('/checkin/{code}/supplier-return', 'Backend\SupplierReturnRequestController@store')->name('supplier_return_store');
         Route::get('/checkin_delete/{id}', 'Backend\CheckinController@delete_checkin')->name('delete_checkin');
         //Excel
         Route::get('/checkin_excel/{id?}', 'Backend\CheckinController@excel')->name('checkin_excel');
