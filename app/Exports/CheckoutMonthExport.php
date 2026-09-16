@@ -395,6 +395,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                         2,
                         $approvedPriceService->usdRate()
                     );
+                    $actualUnitPriceUsd = static::checkoutDetailUnitPriceUsd($detail, $periodCheckout);
                     $clientAllocationProducts[] = [
                         'price_key' => (string) ($approvedPrices['code'] ?? $productName),
                         'name' => $productName,
@@ -405,6 +406,10 @@ class CheckoutMonthExport implements FromView, WithStyles
                         'unit_price_uzs' => $unitPriceUzs,
                         'factory_price_usd' => $factoryPriceUsd,
                         'factory_price_uzs' => $factoryPriceUzs,
+                        'actual_unit_price_usd' => $actualUnitPriceUsd,
+                        'actual_total_usd' => $actualUnitPriceUsd === null
+                            ? null
+                            : $actualUnitPriceUsd * (float) ($detail->qty ?? 0),
                     ];
                 }
             }
@@ -441,6 +446,8 @@ class CheckoutMonthExport implements FromView, WithStyles
                             'unit_price_uzs' => $unitPriceUzs,
                             'factory_price_usd' => $factoryPriceUsd,
                             'factory_price_uzs' => $factoryPriceUzs,
+                            'actual_unit_price_usd' => null,
+                            'actual_total_usd' => null,
                         ];
                     }
                 }
@@ -472,6 +479,8 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'unit_price_uzs' => $unitPriceUzs,
                     'factory_price_usd' => $factoryPriceUzs / $reportUsdRate,
                     'factory_price_uzs' => $factoryPriceUzs,
+                    'actual_unit_price_usd' => null,
+                    'actual_total_usd' => null,
                 ];
                 $existingPriceKeys[] = mb_strtolower($priceKey, 'UTF-8');
             }
@@ -481,6 +490,15 @@ class CheckoutMonthExport implements FromView, WithStyles
                 ->map(function (Collection $sameProducts): array {
                     $product = $sameProducts->first();
                     $product['qty'] = (float) $sameProducts->sum('qty');
+                    $actualQty = (float) $sameProducts
+                        ->filter(fn (array $row) => $row['actual_unit_price_usd'] !== null)
+                        ->sum('qty');
+                    $actualTotal = (float) $sameProducts->sum(fn (array $row) =>
+                        (float) ($row['actual_total_usd'] ?? 0)
+                    );
+                    $product['actual_unit_price_usd'] = $actualQty > 0
+                        ? $actualTotal / $actualQty
+                        : null;
 
                     return $product;
                 })
@@ -513,11 +531,14 @@ class CheckoutMonthExport implements FromView, WithStyles
                 $quantities[] = $qty;
                 $unitPrices[] = $unitPriceUsd;
                 $unitPricesUzs[] = (float) $allocationProduct['unit_price_uzs'];
-                $actualUnitPricesUsd[] = null;
+                $actualUnitPriceUsd = $allocationProduct['actual_unit_price_usd'] ?? null;
+                $actualUnitPricesUsd[] = $actualUnitPriceUsd;
                 $factoryPrices[] = $factoryPriceUsd;
                 $factoryPricesUzs[] = (float) $allocationProduct['factory_price_uzs'];
                 $markupPercentages[] = Currency::markupPercent($factoryPriceUsd, $unitPriceUsd);
-                $actualLineTotalsUsd[] = null;
+                $actualLineTotalsUsd[] = $actualUnitPriceUsd === null
+                    ? null
+                    : $qty * (float) $actualUnitPriceUsd;
                 $approvedTotalUsd += $qty * $unitPriceUsd;
             }
 
@@ -743,6 +764,41 @@ class CheckoutMonthExport implements FromView, WithStyles
             'actual_total_usd' => sprintf('=G%d*I%d', $row, $row),
             'factory_total_usd' => sprintf('=G%d*J%d', $row, $row),
         ];
+    }
+
+    /** Checkout sahifasida saqlangan haqiqiy mijoz narxini USDda qaytaradi. */
+    public static function checkoutDetailUnitPriceUsd($detail, Checkout $checkout): ?float
+    {
+        $qty = (float) ($detail->qty ?? 0);
+        if ($qty <= 0) {
+            return null;
+        }
+
+        $total = (float) ($detail->total_price ?? 0);
+        if ($total <= 0) {
+            $total = (float) ($detail->price ?? 0) * $qty;
+        }
+        if ($total <= 0) {
+            return null;
+        }
+
+        $currencyType = (int) ($detail->currency_type ?? $checkout->currency_type ?? 2);
+        $rate = (float) ($detail->currency_type_price
+            ?? $checkout->currency_type_price
+            ?? Currency::usdRateForDate($checkout->date ?: $checkout->created_at));
+        $unitPrice = $total / $qty;
+
+        // Eski checkoutlarda USD narxi UZS sifatida, kurs esa 1 bilan yozilgan.
+        if ($currencyType === 2 && $rate <= 1 && $unitPrice > 0 && $unitPrice < 1000) {
+            return $unitPrice;
+        }
+
+        return Currency::documentAmountToUsd(
+            $unitPrice,
+            $currencyType,
+            $rate,
+            $checkout->date ?: $checkout->created_at
+        );
     }
 
     private static function excelNumber(float $value): string

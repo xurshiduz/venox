@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Exports\CheckoutMonthExport;
 use App\Models\Checkout;
+use App\Models\CheckoutDetail;
 use App\Services\ApprovedProductPriceService;
 use PHPUnit\Framework\TestCase;
 
@@ -257,6 +258,48 @@ class CheckoutMonthApprovedPriceTest extends TestCase
             'actual_total_usd' => '=G3*I3',
             'factory_total_usd' => '=G3*J3',
         ], CheckoutMonthExport::lineExcelFormulas(3, 207000, 192000));
+    }
+
+    public function test_actual_client_price_is_read_from_checkout_detail(): void
+    {
+        $checkout = new Checkout([
+            'date' => '2026-09-16',
+            'currency_type' => 2,
+            'currency_type_price' => 11900,
+        ]);
+        $detail = new CheckoutDetail([
+            'qty' => 12,
+            'total_price' => 3373650,
+            'currency_type' => 2,
+            'currency_type_price' => 11900,
+        ]);
+
+        $this->assertEqualsWithDelta(
+            23.625,
+            CheckoutMonthExport::checkoutDetailUnitPriceUsd($detail, $checkout),
+            0.000001
+        );
+    }
+
+    public function test_legacy_checkout_usd_price_is_not_divided_again(): void
+    {
+        $checkout = new Checkout([
+            'date' => '2026-09-16',
+            'currency_type' => 2,
+            'currency_type_price' => 1,
+        ]);
+        $detail = new CheckoutDetail([
+            'qty' => 4,
+            'total_price' => 70.36,
+            'currency_type' => 2,
+            'currency_type_price' => 1,
+        ]);
+
+        $this->assertEqualsWithDelta(
+            17.59,
+            CheckoutMonthExport::checkoutDetailUnitPriceUsd($detail, $checkout),
+            0.000001
+        );
     }
 
     public function test_saved_period_commission_bonus_is_used_when_linked_checkout_has_zero_bonus(): void
