@@ -50,36 +50,36 @@
                 </div>
             @endforeach
         </div>
-        <div class="card mb-3">
+        <div class="card dashboard-filter mb-3">
             <div class="card-inner py-3">
                 <form method="GET" action="{{ route('checkouts_index', ['ctypeAlias' => $ctypeAlias]) }}">
                     <div class="row gy-2 align-items-end">
                         <div class="col-lg-3 col-md-6">
-                            <label class="form-label mb-1">Qidirish</label>
-                            <input type="text" class="form-control" name="search" value="{{ $keyword }}" placeholder="Hujjat, mijoz, agent yoki izoh">
+                            <label class="form-label mb-1">{{ trans('backend.ui.search') }}</label>
+                            <input type="text" class="form-control" name="search" value="{{ $keyword }}" placeholder="{{ trans('backend.ui.checkout_search_hint') }}">
                         </div>
                         <div class="col-lg-2 col-md-6">
-                            <label class="form-label mb-1">Agent</label>
+                            <label class="form-label mb-1">{{ trans('backend.ui.agent') }}</label>
                             <select class="form-select js-select2" name="agent_id" data-search="on">
-                                <option value="">Barcha agentlar</option>
+                                <option value="">{{ trans('backend.ui.all_agents') }}</option>
                                 @foreach($managers as $manager)
                                     <option value="{{ $manager->id }}" @if((int) $selectedAgent === (int) $manager->id) selected @endif>{{ $manager->name }}</option>
                                 @endforeach
                             </select>
                         </div>
                         <div class="col-lg-2 col-md-6">
-                            <label class="form-label mb-1">Boshlanish sanasi</label>
+                            <label class="form-label mb-1">{{ trans('backend.ui.date_from') }}</label>
                             <input type="date" class="form-control" name="date_from" value="{{ $dateFrom }}">
                         </div>
                         <div class="col-lg-2 col-md-6">
-                            <label class="form-label mb-1">Tugash sanasi</label>
+                            <label class="form-label mb-1">{{ trans('backend.ui.date_to') }}</label>
                             <input type="date" class="form-control" name="date_to" value="{{ $dateTo }}">
                         </div>
                         <div class="col-lg-3 col-md-6">
                             <div class="d-flex" style="gap: 8px;">
-                                <button type="submit" class="btn btn-primary flex-grow-1">Ko‘rish</button>
-                                <a target="_blank" href="{{ route('checkouts_pdf', ['ctype_alias' => $ctypeAlias, 'agent_id' => $selectedAgent, 'date_from' => $dateFrom, 'date_to' => $dateTo, 'search' => $keyword]) }}" class="btn btn-danger">PDF</a>
-                                <a href="{{ route('checkouts_index', ['ctypeAlias' => $ctypeAlias]) }}" class="btn btn-outline-light">Tozalash</a>
+                                <button type="submit" class="btn btn-primary flex-grow-1"><em class="icon ni ni-search"></em>{{ trans('backend.ui.search_action') }}</button>
+                                <a target="_blank" href="{{ route('checkouts_pdf', ['ctype_alias' => $ctypeAlias, 'agent_id' => $selectedAgent, 'date_from' => $dateFrom, 'date_to' => $dateTo, 'search' => $keyword]) }}" class="btn btn-danger"><em class="icon ni ni-file-pdf"></em>{{ trans('backend.ui.pdf') }}</a>
+                                <a href="{{ route('checkouts_index', ['ctypeAlias' => $ctypeAlias]) }}" class="btn btn-outline-light"><em class="icon ni ni-reload"></em>{{ trans('backend.ui.clear') }}</a>
                             </div>
                         </div>
                     </div>
@@ -91,7 +91,7 @@
             <div class="nk-content-body">
                 <div class="components-preview mx-auto">
                     <div class="nk-block nk-block-lg">
-                        <div class="card">
+                        <div class="card dashboard-table-card">
                             <div class="card-inner position-relative card-tools-toggle" style="padding: 0.75rem 0.75rem; border-top: 1px solid #dbdfea; border-left: 1px solid #dbdfea; border-right: 1px solid #dbdfea;">
                                 <div class="card-title-group">
                                     <div class="card-tools">
@@ -102,7 +102,7 @@
                                                 <span class="d-md-none"><a href="{{ route('checkout_form') }}" class="btn btn-dim btn-outline-primary btn-icon"><em class="icon ni ni-arrow-right"></em></a></span>
                                             </div>
                                             <div class="btn-wrap">
-                                                <span class="d-none d-md-block"><a href="{{ route('checkout_today_send') }}" class="btn btn-sm btn-warning">Cегодняшняя</a></span>
+                                                <span class="d-none d-md-block"><a href="{{ route('checkout_today_send') }}" class="btn btn-sm btn-warning">{{ trans('backend.ui.today') }}</a></span>
                                                 <span class="d-md-none"><a href="{{ route('checkout_today_send') }}" class="btn btn-dim btn-outline-warning btn-icon"><em class="icon ni ni-arrow-right"></em></a></span>
                                             </div>
                                             <!--<div class="btn-wrap">
@@ -110,9 +110,9 @@
                                                 <span class="d-md-none"><a href="{{ route('checkout_yesterday_send') }}" class="btn btn-dim btn-outline-warning btn-icon"><em class="icon ni ni-arrow-right"></em></a></span>
                                             </div>-->
                                             <div class="btn-wrap">
-                                                <span class="d-none d-md-block"><p><b>Касса: {{ number_format(App\Models\CashReceipt::where('status', 1)->whereDate('date', Carbon\Carbon::today())->sum('price'), 2, '.', ' ') }} </b> 
+                                                <span class="d-none d-md-block"><p><b>{{ trans('backend.ui.cash') }}: {{ number_format(App\Models\CashReceipt::where('status', 1)->whereDate('date', Carbon\Carbon::today())->sum('price'), 2, '.', ' ') }} </b>
                                                 (@foreach(App\Models\CashReceiptType::where('status', 1)->get() as $cashtype)<i>{{ $cashtype->name_ru }}</i>: {{ number_format(App\Models\CashReceipt::where('cash_receipt_type', $cashtype->id)->where('status', 1)->whereDate('date', Carbon\Carbon::today())->sum('price'), 2, '.', ' ') }}@endforeach)
-                                                <b>Долг</b>: {{ number_format(App\Models\Checkout::where('checkout_tip_id', 1)->whereDate('date', Carbon\Carbon::today())->sum('total_price_debt'), 2, '.', ' ') }}</p></span>
+                                                <b>{{ trans('backend.ui.debt') }}</b>: {{ number_format(App\Models\Checkout::where('checkout_tip_id', 1)->whereDate('date', Carbon\Carbon::today())->sum('total_price_debt'), 2, '.', ' ') }}</p></span>
                                             </div>
                                         </div><!-- .form-inline -->
                                     @else
@@ -165,7 +165,7 @@
                                                                                             </div>
                                                                                         </div>
                                                                                     </div>
-                                                                                    
+
                                                                                     <div class="col-lg-12">
                                                                                         <div class="form-group">
                                                                                             <label class="overline-title overline-title-alt">{{ trans('backend.input.type_pay') }}</label>
@@ -235,7 +235,7 @@
                                                                                             <label class="custom-control-label" for="sdata"> Поиск по датам?</label>
                                                                                         </div>
                                                                                     </div>
-                                                                                    
+
                                                                                     <div class="col-12">
                                                                                         <div class="form-group">
                                                                                             <label class="overline-title overline-title-alt">{{ trans('backend.table.manager') }}</label>
@@ -247,8 +247,8 @@
                                                                                             </select>
                                                                                         </div>
                                                                                     </div>
-                                                                                    
-                                                                                    
+
+
                                                                                     <div class="col-12">
                                                                                         <div class="form-group">
                                                                                             <label class="overline-title overline-title-alt">{{ trans('backend.table.client') }}</label>
@@ -256,7 +256,7 @@
                                                                                             <datalist id="items" class="modelList"></datalist>
                                                                                         </div>
                                                                                     </div>
-                                                                                    
+
                                                                                     <div class="col-6">
                                                                                         <div class="custom-control custom-control-sm custom-checkbox">
                                                                                             <input type="checkbox" class="custom-control-input" {{ $shipment ? 'checked' : NULL }} name="shipment" id="shipment">
@@ -284,7 +284,7 @@
                                                                             </form>
                                                                         </div>
                                                                         <div class="dropdown-foot between">
-                                                                            <a class="clickable" href="{{ route('checkouts_index') }}">Reset Filter</a>
+                                                                            <a class="clickable" href="{{ route('checkouts_index') }}">{{ trans('backend.ui.clear') }}</a>
                                                                         </div>
                                                                     </div><!-- .filter-wg -->
                                                                 </div><!-- .dropdown -->
@@ -316,7 +316,7 @@
                                   <thead>
                                     <tr class="text-center">
                                       <th style="padding: 0px 20px; vertical-align: middle;">{{ trans('backend.table.doc_number') }}</th>
-                                      
+
                                       @hasanyrole('admin|cashier|report|select_manager|sale')
                                       <th style="padding: 0px;">{{ trans('backend.table.nakladnoy') }}</th>
                                       @endhasanyrole
@@ -324,7 +324,7 @@
                                       <th width="160px">{{ trans('backend.table.manager') }}</th>
                                       <th width="80px" style="padding: 0px;">{{ trans('backend.table.vid_tovar') }}</th>
                                       <th width="50px">{{ trans('backend.table.post_edit_short') }}</th>
-                                      <th>Курс</th>
+                                      <th>{{ trans('backend.ui.rate') }}</th>
                                       @hasanyrole('admin|cashier|report|sale')
                                       <th>{{ trans('backend.table.summa_dog') }}</th>
                                       <th>{{ trans('backend.table.cash_pay') }}</th>
@@ -333,7 +333,7 @@
                                       <th>{{ trans('backend.input.comment') }}</th>
                                       <th>{{ trans('backend.table.step') }}</th>
                                       <th width="150px">{{ trans('backend.table.data_add') }}</th>
-                                      
+
                                       <th width="50px">{{ trans('backend.table.delete') }}</th>
                                     </tr>
                                   </thead>
@@ -341,7 +341,7 @@
                                     @foreach($data as $item)
                                     <tr class="text-center">
                                       <td style="padding: 0px; vertical-align: middle;">
-                                       <a target="_blank" href="{{ route('checkout_check', ['id' => $item->code])}}">@if($item->number_work) {{ $item->number_work }} @else Чер. #{{ $item->id }} @endif <em class="icon ni ni-download"></em></a>
+                                       <a target="_blank" href="{{ route('checkout_check', ['id' => $item->code])}}">@if($item->number_work) {{ $item->number_work }} @else {{ trans('backend.ui.draft_short') }} #{{ $item->id }} @endif <em class="icon ni ni-download"></em></a>
                                       </td>
                                       @hasanyrole('admin|cashier|report|select_manager|sale')
                                       <td style="padding: 0px; vertical-align: middle;"><a href="{{ route('checkout_print', ['id' => $item->code, 'view' => 'full']) }}"><img width="22px" src="/upload/view-files.png"></a> <a href="{{ route('checkout_excel', ['id' => $item->code]) }}"><img width="22px" src="/upload/excel.png"></a> </td>
@@ -359,24 +359,24 @@
                                            @endhasanyrole
                                            @endif
                                        </td>
-                                       
+
                                        @hasanyrole('admin|cashier|report|sale')
                                        <td>{{ number_format($item->currency_type_price, 2, '.', ' ') }}</td>
                                        <td>{{ number_format($item->total_price, 2, '.', ' ') }} {{ $item->currencytypeid?->name }}</td>
                                        <td>
                                             @foreach($item->payments()->where('status', 1)->get() as $pays)
-                                               <a href="{{ route('cash_receipt_form', ['id' => $pays->code, 'checkout' => 1, 'page' => $data->currentPage()]) }}">{{ $pays->tname ? Str::limit($pays->tname->name, 4, ''): 'tulov turi yuq' }}: {{ number_format($pays->price, 2, '.', ' ') }} <!--сум--></a><br>
+                                               <a href="{{ route('cash_receipt_form', ['id' => $pays->code, 'checkout' => 1, 'page' => $data->currentPage()]) }}">{{ $pays->tname ? Str::limit($pays->tname->name, 4, ''): trans('backend.ui.no_payment_type') }}: {{ number_format($pays->price, 2, '.', ' ') }}</a><br>
                                             @endforeach
                                        </td>
                                        <td style="padding: 2px; font-size: 12px; vertical-align: middle;">
                                         @if($item->number_work && $item->checkout_tip_id == 1)
-                                            @if($item->total_price == $item->payments()->where('status', 1)->sum('price')) 
+                                            @if($item->total_price == $item->payments()->where('status', 1)->sum('price'))
                                                 @if($item->total_price != 0)
-                                                    оплачено
+                                                    {{ trans('backend.ui.paid') }}
                                                 @endif
                                             @else
                                                 @if($item->total_price > 0)
-                                                    <a style="padding: 0px;" href="{{ route('checkout_done_pay', ['id' => $item->code]) }}"data-bs-toggle="modal" data-bs-target="#modalDefault{{ $item->id }}" class="btn btn-warning btn-block btn-sm">Оплата</a> 
+                                                    <a style="padding: 0px;" href="{{ route('checkout_done_pay', ['id' => $item->code]) }}"data-bs-toggle="modal" data-bs-target="#modalDefault{{ $item->id }}" class="btn btn-warning btn-block btn-sm">{{ trans('backend.ui.payment') }}</a>
                                                 @endif
                                             @endif
                                         @endif
@@ -400,20 +400,20 @@
                                        @endhasanyrole
                                        <td style="padding: 2px; font-size: 12px; vertical-align: middle; text-transform: lowercase;" id="tsendsuccess{{ $item->id }}">
                                         @if($item->number_work)
-                                           @if($item->shipment_status == 0 && $item->total_price > 0) 
-                                            <a href="#" style="padding: 0px;" id="sendsuccess" data-id="{{ $item->id }}"  class="btn btn-primary btn-block btn-sm sendsuccess">Даставлено</a>
-                                           @elseif($item->shipment_status == 1) 
-                                            Даставлено
+                                           @if($item->shipment_status == 0 && $item->total_price > 0)
+                                            <a href="#" style="padding: 0px;" id="sendsuccess" data-id="{{ $item->id }}"  class="btn btn-primary btn-block btn-sm sendsuccess">{{ trans('backend.ui.delivered') }}</a>
+                                           @elseif($item->shipment_status == 1)
+                                            {{ trans('backend.ui.delivered') }}
                                            @endif
                                         @else
-                                        
+
                                         @endif
                                        </td>
                                       <td style="padding: 2px; font-size: 12px; vertical-align: middle;">{{ Carbon\Carbon::parse($item->date)->format('Y-m-d') . ' ' .  $item->created_at->format('H:i') }} </td>
-                                       
+
                                        <td><a href="{{ route('delete_checkout', ['id' => $item->code])}}" style="text-decoration:underline;">{{ trans('backend.table.delete') }}</a></td>
                                     </tr>
-                                    
+
                                     @if($item->number_work)
                                     <div class="modal fade" tabindex="-1" id="modalDefault{{ $item->id }}">
                                         <div class="modal-dialog modal-lg" role="document">
@@ -433,7 +433,7 @@
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        
+
                                                         <div class="col-lg-6 col-sm-6">
                                                             <div class="form-group">
                                                                 <label class="form-label">{{ trans('backend.table.type_pay') }}</label>
@@ -464,7 +464,7 @@
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        
+
                                                         <div class="col-lg-3 col-sm-3">
                                                             <div class="form-group">
                                                                 <label class="form-label" for="currency">{{ trans('backend.input.currency') }}</label>
@@ -473,20 +473,20 @@
                                                                         @foreach(App\Models\CurrencyType::where('status', 1)->orderBy('id', 'asc')->get() as $currency)
                                                                         <option value="{{ $currency->id }}" @if((int) $item->currency_type === (int) $currency->id) selected @endif>{{ $currency->name }}</option>
                                                                         @endforeach
-                                                                    </select>    
+                                                                    </select>
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        
+
                                                         <div class="col-lg-3 col-sm-3">
                                                             <div class="form-group">
-                                                                <label class="form-label" for="currency_type_price">Курс валют</label>
+                                                                <label class="form-label" for="currency_type_price">{{ trans('backend.ui.currency_rate') }}</label>
                                                                 <div class="form-control-wrap">
-                                                                    <input type="text" class="form-control" required name="currency_type_price" value="{{ number_format((float) ($item->currency_type_price ?: App\Models\Currency::usdRate()), 2, '.', ' ') }}" data-type="currency" id="currency_type_price" placeholder="Курс валют">
+                                                                    <input type="text" class="form-control" required name="currency_type_price" value="{{ number_format((float) ($item->currency_type_price ?: App\Models\Currency::usdRate()), 2, '.', ' ') }}" data-type="currency" id="currency_type_price" placeholder="{{ trans('backend.ui.currency_rate') }}">
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        
+
                                                         <div class="col-lg-3 col-sm-3">
                                                             <div class="form-group">
                                                                 <label class="form-label" for="comment">{{ trans('backend.input.comment') }}</label>
@@ -501,7 +501,7 @@
                                                         <div class="col-md-6">
                                                             <a href="#" data-bs-dismiss="modal" aria-label="Close" class="btn btn-danger btn-sm btn-block text-uppercase">{{ trans('backend.input.priv') }}</a>
                                                         </div>
-                                                        
+
                                                         <div class="col-md-6">
                                                             <button type="submit" id="register" class="btn btn-primary btn-sm btn-block text-uppercase" >{{ trans('backend.table.button_done') }}</button>
                                                         </div>
@@ -536,7 +536,7 @@
                 <div id="checkoutNoteText"></div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('backend.ui.close') }}</button>
             </div>
         </div>
     </div>
@@ -556,7 +556,7 @@
         $(this).val(n.toLocaleString());
     });
     $('#appointment_form').on('submit', function () {
-       $('#register').attr('disabled', 'true'); 
+       $('#register').attr('disabled', 'true');
     });
 </script>
 
@@ -565,7 +565,7 @@
         keyup: function() {
           formatCurrency($(this));
         },
-        blur: function() { 
+        blur: function() {
           formatCurrency($(this), "blur");
         }
     });
@@ -598,7 +598,7 @@
       var updated_len = input_val.length;
       caret_pos = updated_len - original_len + caret_pos;
       input[0].setSelectionRange(caret_pos, caret_pos);
-    }    
+    }
 </script>
 <script>
         $.ajaxSetup({
@@ -616,7 +616,7 @@
                 dataType: 'JSON',
                 data: { datacid: datacid },
                 success: function(data) {
-                    
+
                     $('#tsendsuccess'+datacid).empty();
                     $('#tsendsuccess'+datacid).append("{{ trans('backend.table.shipment_ok') }} ");
                 },
@@ -625,7 +625,7 @@
                 }
             });
         });
-        
+
         $(document).ready(function (){
             var delay = 500;
             $('#modelName').keyup(function() {
@@ -634,7 +634,7 @@
                     setTimeout(function (){
                         $.ajax({
                             type: 'POST',
-                            url: '{{ route("api_clients") }}', 
+                            url: '{{ route("api_clients") }}',
                             data: {'model': model},
                             success:function (data) {
                                 $(".modelList").empty();
@@ -647,7 +647,7 @@
                 }
             });
         });
-        
+
         $(document).ready(function (){
             var delay = 500;
             $('#modelNameNew').keyup(function() {
@@ -656,7 +656,7 @@
                     setTimeout(function (){
                         $.ajax({
                             type: 'POST',
-                            url: '{{ route("api_clients") }}', 
+                            url: '{{ route("api_clients") }}',
                             data: {'model': model},
                             success:function (data) {
                                 $(".modelListNew").empty();
