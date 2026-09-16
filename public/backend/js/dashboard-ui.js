@@ -16,14 +16,8 @@
         'select[name="manager_id"]',
         'select[name="client_id"]',
         'select[name="type"]',
-        'select[name="type_id"]',
         'select[name="store"]',
-        'select[name="warehouse_id"]',
-        'select[name="warehouse"]',
-        'select[name="category_id"]',
-        'select[name="supplier_id"]',
-        'select[name="dealer_id"]',
-        'select[name="status"]'
+        'select[name="warehouse_id"]'
     ].join(',');
 
     function normalizeMethod(form) {
@@ -103,12 +97,9 @@
 
             table.classList.add('dashboard-data-table');
             var card = table.closest('.card');
-            var responsive = table.closest('.table-responsive');
 
             if (card) {
                 card.classList.add('dashboard-table-card');
-            } else if (responsive) {
-                responsive.classList.add('dashboard-table-card', 'dashboard-table-shell');
             }
         });
 
@@ -143,39 +134,6 @@
             }
 
             form.classList.add('dashboard-form');
-
-            if (form.dataset.autoFilter === 'true') {
-                var card = form.closest('.card');
-                if (card) {
-                    card.classList.add('dashboard-filter');
-                }
-            }
-        });
-
-        document.querySelectorAll('.nk-content .row').forEach(function (row) {
-            if (row.closest('.no-ui-enhance, [data-no-ui-enhance="true"]')) {
-                return;
-            }
-
-            if (row.closest('form[data-auto-filter="true"], .dashboard-filter')) {
-                return;
-            }
-
-            if (row.querySelector('.btn, button, a[href*="excel"], a[href*="pdf"], a[href*="form"], a[href*="download"]') && !row.querySelector('table')) {
-                row.classList.add('dashboard-actions-row');
-            }
-        });
-
-        document.querySelectorAll('.nk-content .card-tools, .nk-content .form-inline').forEach(function (tools) {
-            if (!tools.closest('.no-ui-enhance, [data-no-ui-enhance="true"]')) {
-                tools.classList.add('dashboard-toolbar');
-            }
-        });
-
-        document.querySelectorAll('.nk-content .table-responsive').forEach(function (box) {
-            if (!box.closest('.no-ui-enhance, [data-no-ui-enhance="true"]')) {
-                box.classList.add('dashboard-scroll');
-            }
         });
     }
 
