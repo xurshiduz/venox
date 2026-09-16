@@ -194,7 +194,7 @@ class CheckoutController extends Controller
             $q->where(function ($q) use ($keyword) {
                 $q->where('number_work', 'like', '%' . $keyword . '%')
                     ->orWhere('transaction', 'like', '%' . $keyword . '%')
-                    ->orWhere('comment', 'like', '%' . $keyword . '%')
+                    ->orWhere('reference', 'like', '%' . $keyword . '%')
                     ->orWhereHas('supid', fn ($client) => $client->where('name', 'like', '%' . $keyword . '%'))
                     ->orWhereHas('managerid', fn ($manager) => $manager->where('name', 'like', '%' . $keyword . '%'));
             });
