@@ -50,8 +50,6 @@ class CheckoutMonthExport implements FromView, WithStyles
             ->orderBy('date')
             ->orderBy('id')
             ->get();
-        $periodCheckoutsByClient = $checkouts->groupBy(fn (Checkout $checkout) => (string) $checkout->client_id);
-
         $productIds = $checkouts->flatMap(function ($checkout) {
             return $checkout->checkoutDetails->pluck('product_id');
         })->filter()->unique()->values();
@@ -77,6 +75,7 @@ class CheckoutMonthExport implements FromView, WithStyles
         $clientPayments = [];
         $clientPaymentDates = [];
         $paymentBonusExpensesByClient = [];
+        $clientVenoxBonusByClient = [];
 
         $payments = CashReceipt::query()
             ->where('status', 1)
@@ -160,17 +159,17 @@ class CheckoutMonthExport implements FromView, WithStyles
                     (string) $payment->comment
                 );
             $cashReportRow = $cashReportRowsByReceipt->get((string) $payment->id, []);
-            $commissionCheckout = static::commissionBonusCheckout(
-                $payment->checkout,
-                $periodCheckoutsByClient->get($key, []),
-                $payment->date ?: $payment->created_at
-            );
-
-            // KPI + Venox bonus har qanday hisoblash turida bitta bonus xarajati
-            // bo'lib chiqadi. Agent ulushi bu ustunga kirmaydi.
+            // Bog'langan to'lov faqat o'z checkout foizlarini ishlatadi.
+            // Bog'lanmagan "qarz uchun" to'lovda esa AccountingCashReportService
+            // aynan FIFO qoplangan hujjatlar ulushini hisoblab qaytaradi.
             $reportBonusUsd = static::reportBonusAmountUsd(
                 $usd,
-                $commissionCheckout,
+                $payment->checkout,
+                $cashReportRow
+            );
+            $venoxBonusUsd = static::venoxBonusAmountUsd(
+                $usd,
+                $payment->checkout,
                 $cashReportRow
             );
             $paymentBreakdown = static::paymentBreakdownUsd(
@@ -179,6 +178,7 @@ class CheckoutMonthExport implements FromView, WithStyles
             );
             $clientPayments[$key] = ($clientPayments[$key] ?? 0) + $paymentBreakdown['net_usd'];
             $paymentBonusExpensesByClient[$key] = ($paymentBonusExpensesByClient[$key] ?? 0) + $paymentBreakdown['bonus_usd'];
+            $clientVenoxBonusByClient[$key] = ($clientVenoxBonusByClient[$key] ?? 0) + $venoxBonusUsd;
             $clientPaymentDates[$key][] = Carbon::parse($payment->date ?: $payment->created_at)->format('d.m.Y');
         }
 
@@ -225,6 +225,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'paid_usd' => $paid,
                     'closing_debt_usd' => $closing,
                     'bonus_expense_usd' => (float) ($clientBonusExpenses[$clientKey] ?? 0),
+                    'venox_cash_usd' => (float) ($clientVenoxBonusByClient[$clientKey] ?? 0),
                 ];
             }
 
@@ -484,6 +485,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                 'paid_usd' => (float) ($clientPayments[$clientKey] ?? 0),
                 'closing_debt_usd' => (float) ($closingDebts[$clientKey] ?? 0),
                 'bonus_expense_usd' => (float) ($clientBonusExpenses[$clientKey] ?? 0),
+                'venox_cash_usd' => (float) ($clientVenoxBonusByClient[$clientKey] ?? 0),
             ];
         }
         // Excel tartibi: sana, klient, telefon, agent, avvalgi qarz, mahsulot,
@@ -500,11 +502,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                 $row['paid_usd'],
                 $row['bonus_expense_usd']
             );
-            $venoxCashUsd = static::venoxCashTotalUsd(
-                $row['quantities'],
-                $row['unit_prices'],
-                $row['factory_prices']
-            );
+            $venoxCashUsd = max(0, (float) ($row['venox_cash_usd'] ?? 0));
             $firstRowIndex = count($rows);
             $startRow = count($rows) + 3;
 
@@ -535,7 +533,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'closing_debt_usd' => $row['closing_debt_usd'],
                     'closing_debt_usd_formula' => $clientFormulas['closing_debt_usd'],
                     'bonus_expense_usd' => $row['bonus_expense_usd'],
-                    'venox_cash_usd' => null,
+                    'venox_cash_usd' => $venoxCashUsd,
                     'venox_cash_usd_formula' => null,
                 ];
 
@@ -586,7 +584,6 @@ class CheckoutMonthExport implements FromView, WithStyles
             $endRow = count($rows) + 2;
             $clientFormulas = static::clientExcelFormulas($startRow, $endRow);
             $rows[$firstRowIndex]['closing_debt_usd_formula'] = $clientFormulas['closing_debt_usd'];
-            $rows[$firstRowIndex]['venox_cash_usd_formula'] = $clientFormulas['venox_cash_usd'];
             if ($endRow > $startRow) {
                 foreach (['A', 'B', 'C', 'E', 'O', 'P', 'Q', 'R'] as $column) {
                     $this->mergeRanges[] = $column . $startRow . ':' . $column . $endRow;
@@ -765,13 +762,6 @@ class CheckoutMonthExport implements FromView, WithStyles
                 $endRow,
                 $startRow,
                 $startRow
-            ),
-            'venox_cash_usd' => sprintf(
-                '=SUM(L%d:L%d)-SUM(N%d:N%d)',
-                $startRow,
-                $endRow,
-                $startRow,
-                $endRow
             ),
         ];
     }
@@ -1002,6 +992,18 @@ class CheckoutMonthExport implements FromView, WithStyles
 
         return max(0, (float) ($cashReportRow['kpi'] ?? 0))
             + max(0, (float) ($cashReportRow['venox'] ?? 0));
+    }
+
+    /** Venox kassasi — faqat real to'lovdan Venox uchun ajratilgan ulush. */
+    public static function venoxBonusAmountUsd(float $grossUsd, $checkout, array $cashReportRow = []): float
+    {
+        if ($checkout) {
+            $percent = min(100, max(0, (float) ($checkout->venox_bonus_percent ?? 0)));
+
+            return $grossUsd * $percent / 100;
+        }
+
+        return max(0, (float) ($cashReportRow['venox'] ?? 0));
     }
 
     /** Reverse the exact debt equation displayed in the spreadsheet. */

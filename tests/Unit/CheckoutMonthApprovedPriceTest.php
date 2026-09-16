@@ -371,11 +371,28 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $this->assertSame(20.0, $bonus);
     }
 
+    public function test_venox_cash_uses_only_the_linked_checkout_venox_percentage(): void
+    {
+        $checkout = new Checkout([
+            'kpi_percent' => 5,
+            'venox_bonus_percent' => 7,
+        ]);
+
+        $this->assertSame(70.0, CheckoutMonthExport::venoxBonusAmountUsd(1000, $checkout));
+    }
+
+    public function test_unlinked_payment_uses_the_exact_fifo_venox_amount(): void
+    {
+        $this->assertSame(6.0432, CheckoutMonthExport::venoxBonusAmountUsd(150.42, null, [
+            'kpi' => 2.518,
+            'venox' => 6.0432,
+        ]));
+    }
+
     public function test_monthly_export_client_totals_are_real_excel_formulas(): void
     {
         $this->assertSame([
             'closing_debt_usd' => '=E3+SUM(L3:L5)-O3-P3',
-            'venox_cash_usd' => '=SUM(L3:L5)-SUM(N3:N5)',
         ], CheckoutMonthExport::clientExcelFormulas(3, 5));
     }
 
