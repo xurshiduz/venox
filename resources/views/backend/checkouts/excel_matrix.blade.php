@@ -1,7 +1,7 @@
 <table>
     <thead>
         <tr>
-            <th colspan="18" style="font-weight:bold; font-size:14px; text-align:left;">{{ $periodLabel }} оралиғидаги мижозлар ҳисоботи (USD) — курсни S2 катакда ўзгартиринг</th>
+            <th colspan="19" style="font-weight:bold; font-size:14px; text-align:left;">{{ $periodLabel }} оралиғидаги мижозлар ҳисоботи (USD) — курсни T2 катакда ўзгартиринг</th>
             <th>1 USD (сўм)</th>
             <th>Жами тўланган (сўм)</th>
         </tr>
@@ -21,11 +21,12 @@
             <th>Мижозга ҳақиқий сотилган жами (USD)</th>
             <th>Завод нархи жами</th>
             <th>Тўланган</th>
+            <th>Маҳсулотга боғланмаган тўлов (USD)</th>
             <th>Бонус харажатлар (KPI + Venox bonus)</th>
             <th>Қолдиқ умумий қарз</th>
             <th>Venox касса</th>
             <th>{{ $reportUsdRate }}</th>
-            <th>{{ count($rows) ? '=SUM(O3:O'.(count($rows) + 2).')*$S$2' : 0 }}</th>
+            <th>{{ count($rows) ? '=SUM(O3:O'.(count($rows) + 2).')*$T$2' : 0 }}</th>
         </tr>
     </thead>
     <tbody>
@@ -38,14 +39,15 @@
                 <td>{{ $row['debt_before_payment'] }}</td>
                 <td>{!! nl2br(e($row['product'])) !!}</td>
                 <td>{!! nl2br(e($row['qty'])) !!}</td>
-                <td>{{ $row['actual_unit_price_usd'] }}</td>
+                <td>{{ $row['actual_unit_price_usd'] === null && $row['product'] !== 'Mahsulotga bog‘lanmagan qarz to‘lovi' ? 'Ҳужжатда нарх киритилмаган' : $row['actual_unit_price_usd'] }}</td>
                 <td>{{ $row['unit_price_usd_formula'] ?? $row['unit_price_usd'] }}</td>
                 <td>{{ $row['factory_price_usd_formula'] ?? ($row['factory_price_usd'] ?: null) }}</td>
                 <td>{{ $row['markup_percent_formula'] ?? ($row['markup_percent'] !== null ? $row['markup_percent'] / 100 : null) }}</td>
                 <td>{{ $row['approved_total_usd_formula'] ?? $row['approved_total_usd'] }}</td>
-                <td>{{ $row['actual_total_usd_formula'] ?? $row['actual_total_usd'] }}</td>
+                <td>{{ $row['actual_unit_price_usd'] === null && $row['product'] !== 'Mahsulotga bog‘lanmagan qarz to‘lovi' ? 'Ҳисобланмади' : ($row['actual_total_usd_formula'] ?? $row['actual_total_usd']) }}</td>
                 <td>{{ $row['factory_total_usd_formula'] ?? $row['factory_total_usd'] }}</td>
                 <td>{{ $row['paid_usd'] }}</td>
+                <td>{{ $row['unallocated_payment_usd'] }}</td>
                 <td>{{ $row['bonus_expense_usd'] }}</td>
                 <td>{{ $row['closing_debt_usd_formula'] ?? $row['closing_debt_usd'] }}</td>
                 <td>{{ $row['venox_cash_usd_formula'] ?? $row['venox_cash_usd'] }}</td>
@@ -69,6 +71,7 @@
             <td>{{ count($rows) ? '=SUM(P3:P'.(count($rows) + 2).')' : 0 }}</td>
             <td>{{ count($rows) ? '=SUM(Q3:Q'.(count($rows) + 2).')' : 0 }}</td>
             <td>{{ count($rows) ? '=SUM(R3:R'.(count($rows) + 2).')' : 0 }}</td>
+            <td>{{ count($rows) ? '=SUM(S3:S'.(count($rows) + 2).')' : 0 }}</td>
             <td></td>
             <td></td>
         </tr>

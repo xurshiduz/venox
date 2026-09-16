@@ -76,6 +76,7 @@ class CheckoutMonthExport implements FromView, WithStyles
         $clientPaymentDates = [];
         $paymentBonusExpensesByClient = [];
         $clientVenoxBonusByClient = [];
+        $clientUnallocatedPayments = [];
 
         $payments = CashReceipt::query()
             ->where('status', 1)
@@ -179,6 +180,8 @@ class CheckoutMonthExport implements FromView, WithStyles
             $clientPayments[$key] = ($clientPayments[$key] ?? 0) + $paymentBreakdown['net_usd'];
             $paymentBonusExpensesByClient[$key] = ($paymentBonusExpensesByClient[$key] ?? 0) + $paymentBreakdown['bonus_usd'];
             $clientVenoxBonusByClient[$key] = ($clientVenoxBonusByClient[$key] ?? 0) + $venoxBonusUsd;
+            $clientUnallocatedPayments[$key] = ($clientUnallocatedPayments[$key] ?? 0)
+                + max(0, (float) ($cashReportRow['unallocated_usd'] ?? 0));
             $clientPaymentDates[$key][] = Carbon::parse($payment->date ?: $payment->created_at)->format('d.m.Y');
         }
 
@@ -226,6 +229,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'closing_debt_usd' => $closing,
                     'bonus_expense_usd' => (float) ($clientBonusExpenses[$clientKey] ?? 0),
                     'venox_cash_usd' => (float) ($clientVenoxBonusByClient[$clientKey] ?? 0),
+                    'unallocated_payment_usd' => (float) ($clientUnallocatedPayments[$clientKey] ?? 0),
                 ];
             }
 
@@ -486,6 +490,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                 'closing_debt_usd' => (float) ($closingDebts[$clientKey] ?? 0),
                 'bonus_expense_usd' => (float) ($clientBonusExpenses[$clientKey] ?? 0),
                 'venox_cash_usd' => (float) ($clientVenoxBonusByClient[$clientKey] ?? 0),
+                'unallocated_payment_usd' => (float) ($clientUnallocatedPayments[$clientKey] ?? 0),
             ];
         }
         // Excel tartibi: sana, klient, telefon, agent, avvalgi qarz, mahsulot,
@@ -514,7 +519,9 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'client_phone' => static::formatPhoneForExcel($row['client_phone']),
                     'agent' => $row['fallback_agent'] ?? '—',
                     'debt_before_payment' => $row['debt_before_payment'],
-                    'product' => '',
+                    'product' => (float) ($row['unallocated_payment_usd'] ?? 0) > 0
+                        ? 'Mahsulotga bog‘lanmagan qarz to‘lovi'
+                        : 'Savdo mahsuloti topilmadi',
                     'qty' => '',
                     'unit_price_usd' => '',
                     'unit_price_usd_formula' => null,
@@ -530,6 +537,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'factory_total_usd' => null,
                     'factory_total_usd_formula' => null,
                     'paid_usd' => $row['paid_usd'],
+                    'unallocated_payment_usd' => (float) ($row['unallocated_payment_usd'] ?? 0),
                     'closing_debt_usd' => $row['closing_debt_usd'],
                     'closing_debt_usd_formula' => $clientFormulas['closing_debt_usd'],
                     'bonus_expense_usd' => $row['bonus_expense_usd'],
@@ -573,6 +581,9 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'factory_total_usd' => $qty * $factoryPrice,
                     'factory_total_usd_formula' => $lineFormulas['factory_total_usd'],
                     'paid_usd' => $first ? $row['paid_usd'] : null,
+                    'unallocated_payment_usd' => $first
+                        ? (float) ($row['unallocated_payment_usd'] ?? 0)
+                        : null,
                     'closing_debt_usd' => $first ? $row['closing_debt_usd'] : null,
                     'closing_debt_usd_formula' => null,
                     'bonus_expense_usd' => $first ? $row['bonus_expense_usd'] : null,
@@ -585,7 +596,7 @@ class CheckoutMonthExport implements FromView, WithStyles
             $clientFormulas = static::clientExcelFormulas($startRow, $endRow);
             $rows[$firstRowIndex]['closing_debt_usd_formula'] = $clientFormulas['closing_debt_usd'];
             if ($endRow > $startRow) {
-                foreach (['A', 'B', 'C', 'E', 'O', 'P', 'Q', 'R'] as $column) {
+                foreach (['A', 'B', 'C', 'E', 'O', 'P', 'Q', 'R', 'S'] as $column) {
                     $this->mergeRanges[] = $column . $startRow . ':' . $column . $endRow;
                 }
             }
@@ -675,8 +686,8 @@ class CheckoutMonthExport implements FromView, WithStyles
     ): array
     {
         return [
-            'unit_price_usd' => '=' . static::excelNumber($unitPriceUzs) . '/$S$2',
-            'factory_price_usd' => '=' . static::excelNumber($factoryPriceUzs) . '/$S$2',
+            'unit_price_usd' => '=' . static::excelNumber($unitPriceUzs) . '/$T$2',
+            'factory_price_usd' => '=' . static::excelNumber($factoryPriceUzs) . '/$T$2',
             'markup_percent' => sprintf('=IFERROR((I%d-J%d)/J%d,"")', $row, $row, $row),
             'approved_total_usd' => sprintf('=G%d*I%d', $row, $row),
             'actual_total_usd' => sprintf('=G%d*H%d', $row, $row),
@@ -756,7 +767,7 @@ class CheckoutMonthExport implements FromView, WithStyles
     {
         return [
             'closing_debt_usd' => sprintf(
-                '=E%d+SUM(L%d:L%d)-O%d-P%d',
+                '=E%d+SUM(L%d:L%d)-O%d-Q%d',
                 $startRow,
                 $startRow,
                 $endRow,
@@ -1115,7 +1126,7 @@ class CheckoutMonthExport implements FromView, WithStyles
         $lastRow = max(3, $this->rowCount + 3);
         $sheet->setShowGridlines(false);
         $sheet->freezePane('A3');
-        $sheet->setAutoFilter('A2:R' . max(2, $this->rowCount + 2));
+        $sheet->setAutoFilter('A2:S' . max(2, $this->rowCount + 2));
         $sheet->getDefaultRowDimension()->setRowHeight(44);
         $sheet->getRowDimension(1)->setRowHeight(28);
         $sheet->getRowDimension(2)->setRowHeight(48);
@@ -1128,27 +1139,27 @@ class CheckoutMonthExport implements FromView, WithStyles
             $sheet->mergeCells($range);
         }
 
-        foreach (['A' => 13, 'B' => 28, 'C' => 19, 'D' => 24, 'E' => 20, 'F' => 52, 'G' => 15, 'H' => 18, 'I' => 18, 'J' => 16, 'K' => 20, 'L' => 23, 'M' => 23, 'N' => 20, 'O' => 17, 'P' => 18, 'Q' => 22, 'R' => 18, 'S' => 18, 'T' => 26] as $column => $width) {
+        foreach (['A' => 13, 'B' => 28, 'C' => 19, 'D' => 24, 'E' => 20, 'F' => 52, 'G' => 15, 'H' => 18, 'I' => 18, 'J' => 16, 'K' => 20, 'L' => 23, 'M' => 23, 'N' => 20, 'O' => 17, 'P' => 24, 'Q' => 18, 'R' => 22, 'S' => 18, 'T' => 18, 'U' => 26] as $column => $width) {
             $sheet->getColumnDimension($column)->setWidth($width);
         }
 
-        $sheet->getStyle('A1:T' . $lastRow)->getAlignment()
+        $sheet->getStyle('A1:U' . $lastRow)->getAlignment()
             ->setVertical(Alignment::VERTICAL_CENTER)
             ->setHorizontal(Alignment::HORIZONTAL_CENTER)
             ->setWrapText(true);
-        $sheet->getStyle('A2:R2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-        $sheet->getStyle('A2:R2')->getFont()->setBold(true)->getColor()->setRGB('000000');
-        $sheet->getStyle('A2:R' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('C9C9C9');
+        $sheet->getStyle('A2:S2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('A2:S2')->getFont()->setBold(true)->getColor()->setRGB('000000');
+        $sheet->getStyle('A2:S' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('C9C9C9');
         $sheet->getStyle('G3:G' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.###');
         $sheet->getStyle('E3:E' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
         $sheet->getStyle('H3:J' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
         $sheet->getStyle('K3:K' . $lastRow)->getNumberFormat()->setFormatCode('0.00%');
-        $sheet->getStyle('L3:R' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
-        $sheet->getStyle('A' . $lastRow . ':R' . $lastRow)->getFont()->setBold(true);
-        $sheet->getStyle('S1:T2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setWrapText(true);
-        $sheet->getStyle('S1:T1')->getFont()->setBold(true);
-        $sheet->getStyle('S1:T2')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('C9C9C9');
-        $sheet->getStyle('S2:T2')->getNumberFormat()->setFormatCode('#,##0.00');
-        $sheet->getStyle('S2')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFF2CC');
+        $sheet->getStyle('L3:S' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
+        $sheet->getStyle('A' . $lastRow . ':S' . $lastRow)->getFont()->setBold(true);
+        $sheet->getStyle('T1:U2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setWrapText(true);
+        $sheet->getStyle('T1:U1')->getFont()->setBold(true);
+        $sheet->getStyle('T1:U2')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('C9C9C9');
+        $sheet->getStyle('T2:U2')->getNumberFormat()->setFormatCode('#,##0.00');
+        $sheet->getStyle('T2')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFF2CC');
     }
 }

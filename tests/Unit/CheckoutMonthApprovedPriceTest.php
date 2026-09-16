@@ -251,8 +251,8 @@ class CheckoutMonthApprovedPriceTest extends TestCase
     public function test_monthly_export_line_cells_are_real_excel_formulas(): void
     {
         $this->assertSame([
-            'unit_price_usd' => '=207000/$S$2',
-            'factory_price_usd' => '=192000/$S$2',
+            'unit_price_usd' => '=207000/$T$2',
+            'factory_price_usd' => '=192000/$T$2',
             'markup_percent' => '=IFERROR((I3-J3)/J3,"")',
             'approved_total_usd' => '=G3*I3',
             'actual_total_usd' => '=G3*H3',
@@ -392,7 +392,7 @@ class CheckoutMonthApprovedPriceTest extends TestCase
     public function test_monthly_export_client_totals_are_real_excel_formulas(): void
     {
         $this->assertSame([
-            'closing_debt_usd' => '=E3+SUM(L3:L5)-O3-P3',
+            'closing_debt_usd' => '=E3+SUM(L3:L5)-O3-Q3',
         ], CheckoutMonthExport::clientExcelFormulas(3, 5));
     }
 
