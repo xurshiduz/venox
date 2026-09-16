@@ -173,8 +173,30 @@
 .nk-content .btn-success { background: var(--ui-success); border-color: var(--ui-success); }
 .nk-content .btn-warning { background: var(--ui-warning); border-color: var(--ui-warning); color: #fff; }
 .nk-content .btn-danger { background: var(--ui-danger); border-color: var(--ui-danger); }
-.dashboard-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
-.dashboard-actions .btn { min-width: 120px; }
+.dashboard-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-left: 0;
+    margin-right: 0;
+    margin-bottom: 14px;
+}
+.dashboard-actions > [class*="col-"] {
+    flex: 0 0 auto;
+    width: auto;
+    max-width: none;
+    padding-left: 0;
+    padding-right: 0;
+    margin-bottom: 0 !important;
+}
+.dashboard-actions > [class*="col-"]:empty {
+    display: none;
+}
+.dashboard-actions .btn {
+    min-width: 145px;
+}
 .dashboard-table-card .table-responsive,
 .nk-content .table-responsive {
     border-radius: var(--ui-radius);
@@ -449,7 +471,13 @@
     .nk-content { padding: 14px 8px 22px; }
     .nk-content .card-inner { padding: 14px; }
     .dashboard-actions { justify-content: stretch; }
-    .dashboard-actions .btn { flex: 1 1 140px; }
+    .dashboard-actions > [class*="col-"] {
+        width: 100%;
+    }
+    .dashboard-actions .btn {
+        width: 100%;
+        min-width: 0;
+    }
     .dashboard-filter .btn { width: 100%; }
     .nk-content .btn {
         min-height: 42px;
