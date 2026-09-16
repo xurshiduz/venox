@@ -9,8 +9,8 @@
         </div>
     </div>
     <form method="GET" class="row gy-2 gx-2 align-items-end mb-4">
-        <div class="col-md-2"><label class="form-label">Oy dan</label><input type="month" name="from_month" value="{{ $filters['from_month'] }}" class="form-control"></div>
-        <div class="col-md-2"><label class="form-label">Oy gacha</label><input type="month" name="to_month" value="{{ $filters['to_month'] }}" class="form-control"></div>
+        <div class="col-md-2"><label class="form-label">Boshlanish sanasi</label><input type="date" name="date_from" value="{{ $filters['date_from'] }}" class="form-control js-open-picker"></div>
+        <div class="col-md-2"><label class="form-label">Tugash sanasi</label><input type="date" name="date_to" value="{{ $filters['date_to'] }}" class="form-control js-open-picker"></div>
         <div class="col-md-3"><label class="form-label">Tovar</label><select name="product_id" class="form-select"><option value="">Barcha tovarlar</option>@foreach($products as $product)<option value="{{ $product->id }}" @if((string)$filters['product_id']===(string)$product->id) selected @endif>{{ $product->name }}</option>@endforeach</select></div>
         <div class="col-md-2"><label class="form-label">Bonus turi</label><select name="scheme" class="form-select"><option value="">Barchasi</option><option value="special" @if($filters['scheme']==='special') selected @endif>Spes</option><option value="contract" @if($filters['scheme']==='contract') selected @endif>Shartnoma</option><option value="venox_bonus" @if($filters['scheme']==='venox_bonus') selected @endif>Venox bonus</option></select></div>
         <div class="col-md-3 d-flex" style="gap:8px"><button class="btn btn-primary flex-grow-1">Ko‘rsatish</button><a href="{{ route('accounting_cash_report') }}" class="btn btn-light">Tozalash</a></div>

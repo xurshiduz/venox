@@ -1641,18 +1641,34 @@ class CheckoutController extends Controller
 
     private function cashReportFilters(Request $request): array
     {
+        $datePattern = '/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/';
         $monthPattern = '/^\d{4}-(0[1-9]|1[0-2])$/';
-        $defaultMonth = Carbon::now()->format('Y-m');
-        $fromMonth = preg_match($monthPattern, (string) $request->input('from_month')) ? $request->input('from_month') : $defaultMonth;
-        $toMonth = preg_match($monthPattern, (string) $request->input('to_month')) ? $request->input('to_month') : $defaultMonth;
-        if ($fromMonth > $toMonth) {
-            [$fromMonth, $toMonth] = [$toMonth, $fromMonth];
+        $fromDate = preg_match($datePattern, (string) $request->input('date_from'))
+            ? $request->input('date_from')
+            : null;
+        $toDate = preg_match($datePattern, (string) $request->input('date_to'))
+            ? $request->input('date_to')
+            : null;
+
+        // Eski oyli havolalar ham ishlashda davom etadi.
+        if (! $fromDate && preg_match($monthPattern, (string) $request->input('from_month'))) {
+            $fromDate = Carbon::createFromFormat('Y-m', $request->input('from_month'))->startOfMonth()->format('Y-m-d');
         }
+        if (! $toDate && preg_match($monthPattern, (string) $request->input('to_month'))) {
+            $toDate = Carbon::createFromFormat('Y-m', $request->input('to_month'))->endOfMonth()->format('Y-m-d');
+        }
+
+        $fromDate = $fromDate ?: Carbon::now()->startOfMonth()->format('Y-m-d');
+        $toDate = $toDate ?: Carbon::now()->format('Y-m-d');
+        if ($fromDate > $toDate) {
+            [$fromDate, $toDate] = [$toDate, $fromDate];
+        }
+
         return [
-            'from_month' => $fromMonth,
-            'to_month' => $toMonth,
-            'from' => Carbon::createFromFormat('Y-m', $fromMonth)->startOfMonth()->format('Y-m-d'),
-            'to' => Carbon::createFromFormat('Y-m', $toMonth)->endOfMonth()->format('Y-m-d'),
+            'date_from' => $fromDate,
+            'date_to' => $toDate,
+            'from' => $fromDate,
+            'to' => $toDate,
             'scheme' => $request->input('scheme'),
             'product_id' => $request->input('product_id'),
         ];
