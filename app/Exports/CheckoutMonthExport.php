@@ -75,7 +75,6 @@ class CheckoutMonthExport implements FromView, WithStyles
         $clientPayments = [];
         $clientPaymentDates = [];
         $paymentBonusExpensesByClient = [];
-        $clientVenoxBonusByClient = [];
         $clientUnallocatedPayments = [];
 
         $payments = CashReceipt::query()
@@ -168,18 +167,12 @@ class CheckoutMonthExport implements FromView, WithStyles
                 $payment->checkout,
                 $cashReportRow
             );
-            $venoxBonusUsd = static::venoxBonusAmountUsd(
-                $usd,
-                $payment->checkout,
-                $cashReportRow
-            );
             $paymentBreakdown = static::paymentBreakdownUsd(
                 $usd,
                 $reportBonusUsd
             );
             $clientPayments[$key] = ($clientPayments[$key] ?? 0) + $paymentBreakdown['net_usd'];
             $paymentBonusExpensesByClient[$key] = ($paymentBonusExpensesByClient[$key] ?? 0) + $paymentBreakdown['bonus_usd'];
-            $clientVenoxBonusByClient[$key] = ($clientVenoxBonusByClient[$key] ?? 0) + $venoxBonusUsd;
             $clientUnallocatedPayments[$key] = ($clientUnallocatedPayments[$key] ?? 0)
                 + max(0, (float) ($cashReportRow['unallocated_usd'] ?? 0));
             $clientPaymentDates[$key][] = Carbon::parse($payment->date ?: $payment->created_at)->format('d.m.Y');
@@ -228,7 +221,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'paid_usd' => $paid,
                     'closing_debt_usd' => $closing,
                     'bonus_expense_usd' => (float) ($clientBonusExpenses[$clientKey] ?? 0),
-                    'venox_cash_usd' => (float) ($clientVenoxBonusByClient[$clientKey] ?? 0),
+                    'venox_cash_usd' => 0.0,
                     'unallocated_payment_usd' => (float) ($clientUnallocatedPayments[$clientKey] ?? 0),
                 ];
             }
@@ -489,7 +482,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                 'paid_usd' => (float) ($clientPayments[$clientKey] ?? 0),
                 'closing_debt_usd' => (float) ($closingDebts[$clientKey] ?? 0),
                 'bonus_expense_usd' => (float) ($clientBonusExpenses[$clientKey] ?? 0),
-                'venox_cash_usd' => (float) ($clientVenoxBonusByClient[$clientKey] ?? 0),
+                'venox_cash_usd' => 0.0,
                 'unallocated_payment_usd' => (float) ($clientUnallocatedPayments[$clientKey] ?? 0),
             ];
         }
@@ -507,7 +500,14 @@ class CheckoutMonthExport implements FromView, WithStyles
                 $row['paid_usd'],
                 $row['bonus_expense_usd']
             );
-            $venoxCashUsd = max(0, (float) ($row['venox_cash_usd'] ?? 0));
+            // Venox kassasi bonus foizi emas. U aynan real sotilgan summa bilan
+            // zavod tannarxi orasidagi marja. Narxi hujjatda yo'q qatorlar
+            // taxminiy 0 bilan marjani buzmasligi uchun hisobga olinmaydi.
+            $venoxCashUsd = static::venoxCashTotalUsd(
+                $row['quantities'],
+                $row['actual_unit_prices_usd'],
+                $row['factory_prices']
+            );
             $firstRowIndex = count($rows);
             $startRow = count($rows) + 3;
 
@@ -595,6 +595,7 @@ class CheckoutMonthExport implements FromView, WithStyles
             $endRow = count($rows) + 2;
             $clientFormulas = static::clientExcelFormulas($startRow, $endRow);
             $rows[$firstRowIndex]['closing_debt_usd_formula'] = $clientFormulas['closing_debt_usd'];
+            $rows[$firstRowIndex]['venox_cash_usd_formula'] = static::venoxCashExcelFormula($startRow, $endRow);
             if ($endRow > $startRow) {
                 foreach (['A', 'B', 'C', 'E', 'O', 'P', 'Q', 'R', 'S'] as $column) {
                     $this->mergeRanges[] = $column . $startRow . ':' . $column . $endRow;
@@ -669,6 +670,9 @@ class CheckoutMonthExport implements FromView, WithStyles
     ): float {
         $total = 0.0;
         foreach ($quantities as $index => $qty) {
+            if (! isset($saleUnitPricesUsd[$index]) || $saleUnitPricesUsd[$index] === null) {
+                continue;
+            }
             $total += static::venoxCashUsd(
                 (float) $qty,
                 (float) ($saleUnitPricesUsd[$index] ?? 0),
@@ -677,6 +681,22 @@ class CheckoutMonthExport implements FromView, WithStyles
         }
 
         return $total;
+    }
+
+    /** Venox margin for rows whose real checkout price is available. */
+    public static function venoxCashExcelFormula(int $startRow, int $endRow): string
+    {
+        return sprintf(
+            '=SUMIF(H%d:H%d,">=0",M%d:M%d)-SUMIF(H%d:H%d,">=0",N%d:N%d)',
+            $startRow,
+            $endRow,
+            $startRow,
+            $endRow,
+            $startRow,
+            $endRow,
+            $startRow,
+            $endRow
+        );
     }
 
     public static function lineExcelFormulas(

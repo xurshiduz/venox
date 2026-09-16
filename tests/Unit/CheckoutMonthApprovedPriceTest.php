@@ -248,6 +248,21 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $this->assertSame(160.0, $venoxCash);
     }
 
+    public function test_venox_cash_ignores_rows_without_real_sale_price(): void
+    {
+        $venoxCash = CheckoutMonthExport::venoxCashTotalUsd(
+            [2, 4],
+            [null, 17.5],
+            [16, 16]
+        );
+
+        $this->assertSame(6.0, $venoxCash);
+        $this->assertSame(
+            '=SUMIF(H3:H5,">=0",M3:M5)-SUMIF(H3:H5,">=0",N3:N5)',
+            CheckoutMonthExport::venoxCashExcelFormula(3, 5)
+        );
+    }
+
     public function test_monthly_export_line_cells_are_real_excel_formulas(): void
     {
         $this->assertSame([
