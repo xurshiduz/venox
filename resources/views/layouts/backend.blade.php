@@ -11,7 +11,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="stylesheet" href="/backend/assets/css/dashlite.css?ver=3.0.3">
     <link id="skin-default" rel="stylesheet" href="/backend/assets/css/theme.css?ver=3.0.3">
-    <link rel="stylesheet" href="/backend/css/dashboard-ui.css?v=1.0.7">
+    <link rel="stylesheet" href="/backend/css/dashboard-ui.css?v=1.0.8">
     
     @yield('css')
 </head>
@@ -40,7 +40,7 @@
     <script src="/backend/js/jquery.repeater.min.js"></script>
     <script src="/backend/js/form-repeater.js"></script>
     <script src="/js/filter.js"></script>
-    <script src="/backend/js/dashboard-ui.js?v=1.0.8"></script>
+    <script src="/backend/js/dashboard-ui.js?v=1.0.9"></script>
     
     @yield('script')
     <script>
