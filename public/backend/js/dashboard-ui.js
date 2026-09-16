@@ -3,6 +3,57 @@
 
     var submitTimers = new WeakMap();
     var typingDelay = 450;
+    var autoFilterSelector = [
+        'input[name="search"]',
+        'input[name="date_from"]',
+        'input[name="date_to"]',
+        'input[name="fromdate"]',
+        'input[name="todate"]',
+        'input[name="from"]',
+        'input[name="to"]',
+        'select[name="agent_id"]',
+        'select[name="manager"]',
+        'select[name="manager_id"]',
+        'select[name="client_id"]',
+        'select[name="type"]',
+        'select[name="store"]',
+        'select[name="warehouse_id"]'
+    ].join(',');
+
+    function normalizeMethod(form) {
+        return (form.getAttribute('method') || 'GET').toUpperCase();
+    }
+
+    function isSafeAutoFilterForm(form) {
+        if (!form || form.dataset.noAutoFilter === 'true') {
+            return false;
+        }
+
+        if (form.dataset.autoFilter === 'true') {
+            return true;
+        }
+
+        if (normalizeMethod(form) !== 'GET') {
+            return false;
+        }
+
+        return !!form.querySelector(autoFilterSelector);
+    }
+
+    function initAutoFilterForms() {
+        document.querySelectorAll('form').forEach(function (form) {
+            if (!isSafeAutoFilterForm(form)) {
+                return;
+            }
+
+            form.dataset.autoFilter = 'true';
+            form.classList.add('dashboard-filter-form');
+
+            form.querySelectorAll('input[type="text"].date-picker, input[name="fromdate"], input[name="todate"], input[name="date_from"], input[name="date_to"]').forEach(function (field) {
+                field.classList.add('js-open-picker');
+            });
+        });
+    }
 
     function submitForm(form, delay) {
         if (!form || form.dataset.submitting === '1') {
@@ -38,6 +89,8 @@
 
         submitForm(form, typingDelay);
     });
+
+    document.addEventListener('DOMContentLoaded', initAutoFilterForms);
 
     document.addEventListener('change', function (event) {
         var field = event.target;
