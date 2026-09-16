@@ -16,6 +16,18 @@
         }, delay));
     }
 
+    function submitFormDirect(form, delay) {
+        if (!form || form.dataset.submitting === '1') {
+            return;
+        }
+
+        clearTimeout(submitTimers.get(form));
+        submitTimers.set(form, setTimeout(function () {
+            form.dataset.submitting = '1';
+            HTMLFormElement.prototype.submit.call(form);
+        }, delay));
+    }
+
     document.addEventListener('input', function (event) {
         var field = event.target;
         var form = field.closest('form[data-auto-filter="true"]');
@@ -40,7 +52,7 @@
 
     if (window.jQuery) {
         window.jQuery(document).on('change select2:select select2:clear', 'form[data-auto-filter="true"] select', function () {
-            submitForm(this.closest('form[data-auto-filter="true"]'), 120);
+            submitFormDirect(this.closest('form[data-auto-filter="true"]'), 220);
         });
     }
 

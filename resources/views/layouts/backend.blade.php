@@ -40,7 +40,7 @@
     <script src="/backend/js/jquery.repeater.min.js"></script>
     <script src="/backend/js/form-repeater.js"></script>
     <script src="/js/filter.js"></script>
-    <script src="/backend/js/dashboard-ui.js?v=1.0.2"></script>
+    <script src="/backend/js/dashboard-ui.js?v=1.0.3"></script>
     
     @yield('script')
     <script>
