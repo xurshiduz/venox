@@ -1,7 +1,7 @@
 <table>
     <thead>
         <tr>
-            <th colspan="16" style="font-weight:bold; font-size:14px; text-align:left;">{{ $periodLabel }} оралиғидаги мижозлар ҳисоботи (USD) — курсни Q2 катакда ўзгартиринг</th>
+            <th colspan="18" style="font-weight:bold; font-size:14px; text-align:left;">{{ $periodLabel }} оралиғидаги мижозлар ҳисоботи (USD) — курсни S2 катакда ўзгартиринг</th>
             <th>1 USD (сўм)</th>
             <th>Жами тўланган (сўм)</th>
         </tr>
@@ -13,17 +13,19 @@
             <th>Аввалги қарзи</th>
             <th>Товар Тўлиқ Номи ва Ҳажми</th>
             <th>Миқдори (шт/л)</th>
-            <th>Сотув Нархи</th>
+            <th>Тасдиқланган сотув нархи (USD)</th>
+            <th>Мижозга ҳақиқий сотилган нарх (USD)</th>
             <th>Завод нархи</th>
             <th>Устига қўйилган фоиз (%)</th>
             <th>Тасдиқланган прайс бўйича жами</th>
+            <th>Мижозга ҳақиқий сотилган жами (USD)</th>
             <th>Завод нархи жами</th>
             <th>Тўланган</th>
             <th>Бонус харажатлар (KPI + Venox bonus)</th>
             <th>Қолдиқ умумий қарз</th>
             <th>Venox касса</th>
             <th>{{ $reportUsdRate }}</th>
-            <th>{{ count($rows) ? '=SUM(M3:M'.(count($rows) + 2).')*$Q$2' : 0 }}</th>
+            <th>{{ count($rows) ? '=SUM(O3:O'.(count($rows) + 2).')*$S$2' : 0 }}</th>
         </tr>
     </thead>
     <tbody>
@@ -37,9 +39,11 @@
                 <td>{!! nl2br(e($row['product'])) !!}</td>
                 <td>{!! nl2br(e($row['qty'])) !!}</td>
                 <td>{{ $row['unit_price_usd_formula'] ?? $row['unit_price_usd'] }}</td>
+                <td>{{ $row['actual_unit_price_usd'] }}</td>
                 <td>{{ $row['factory_price_usd_formula'] ?? ($row['factory_price_usd'] ?: null) }}</td>
                 <td>{{ $row['markup_percent_formula'] ?? ($row['markup_percent'] !== null ? $row['markup_percent'] / 100 : null) }}</td>
                 <td>{{ $row['approved_total_usd_formula'] ?? $row['approved_total_usd'] }}</td>
+                <td>{{ $row['actual_total_usd_formula'] ?? $row['actual_total_usd'] }}</td>
                 <td>{{ $row['factory_total_usd_formula'] ?? $row['factory_total_usd'] }}</td>
                 <td>{{ $row['paid_usd'] }}</td>
                 <td>{{ $row['bonus_expense_usd'] }}</td>
@@ -57,12 +61,14 @@
             <td></td>
             <td></td>
             <td></td>
-            <td>{{ count($rows) ? '=SUM(K3:K'.(count($rows) + 2).')' : 0 }}</td>
+            <td></td>
             <td>{{ count($rows) ? '=SUM(L3:L'.(count($rows) + 2).')' : 0 }}</td>
             <td>{{ count($rows) ? '=SUM(M3:M'.(count($rows) + 2).')' : 0 }}</td>
             <td>{{ count($rows) ? '=SUM(N3:N'.(count($rows) + 2).')' : 0 }}</td>
             <td>{{ count($rows) ? '=SUM(O3:O'.(count($rows) + 2).')' : 0 }}</td>
             <td>{{ count($rows) ? '=SUM(P3:P'.(count($rows) + 2).')' : 0 }}</td>
+            <td>{{ count($rows) ? '=SUM(Q3:Q'.(count($rows) + 2).')' : 0 }}</td>
+            <td>{{ count($rows) ? '=SUM(R3:R'.(count($rows) + 2).')' : 0 }}</td>
             <td></td>
             <td></td>
         </tr>

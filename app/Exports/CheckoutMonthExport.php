@@ -226,6 +226,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'quantities' => [],
                     'unit_prices' => [],
                     'unit_prices_uzs' => [],
+                    'actual_unit_prices_usd' => [],
                     'factory_prices' => [],
                     'factory_prices_uzs' => [],
                     'markup_percentages' => [],
@@ -338,6 +339,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                 $groupedRows[$clientKey]['quantities'][] = $qty;
                 $groupedRows[$clientKey]['unit_prices'][] = $unitPriceUsd;
                 $groupedRows[$clientKey]['unit_prices_uzs'][] = $unitPriceUzs;
+                $groupedRows[$clientKey]['actual_unit_prices_usd'][] = $actualUnitPriceUsd;
                 $groupedRows[$clientKey]['factory_prices'][] = $factoryPriceUsd;
                 $groupedRows[$clientKey]['factory_prices_uzs'][] = $factoryPriceUzs;
                 $groupedRows[$clientKey]['markup_percentages'][] = $markupPercent;
@@ -362,6 +364,7 @@ class CheckoutMonthExport implements FromView, WithStyles
             $quantities = [];
             $unitPrices = [];
             $unitPricesUzs = [];
+            $actualUnitPricesUsd = [];
             $factoryPrices = [];
             $factoryPricesUzs = [];
             $markupPercentages = [];
@@ -510,6 +513,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                 $quantities[] = $qty;
                 $unitPrices[] = $unitPriceUsd;
                 $unitPricesUzs[] = (float) $allocationProduct['unit_price_uzs'];
+                $actualUnitPricesUsd[] = null;
                 $factoryPrices[] = $factoryPriceUsd;
                 $factoryPricesUzs[] = (float) $allocationProduct['factory_price_uzs'];
                 $markupPercentages[] = Currency::markupPercent($factoryPriceUsd, $unitPriceUsd);
@@ -528,6 +532,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                 'quantities' => $quantities,
                 'unit_prices' => $unitPrices,
                 'unit_prices_uzs' => $unitPricesUzs,
+                'actual_unit_prices_usd' => $actualUnitPricesUsd,
                 'factory_prices' => $factoryPrices,
                 'factory_prices_uzs' => $factoryPricesUzs,
                 'markup_percentages' => $markupPercentages,
@@ -573,12 +578,15 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'qty' => '',
                     'unit_price_usd' => '',
                     'unit_price_usd_formula' => null,
+                    'actual_unit_price_usd' => null,
                     'factory_price_usd' => null,
                     'factory_price_usd_formula' => null,
                     'markup_percent' => null,
                     'markup_percent_formula' => null,
                     'approved_total_usd' => null,
                     'approved_total_usd_formula' => null,
+                    'actual_total_usd' => null,
+                    'actual_total_usd_formula' => null,
                     'factory_total_usd' => null,
                     'factory_total_usd_formula' => null,
                     'paid_usd' => $row['paid_usd'],
@@ -596,6 +604,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                 $qty = (float) $row['quantities'][$index];
                 $unitPrice = (float) $row['unit_prices'][$index];
                 $unitPriceUzs = (float) $row['unit_prices_uzs'][$index];
+                $actualUnitPrice = $row['actual_unit_prices_usd'][$index] ?? null;
                 $factoryPrice = (float) $row['factory_prices'][$index];
                 $factoryPriceUzs = (float) $row['factory_prices_uzs'][$index];
                 $first = $index === 0;
@@ -612,12 +621,15 @@ class CheckoutMonthExport implements FromView, WithStyles
                     'qty' => $qty,
                     'unit_price_usd' => $unitPrice,
                     'unit_price_usd_formula' => $lineFormulas['unit_price_usd'],
+                    'actual_unit_price_usd' => $actualUnitPrice,
                     'factory_price_usd' => $factoryPrice,
                     'factory_price_usd_formula' => $lineFormulas['factory_price_usd'],
                     'markup_percent' => $row['markup_percentages'][$index],
                     'markup_percent_formula' => $lineFormulas['markup_percent'],
                     'approved_total_usd' => $qty * $unitPrice,
                     'approved_total_usd_formula' => $lineFormulas['approved_total_usd'],
+                    'actual_total_usd' => $actualUnitPrice === null ? null : (float) $row['actual_line_totals_usd'][$index],
+                    'actual_total_usd_formula' => $actualUnitPrice === null ? null : $lineFormulas['actual_total_usd'],
                     'factory_total_usd' => $qty * $factoryPrice,
                     'factory_total_usd_formula' => $lineFormulas['factory_total_usd'],
                     'paid_usd' => $first ? $row['paid_usd'] : null,
@@ -634,7 +646,7 @@ class CheckoutMonthExport implements FromView, WithStyles
             $rows[$firstRowIndex]['closing_debt_usd_formula'] = $clientFormulas['closing_debt_usd'];
             $rows[$firstRowIndex]['venox_cash_usd_formula'] = $clientFormulas['venox_cash_usd'];
             if ($endRow > $startRow) {
-                foreach (['A', 'B', 'C', 'E', 'M', 'N', 'O', 'P'] as $column) {
+                foreach (['A', 'B', 'C', 'E', 'O', 'P', 'Q', 'R'] as $column) {
                     $this->mergeRanges[] = $column . $startRow . ':' . $column . $endRow;
                 }
             }
@@ -724,11 +736,12 @@ class CheckoutMonthExport implements FromView, WithStyles
     ): array
     {
         return [
-            'unit_price_usd' => '=' . static::excelNumber($unitPriceUzs) . '/$Q$2',
-            'factory_price_usd' => '=' . static::excelNumber($factoryPriceUzs) . '/$Q$2',
-            'markup_percent' => sprintf('=IFERROR((H%d-I%d)/I%d,"")', $row, $row, $row),
+            'unit_price_usd' => '=' . static::excelNumber($unitPriceUzs) . '/$S$2',
+            'factory_price_usd' => '=' . static::excelNumber($factoryPriceUzs) . '/$S$2',
+            'markup_percent' => sprintf('=IFERROR((H%d-J%d)/J%d,"")', $row, $row, $row),
             'approved_total_usd' => sprintf('=G%d*H%d', $row, $row),
-            'factory_total_usd' => sprintf('=G%d*I%d', $row, $row),
+            'actual_total_usd' => sprintf('=G%d*I%d', $row, $row),
+            'factory_total_usd' => sprintf('=G%d*J%d', $row, $row),
         ];
     }
 
@@ -743,7 +756,7 @@ class CheckoutMonthExport implements FromView, WithStyles
     {
         return [
             'closing_debt_usd' => sprintf(
-                '=E%d+SUM(K%d:K%d)-M%d-N%d',
+                '=E%d+SUM(L%d:L%d)-O%d-P%d',
                 $startRow,
                 $startRow,
                 $endRow,
@@ -751,7 +764,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                 $startRow
             ),
             'venox_cash_usd' => sprintf(
-                '=SUM(K%d:K%d)-SUM(L%d:L%d)',
+                '=SUM(L%d:L%d)-SUM(N%d:N%d)',
                 $startRow,
                 $endRow,
                 $startRow,
@@ -1097,7 +1110,7 @@ class CheckoutMonthExport implements FromView, WithStyles
         $lastRow = max(3, $this->rowCount + 3);
         $sheet->setShowGridlines(false);
         $sheet->freezePane('A3');
-        $sheet->setAutoFilter('A2:P' . max(2, $this->rowCount + 2));
+        $sheet->setAutoFilter('A2:R' . max(2, $this->rowCount + 2));
         $sheet->getDefaultRowDimension()->setRowHeight(44);
         $sheet->getRowDimension(1)->setRowHeight(28);
         $sheet->getRowDimension(2)->setRowHeight(48);
@@ -1110,27 +1123,27 @@ class CheckoutMonthExport implements FromView, WithStyles
             $sheet->mergeCells($range);
         }
 
-        foreach (['A' => 13, 'B' => 28, 'C' => 19, 'D' => 24, 'E' => 20, 'F' => 52, 'G' => 15, 'H' => 16, 'I' => 16, 'J' => 20, 'K' => 23, 'L' => 20, 'M' => 17, 'N' => 18, 'O' => 22, 'P' => 18, 'Q' => 18, 'R' => 26] as $column => $width) {
+        foreach (['A' => 13, 'B' => 28, 'C' => 19, 'D' => 24, 'E' => 20, 'F' => 52, 'G' => 15, 'H' => 18, 'I' => 18, 'J' => 16, 'K' => 20, 'L' => 23, 'M' => 23, 'N' => 20, 'O' => 17, 'P' => 18, 'Q' => 22, 'R' => 18, 'S' => 18, 'T' => 26] as $column => $width) {
             $sheet->getColumnDimension($column)->setWidth($width);
         }
 
-        $sheet->getStyle('A1:R' . $lastRow)->getAlignment()
+        $sheet->getStyle('A1:T' . $lastRow)->getAlignment()
             ->setVertical(Alignment::VERTICAL_CENTER)
             ->setHorizontal(Alignment::HORIZONTAL_CENTER)
             ->setWrapText(true);
-        $sheet->getStyle('A2:P2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-        $sheet->getStyle('A2:P2')->getFont()->setBold(true)->getColor()->setRGB('000000');
-        $sheet->getStyle('A2:P' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('C9C9C9');
+        $sheet->getStyle('A2:R2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('A2:R2')->getFont()->setBold(true)->getColor()->setRGB('000000');
+        $sheet->getStyle('A2:R' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('C9C9C9');
         $sheet->getStyle('G3:G' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.###');
         $sheet->getStyle('E3:E' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
-        $sheet->getStyle('H3:I' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
-        $sheet->getStyle('J3:J' . $lastRow)->getNumberFormat()->setFormatCode('0.00%');
-        $sheet->getStyle('K3:P' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
-        $sheet->getStyle('A' . $lastRow . ':P' . $lastRow)->getFont()->setBold(true);
-        $sheet->getStyle('Q1:R2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setWrapText(true);
-        $sheet->getStyle('Q1:R1')->getFont()->setBold(true);
-        $sheet->getStyle('Q1:R2')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('C9C9C9');
-        $sheet->getStyle('Q2:R2')->getNumberFormat()->setFormatCode('#,##0.00');
-        $sheet->getStyle('Q2')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFF2CC');
+        $sheet->getStyle('H3:J' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
+        $sheet->getStyle('K3:K' . $lastRow)->getNumberFormat()->setFormatCode('0.00%');
+        $sheet->getStyle('L3:R' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
+        $sheet->getStyle('A' . $lastRow . ':R' . $lastRow)->getFont()->setBold(true);
+        $sheet->getStyle('S1:T2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setWrapText(true);
+        $sheet->getStyle('S1:T1')->getFont()->setBold(true);
+        $sheet->getStyle('S1:T2')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('C9C9C9');
+        $sheet->getStyle('S2:T2')->getNumberFormat()->setFormatCode('#,##0.00');
+        $sheet->getStyle('S2')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFF2CC');
     }
 }
