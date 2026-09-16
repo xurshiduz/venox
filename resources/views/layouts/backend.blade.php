@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zxx" class="js">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="js">
 
 <head>
     <meta charset="utf-8">
@@ -11,6 +11,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="stylesheet" href="/backend/assets/css/dashlite.css?ver=3.0.3">
     <link id="skin-default" rel="stylesheet" href="/backend/assets/css/theme.css?ver=3.0.3">
+    <link rel="stylesheet" href="/backend/css/dashboard-ui.css?v=1.0.0">
     
     @yield('css')
 </head>
