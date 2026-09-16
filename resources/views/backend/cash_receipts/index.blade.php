@@ -9,19 +9,19 @@
                     <div class="nk-block nk-block-lg">
                         <div class="card dashboard-filter mb-3">
                             <div class="card-inner py-3">
-                                <form method="GET" action="{{ route($filterRoute) }}">
+                                <form method="GET" action="{{ route($filterRoute) }}" data-auto-filter="true">
                                     <div class="row gy-2 align-items-end">
                                         <div class="col-lg-4 col-md-6">
                                             <label class="form-label mb-1">{{ trans('backend.ui.search') }}</label>
-                                            <input type="text" class="form-control" name="search" value="{{ $keyword }}" placeholder="{{ trans('backend.ui.cash_search_hint') }}">
+                                            <input type="text" class="form-control" name="search" value="{{ $keyword }}" placeholder="{{ trans('backend.ui.cash_search_hint') }}" autocomplete="off">
                                         </div>
                                         <div class="col-lg-2 col-md-6">
                                             <label class="form-label mb-1">{{ trans('backend.ui.date_from') }}</label>
-                                            <input type="date" class="form-control" name="date_from" value="{{ $dateFrom }}">
+                                            <input type="date" class="form-control js-open-picker" name="date_from" value="{{ $dateFrom }}">
                                         </div>
                                         <div class="col-lg-2 col-md-6">
                                             <label class="form-label mb-1">{{ trans('backend.ui.date_to') }}</label>
-                                            <input type="date" class="form-control" name="date_to" value="{{ $dateTo }}">
+                                            <input type="date" class="form-control js-open-picker" name="date_to" value="{{ $dateTo }}">
                                         </div>
                                         <div class="col-lg-4 col-md-6">
                                             <div class="d-flex" style="gap: 8px;">
@@ -81,8 +81,14 @@
                                       <td>{{ $item->created_at->format('Y-m-d H:i') }}</td>
                                       <td>{{ $item->user_id ? $item->uname->name : NULL }}</td>
                                       <td>{{ $item->status ? trans('backend.table.pay_success') : trans('backend.table.pay_cancel') }}</td>
-                                      <td>@if($item->status) <a href="{{ route('cash_receipt_status', ['id' => $item->code])}}" style="text-decoration:underline;">{{ trans('backend.table.annulirovat') }}</a> @else <a href="{{ route('cash_receipt_status', ['id' => $item->code])}}" style="text-decoration:underline;">{{ trans('backend.table.return_pay') }}</a> @endif</td>
-                                      <td width="120px"><a href="{{ route('cash_receipt_form', ['id' => $item->code])}}" style="text-decoration:underline;">{{ trans('backend.ui.edit') }}</a></td>
+                                      <td class="table-actions">
+                                          @if($item->status)
+                                              <a href="{{ route('cash_receipt_status', ['id' => $item->code])}}" class="btn btn-icon btn-sm btn-outline-danger" title="{{ trans('backend.table.annulirovat') }}" aria-label="{{ trans('backend.table.annulirovat') }}"><em class="icon ni ni-cross-circle"></em></a>
+                                          @else
+                                              <a href="{{ route('cash_receipt_status', ['id' => $item->code])}}" class="btn btn-icon btn-sm btn-outline-success" title="{{ trans('backend.table.return_pay') }}" aria-label="{{ trans('backend.table.return_pay') }}"><em class="icon ni ni-undo"></em></a>
+                                          @endif
+                                      </td>
+                                      <td width="80px" class="table-actions"><a href="{{ route('cash_receipt_form', ['id' => $item->code])}}" class="btn btn-icon btn-sm btn-outline-primary" title="{{ trans('backend.ui.edit') }}" aria-label="{{ trans('backend.ui.edit') }}"><em class="icon ni ni-edit"></em></a></td>
                                     </tr>
                                     @endforeach
                                   </tbody>
