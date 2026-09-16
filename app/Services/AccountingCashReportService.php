@@ -246,6 +246,12 @@ class AccountingCashReportService
                 $product['actual_unit_price_usd'] = $product['qty'] > 0
                     ? $actualTotal / $product['qty']
                     : null;
+                $factoryTotal = (float) $group->sum(fn (array $row) =>
+                    (float) ($row['factory_unit_price_usd'] ?? 0) * (float) ($row['qty'] ?? 0)
+                );
+                $product['factory_unit_price_usd'] = $product['qty'] > 0 && $factoryTotal > 0
+                    ? $factoryTotal / $product['qty']
+                    : null;
 
                 return $product;
             })
@@ -369,6 +375,7 @@ class AccountingCashReportService
             $coveredUsd = min($remaining, $availableLineUsd);
             $coveredQty = $qty * ($coveredUsd / $lineUsd);
             if ($coveredQty > 0) {
+                $unitCostUsd = null;
                 if ($includePurchaseCost) {
                     $unitCostUsd = $this->detailUnitCostUsd($detail);
                     $purchaseCostUsd += $coveredQty * $unitCostUsd;
@@ -381,6 +388,7 @@ class AccountingCashReportService
                     'unit' => optional(optional($detail->prodid)->unitid)->name ?? 'dona',
                     'actual_unit_price_usd' => $lineUsd / $qty,
                     'actual_total_usd' => $coveredUsd,
+                    'factory_unit_price_usd' => $unitCostUsd,
                 ];
                 $remaining -= $coveredUsd;
             }

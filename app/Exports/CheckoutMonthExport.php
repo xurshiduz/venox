@@ -140,7 +140,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                 'scheme' => null,
                 'product_id' => null,
                 'client_ids' => $cashReportClientIds->all(),
-                'include_purchase_cost' => false,
+                'include_purchase_cost' => true,
             ]);
             $cashReportRowsByReceipt = $cashReportRows
                 ->keyBy(fn (array $row) => (string) ($row['receipt_id'] ?? ''));
@@ -310,11 +310,17 @@ class CheckoutMonthExport implements FromView, WithStyles
                 // ikkalasi ham aniq kiritilgan mahsulotlar ko'rsatiladi.
                 $product = $detail->prodid;
                 $approvedPrices = $approvedPriceService->pricesFor((string) ($product->name ?? ''));
-                if (! static::hasCompleteApprovedPrices($approvedPrices)) {
+                if ($actualUnitPriceUsd === null && ! $approvedPrices) {
                     continue;
                 }
-                $unitPriceUzs = (float) $approvedPrices['sale_uzs'];
-                $factoryPriceUzs = (float) $approvedPrices['factory_uzs'];
+                $resolvedPrices = static::resolveReportPricesUzs(
+                    $approvedPrices,
+                    $actualUnitPriceUsd,
+                    $latestCheckinPriceUsd > 0 ? $latestCheckinPriceUsd : null,
+                    $reportUsdRate
+                );
+                $unitPriceUzs = $resolvedPrices['sale_uzs'];
+                $factoryPriceUzs = $resolvedPrices['factory_uzs'];
                 $unitPriceUsd = Currency::documentAmountToUsd(
                     $unitPriceUzs,
                     2,
@@ -375,11 +381,27 @@ class CheckoutMonthExport implements FromView, WithStyles
                 foreach ($periodCheckout->checkoutDetails as $detail) {
                     $productName = (string) (optional($detail->prodid)->name ?? 'Noma\'lum mahsulot');
                     $approvedPrices = $approvedPriceService->pricesFor($productName);
-                    if (! static::hasCompleteApprovedPrices($approvedPrices)) {
+                    $actualUnitPriceUsd = static::checkoutDetailUnitPriceUsd($detail, $periodCheckout);
+                    if ($actualUnitPriceUsd === null && ! $approvedPrices) {
                         continue;
                     }
-                    $unitPriceUzs = (float) $approvedPrices['sale_uzs'];
-                    $factoryPriceUzs = (float) $approvedPrices['factory_uzs'];
+                    $storedFactoryUsd = (float) ($detail->tan_price ?? 0);
+                    if ($storedFactoryUsd > 1000) {
+                        $storedFactoryUsd = Currency::documentAmountToUsd(
+                            $storedFactoryUsd,
+                            (int) ($detail->currency_type ?? $periodCheckout->currency_type ?? 2),
+                            (float) ($detail->currency_type_price ?? $periodCheckout->currency_type_price ?? $reportUsdRate),
+                            $periodCheckout->date ?: $periodCheckout->created_at
+                        );
+                    }
+                    $resolvedPrices = static::resolveReportPricesUzs(
+                        $approvedPrices,
+                        $actualUnitPriceUsd,
+                        $storedFactoryUsd > 0 ? $storedFactoryUsd : null,
+                        $reportUsdRate
+                    );
+                    $unitPriceUzs = $resolvedPrices['sale_uzs'];
+                    $factoryPriceUzs = $resolvedPrices['factory_uzs'];
                     $unitPriceUsd = Currency::documentAmountToUsd(
                         $unitPriceUzs,
                         2,
@@ -390,7 +412,6 @@ class CheckoutMonthExport implements FromView, WithStyles
                         2,
                         $approvedPriceService->usdRate()
                     );
-                    $actualUnitPriceUsd = static::checkoutDetailUnitPriceUsd($detail, $periodCheckout);
                     $clientAllocationProducts[] = [
                         'price_key' => (string) ($approvedPrices['code'] ?? $productName),
                         'name' => $productName,
@@ -416,11 +437,23 @@ class CheckoutMonthExport implements FromView, WithStyles
                     foreach ($allocationRow['products'] ?? [] as $allocatedProduct) {
                         $productName = (string) ($allocatedProduct['name'] ?? 'Noma\'lum mahsulot');
                         $approvedPrices = $approvedPriceService->pricesFor($productName);
-                        if (! static::hasCompleteApprovedPrices($approvedPrices)) {
+                        $actualUnitPriceUsd = isset($allocatedProduct['actual_unit_price_usd'])
+                            ? (float) $allocatedProduct['actual_unit_price_usd']
+                            : null;
+                        if ($actualUnitPriceUsd === null && ! $approvedPrices) {
                             continue;
                         }
-                        $unitPriceUzs = (float) $approvedPrices['sale_uzs'];
-                        $factoryPriceUzs = (float) $approvedPrices['factory_uzs'];
+                        $factoryUnitPriceUsd = isset($allocatedProduct['factory_unit_price_usd'])
+                            ? (float) $allocatedProduct['factory_unit_price_usd']
+                            : null;
+                        $resolvedPrices = static::resolveReportPricesUzs(
+                            $approvedPrices,
+                            $actualUnitPriceUsd,
+                            $factoryUnitPriceUsd,
+                            $reportUsdRate
+                        );
+                        $unitPriceUzs = $resolvedPrices['sale_uzs'];
+                        $factoryPriceUzs = $resolvedPrices['factory_uzs'];
                         $unitPriceUsd = Currency::documentAmountToUsd(
                             $unitPriceUzs,
                             2,
@@ -441,9 +474,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                             'unit_price_uzs' => $unitPriceUzs,
                             'factory_price_usd' => $factoryPriceUsd,
                             'factory_price_uzs' => $factoryPriceUzs,
-                            'actual_unit_price_usd' => isset($allocatedProduct['actual_unit_price_usd'])
-                                ? (float) $allocatedProduct['actual_unit_price_usd']
-                                : null,
+                            'actual_unit_price_usd' => $actualUnitPriceUsd,
                             'actual_total_usd' => isset($allocatedProduct['actual_total_usd'])
                                 ? (float) $allocatedProduct['actual_total_usd']
                                 : null,
@@ -769,6 +800,32 @@ class CheckoutMonthExport implements FromView, WithStyles
             $rate,
             $checkout->date ?: $checkout->created_at
         );
+    }
+
+    /** Fill every report price from approved prices, then real checkout values. */
+    public static function resolveReportPricesUzs(
+        ?array $approvedPrices,
+        ?float $actualUnitPriceUsd,
+        ?float $factoryUnitPriceUsd,
+        float $usdRate
+    ): array {
+        $fallbackSale = max(0, (float) $actualUnitPriceUsd) * $usdRate;
+        $sale = (float) ($approvedPrices['sale_uzs'] ?? 0);
+        $factory = (float) ($approvedPrices['factory_uzs'] ?? 0);
+
+        if ($sale <= 0) {
+            $sale = $fallbackSale;
+        }
+        if ($factory <= 0) {
+            $factory = max(0, (float) $factoryUnitPriceUsd) * $usdRate;
+        }
+        // Eski checkoutda tannarx saqlanmagan bo'lsa, qatorni bo'sh/0
+        // qoldirmaslik uchun real sotuv narxi eng oxirgi zaxira bo'ladi.
+        if ($factory <= 0) {
+            $factory = $fallbackSale;
+        }
+
+        return ['sale_uzs' => $sale, 'factory_uzs' => $factory];
     }
 
     private static function excelNumber(float $value): string

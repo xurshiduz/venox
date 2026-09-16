@@ -302,6 +302,27 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         );
     }
 
+    public function test_missing_approved_sale_price_uses_real_checkout_price(): void
+    {
+        $prices = CheckoutMonthExport::resolveReportPricesUzs(
+            ['sale_uzs' => null, 'factory_uzs' => 800000],
+            57,
+            null,
+            11800
+        );
+
+        $this->assertSame(672600.0, $prices['sale_uzs']);
+        $this->assertSame(800000.0, $prices['factory_uzs']);
+    }
+
+    public function test_missing_catalogue_prices_fall_back_to_checkout_values(): void
+    {
+        $prices = CheckoutMonthExport::resolveReportPricesUzs(null, 25, 20, 11900);
+
+        $this->assertSame(297500.0, $prices['sale_uzs']);
+        $this->assertSame(238000.0, $prices['factory_uzs']);
+    }
+
     public function test_saved_period_commission_bonus_is_used_when_linked_checkout_has_zero_bonus(): void
     {
         $linked = new Checkout(['id' => 10, 'date' => '2026-09-10', 'kpi_percent' => 0, 'venox_bonus_percent' => 0]);
