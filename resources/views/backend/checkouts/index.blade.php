@@ -52,11 +52,11 @@
         </div>
         <div class="card dashboard-filter mb-3">
             <div class="card-inner py-3">
-                <form method="GET" action="{{ route('checkouts_index', ['ctypeAlias' => $ctypeAlias]) }}" data-auto-filter="true">
+                <form method="GET" action="{{ route('checkouts_index', ['ctypeAlias' => $ctypeAlias]) }}">
                     <div class="row gy-2 align-items-end">
                         <div class="col-lg-3 col-md-6">
                             <label class="form-label mb-1">{{ trans('backend.ui.search') }}</label>
-                            <input type="text" class="form-control" name="search" value="{{ $keyword }}" placeholder="{{ trans('backend.ui.checkout_search_hint') }}" autocomplete="off">
+                            <input type="text" class="form-control" name="search" value="{{ $keyword }}" placeholder="{{ trans('backend.ui.checkout_search_hint') }}">
                         </div>
                         <div class="col-lg-2 col-md-6">
                             <label class="form-label mb-1">{{ trans('backend.ui.agent') }}</label>
@@ -69,11 +69,11 @@
                         </div>
                         <div class="col-lg-2 col-md-6">
                             <label class="form-label mb-1">{{ trans('backend.ui.date_from') }}</label>
-                            <input type="date" class="form-control js-open-picker" name="date_from" value="{{ $dateFrom }}">
+                            <input type="date" class="form-control" name="date_from" value="{{ $dateFrom }}">
                         </div>
                         <div class="col-lg-2 col-md-6">
                             <label class="form-label mb-1">{{ trans('backend.ui.date_to') }}</label>
-                            <input type="date" class="form-control js-open-picker" name="date_to" value="{{ $dateTo }}">
+                            <input type="date" class="form-control" name="date_to" value="{{ $dateTo }}">
                         </div>
                         <div class="col-lg-3 col-md-6">
                             <div class="d-flex" style="gap: 8px;">
@@ -98,12 +98,12 @@
                                     @if(Route::currentRouteName() == 'checkouts_index')
                                         <div class="form-inline flex-nowrap gx-3">
                                             <div class="btn-wrap">
-                                                <span class="d-none d-md-block"><a href="{{ route('checkout_form') }}" class="btn btn-sm btn-primary"><em class="icon ni ni-plus"></em>{{ trans('backend.table.add_from') }}</a></span>
-                                                <span class="d-md-none"><a href="{{ route('checkout_form') }}" class="btn btn-dim btn-outline-primary btn-icon"><em class="icon ni ni-plus"></em></a></span>
+                                                <span class="d-none d-md-block"><a href="{{ route('checkout_form') }}" class="btn btn-sm btn-primary">{{ trans('backend.table.add_from') }}</a></span>
+                                                <span class="d-md-none"><a href="{{ route('checkout_form') }}" class="btn btn-dim btn-outline-primary btn-icon"><em class="icon ni ni-arrow-right"></em></a></span>
                                             </div>
                                             <div class="btn-wrap">
-                                                <span class="d-none d-md-block"><a href="{{ route('checkout_today_send') }}" class="btn btn-sm btn-warning"><em class="icon ni ni-calendar"></em>{{ trans('backend.ui.today') }}</a></span>
-                                                <span class="d-md-none"><a href="{{ route('checkout_today_send') }}" class="btn btn-dim btn-outline-warning btn-icon"><em class="icon ni ni-calendar"></em></a></span>
+                                                <span class="d-none d-md-block"><a href="{{ route('checkout_today_send') }}" class="btn btn-sm btn-warning">{{ trans('backend.ui.today') }}</a></span>
+                                                <span class="d-md-none"><a href="{{ route('checkout_today_send') }}" class="btn btn-dim btn-outline-warning btn-icon"><em class="icon ni ni-arrow-right"></em></a></span>
                                             </div>
                                             <!--<div class="btn-wrap">
                                                 <span class="d-none d-md-block"><a href="{{ route('checkout_yesterday_send') }}" class="btn btn-sm btn-warning">Вчерашняя</a></span>
@@ -312,7 +312,7 @@
                             @include('layouts.message.success')
                             @include('layouts.message.error')
                             <div class="table-responsive">
-                                <table class="table table-bordered dashboard-data-table">
+                                <table class="table table-bordered text-nowrap">
                                   <thead>
                                     <tr class="text-center">
                                       <th style="padding: 0px 20px; vertical-align: middle;">{{ trans('backend.table.doc_number') }}</th>
@@ -344,7 +344,7 @@
                                        <a target="_blank" href="{{ route('checkout_check', ['id' => $item->code])}}">@if($item->number_work) {{ $item->number_work }} @else {{ trans('backend.ui.draft_short') }} #{{ $item->id }} @endif <em class="icon ni ni-download"></em></a>
                                       </td>
                                       @hasanyrole('admin|cashier|report|select_manager|sale')
-                                      <td style="padding: 0px; vertical-align: middle;" class="table-actions"><a href="{{ route('checkout_print', ['id' => $item->code, 'view' => 'full']) }}" class="btn btn-icon btn-sm btn-outline-primary" title="{{ trans('backend.ui.pdf') }}" aria-label="{{ trans('backend.ui.pdf') }}"><em class="icon ni ni-file-pdf"></em></a> <a href="{{ route('checkout_excel', ['id' => $item->code]) }}" class="btn btn-icon btn-sm btn-outline-success" title="{{ trans('backend.ui.excel') }}" aria-label="{{ trans('backend.ui.excel') }}"><em class="icon ni ni-file-xls"></em></a> </td>
+                                      <td style="padding: 0px; vertical-align: middle;"><a href="{{ route('checkout_print', ['id' => $item->code, 'view' => 'full']) }}"><img width="22px" src="/upload/view-files.png"></a> <a href="{{ route('checkout_excel', ['id' => $item->code]) }}"><img width="22px" src="/upload/excel.png"></a> </td>
                                       <!--<td style="min-width: 60px; padding: 0px; vertical-align: middle;"><a href="{{ route('checkout_print', ['id' => $item->code, 'view' => 'short']) }}"><img width="22px" src="/upload/view-files.png"></a> <a href="{{ route('checkout_excel_null', ['id' => $item->code]) }}"><img width="22px" src="/upload/excel.png"></a> </td>
                                       -->@endhasanyrole
                                        <td style="padding: 2px; {{ $item->total_price_debt != 0 &&  $item->checkout_tip_id == 1 ? 'background-color: #fff29c' : NULL }}"><span data-bs-toggle="tooltip" data-bs-placement="top" title="{{ $item->client_id ? $item->supid->name : NULL }}">{{ $item->client_id ? Str::limit($item->supid->name, 30, '') : NULL }} {{ $item->checkout_tip_id == 3 ? '*' : NULL }}</span></td>
@@ -352,10 +352,10 @@
                                        <td>{{ $item->details()->count() }} </td>
                                        <td>
                                            @if($item->step == 1)
-                                           <a href="{{ route('checkout_form', ['id' => $item->code, 'page' => $data->currentPage()])}}" class="btn btn-icon btn-sm btn-outline-primary" title="{{ trans('backend.table.post_edit') }}" aria-label="{{ trans('backend.table.post_edit') }}"><em class="icon ni ni-edit"></em></a>
+                                           <a href="{{ route('checkout_form', ['id' => $item->code, 'page' => $data->currentPage()])}}" style="text-decoration:underline;">{{ trans('backend.table.post_edit_short') }}</a>
                                            @else
                                            @hasanyrole('admin|cashier|sale|dealer_admin')
-                                           <a href="{{ route('checkout_form', ['id' => $item->code, 'page' => $data->currentPage()])}}" class="btn btn-icon btn-sm btn-outline-primary" title="{{ trans('backend.table.post_edit') }}" aria-label="{{ trans('backend.table.post_edit') }}"><em class="icon ni ni-edit"></em></a>
+                                           <a href="{{ route('checkout_form', ['id' => $item->code, 'page' => $data->currentPage()])}}" style="text-decoration:underline;">{{ trans('backend.table.post_edit_short') }}</a>
                                            @endhasanyrole
                                            @endif
                                        </td>
@@ -411,7 +411,7 @@
                                        </td>
                                       <td style="padding: 2px; font-size: 12px; vertical-align: middle;">{{ Carbon\Carbon::parse($item->date)->format('Y-m-d') . ' ' .  $item->created_at->format('H:i') }} </td>
 
-                                       <td class="table-actions"><a href="{{ route('delete_checkout', ['id' => $item->code])}}" class="btn btn-icon btn-sm btn-outline-danger" title="{{ trans('backend.table.delete') }}" aria-label="{{ trans('backend.table.delete') }}"><em class="icon ni ni-trash"></em></a></td>
+                                       <td><a href="{{ route('delete_checkout', ['id' => $item->code])}}" style="text-decoration:underline;">{{ trans('backend.table.delete') }}</a></td>
                                     </tr>
 
                                     @if($item->number_work)

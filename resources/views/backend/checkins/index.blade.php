@@ -11,19 +11,19 @@
                         @include('layouts.message.error')
                         <div class="card dashboard-filter mb-3">
                             <div class="card-inner py-3">
-                                <form method="GET" action="{{ route('checkins_index') }}" data-auto-filter="true">
+                                <form method="GET" action="{{ route('checkins_index') }}">
                                     <div class="row gy-2 align-items-end">
                                         <div class="col-lg-4 col-md-6">
                                             <label class="form-label mb-1">{{ trans('backend.ui.search') }}</label>
-                                            <input type="text" class="form-control" value="{{ $keyword }}" name="search" placeholder="{{ trans('backend.ui.checkin_search_hint') }}" autocomplete="off">
+                                            <input type="text" class="form-control" value="{{ $keyword }}" name="search" placeholder="{{ trans('backend.ui.checkin_search_hint') }}">
                                         </div>
                                         <div class="col-lg-2 col-md-6">
                                             <label class="form-label mb-1">{{ trans('backend.ui.date_from') }}</label>
-                                            <input type="date" class="form-control js-open-picker" name="date_from" value="{{ $dateFrom }}">
+                                            <input type="date" class="form-control" name="date_from" value="{{ $dateFrom }}">
                                         </div>
                                         <div class="col-lg-2 col-md-6">
                                             <label class="form-label mb-1">{{ trans('backend.ui.date_to') }}</label>
-                                            <input type="date" class="form-control js-open-picker" name="date_to" value="{{ $dateTo }}">
+                                            <input type="date" class="form-control" name="date_to" value="{{ $dateTo }}">
                                         </div>
                                         <div class="col-lg-4 col-md-6">
                                             <div class="d-flex" style="gap: 8px;">
@@ -48,7 +48,7 @@
 
                         <div class="card dashboard-table-card">
                             <div class="table-responsive">
-                                <table class="table table-bordered dashboard-data-table">
+                                <table class="table table-bordered text-nowrap">
                                   <thead>
                                     <tr class="text-center">
                                       <th width="160px">{{ trans('backend.table.doc_number') }}</th>
@@ -84,14 +84,14 @@
                                        <td>{{ number_format($item->currency_type_price, 0, '.', ' ') }}</td>
                                        <td>
                                            @if(!$item->source_system)
-                                           <a href="{{ route('checkin_form', ['id' => $item->code])}}" class="btn btn-icon btn-sm btn-outline-primary" title="{{ trans('backend.table.post_edit') }}" aria-label="{{ trans('backend.table.post_edit') }}"><em class="icon ni ni-edit"></em></a>
+                                           <a href="{{ route('checkin_form', ['id' => $item->code])}}" style="text-decoration:underline;">{{ trans('backend.table.post_edit_short') }}</a>
                                            @else
                                            <span class="text-muted">LIDAZ</span>
                                            @endif
-                                           @if($item->file_excel) <a href="{{ route('checkin_form', ['id' => $item->code])}}" class="btn btn-icon btn-sm btn-outline-success" title="Excel" aria-label="Excel"><em class="icon ni ni-file-xls"></em></a> @endif
+                                           @if($item->file_excel) | <a href="{{ route('checkin_form', ['id' => $item->code])}}" style="text-decoration:underline;">EXCEL</a> @endif
                                        </td>
                                        <td>{{ $item->reference }} </td>
-                                       <td class="table-actions"><a target="_blank" href="{{ route('checkin_excel', ['id' => $item->code]) }}" class="btn btn-icon btn-sm btn-outline-success" title="{{ trans('backend.table.download') }}" aria-label="{{ trans('backend.table.download') }}"><em class="icon ni ni-download"></em></a></td>
+                                       <td><a target="_blank" href="{{ route('checkin_excel', ['id' => $item->code]) }}">{{ trans('backend.table.download') }}</a></td>
                                        <td>
                                            @php
                                                $totalsByCurrency = $item->details
@@ -111,7 +111,7 @@
                                       <td>{{ $item->userid ? $item->userid->name : null  }}</td>
                                       <td>
                                           @if(!$item->source_system)
-                                          <a href="{{ route('delete_checkin', ['id' => $item->code])}}" class="btn btn-icon btn-sm btn-outline-danger" title="{{ trans('backend.table.delete') }}" aria-label="{{ trans('backend.table.delete') }}"><em class="icon ni ni-trash"></em></a>
+                                          <a href="{{ route('delete_checkin', ['id' => $item->code])}}" style="text-decoration:underline;">{{ trans('backend.table.delete') }}</a>
                                           @endif
                                       </td>
                                       <td>
