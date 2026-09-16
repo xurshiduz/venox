@@ -103,17 +103,6 @@ class CheckoutMonthExport implements FromView, WithStyles
                     ->filter()
                     ->first();
             });
-        $historicalCheckoutsByClient = Checkout::with(['managerid:id,name', 'checkoutDetails.prodid'])
-            ->where('status', 1)
-            ->where('checkout_tip_id', 1)
-            ->where('type_id', 1)
-            ->whereIn('client_id', static::mergeReportClientIds([], $paymentClientIds))
-            ->whereDate('date', '<=', $periodEnd->toDateString())
-            ->orderByDesc('date')
-            ->orderByDesc('id')
-            ->get()
-            ->groupBy(fn (Checkout $checkout) => (string) $checkout->client_id)
-            ->map(fn (Collection $clientCheckouts) => $clientCheckouts->take(10)->values());
         $checkoutClientIds = static::mergeReportClientIds($checkouts->pluck('client_id'), []);
         $clientIds = static::mergeReportClientIds(
             $checkoutClientIds,
@@ -374,30 +363,27 @@ class CheckoutMonthExport implements FromView, WithStyles
             $clientAllocationProducts = [];
             $fallbackAgent = (string) ($paymentAgentsByClient->get($clientKey) ?: '—');
 
-            // Avval shu davrdagi checkoutning to'liq mahsulot tarkibini olamiz.
-            // FIFO payment row ko'pincha faqat dastlabki 1-2 tovarni qaytaradi va
-            // barcha summani 96/20 kabi shu ikki tovarga yuklab qo'yadi.
-            foreach ($historicalCheckoutsByClient->get($clientKey, collect()) as $periodCheckout) {
-                foreach ($periodCheckout->checkoutDetails as $detail) {
-                    $productName = (string) (optional($detail->prodid)->name ?? 'Noma\'lum mahsulot');
+            // To'lov qaysi real checkout qatorlarini qoplagan bo'lsa, mahsulot,
+            // miqdor va haqiqiy sotuv narxini aynan o'sha FIFO taqsimotidan olamiz.
+            // Tarixdagi so'nggi savdolarni olib, miqdorni to'lovga moslab sun'iy
+            // o'zgartirish bo'sh narxlar va noto'g'ri marjaga sabab bo'lgan.
+            foreach ($paymentAllocationRows->get($clientKey, collect()) as $allocationRow) {
+                foreach ($allocationRow['products'] ?? [] as $allocatedProduct) {
+                    $productName = (string) ($allocatedProduct['name'] ?? 'Noma\'lum mahsulot');
                     $approvedPrices = $approvedPriceService->pricesFor($productName);
-                    $actualUnitPriceUsd = static::checkoutDetailUnitPriceUsd($detail, $periodCheckout);
+                    $actualUnitPriceUsd = isset($allocatedProduct['actual_unit_price_usd'])
+                        ? (float) $allocatedProduct['actual_unit_price_usd']
+                        : null;
                     if ($actualUnitPriceUsd === null && ! $approvedPrices) {
                         continue;
                     }
-                    $storedFactoryUsd = (float) ($detail->tan_price ?? 0);
-                    if ($storedFactoryUsd > 1000) {
-                        $storedFactoryUsd = Currency::documentAmountToUsd(
-                            $storedFactoryUsd,
-                            (int) ($detail->currency_type ?? $periodCheckout->currency_type ?? 2),
-                            (float) ($detail->currency_type_price ?? $periodCheckout->currency_type_price ?? $reportUsdRate),
-                            $periodCheckout->date ?: $periodCheckout->created_at
-                        );
-                    }
+                    $factoryUnitPriceUsd = isset($allocatedProduct['factory_unit_price_usd'])
+                        ? (float) $allocatedProduct['factory_unit_price_usd']
+                        : null;
                     $resolvedPrices = static::resolveReportPricesUzs(
                         $approvedPrices,
                         $actualUnitPriceUsd,
-                        $storedFactoryUsd > 0 ? $storedFactoryUsd : null,
+                        $factoryUnitPriceUsd,
                         $reportUsdRate
                     );
                     $unitPriceUzs = $resolvedPrices['sale_uzs'];
@@ -415,71 +401,18 @@ class CheckoutMonthExport implements FromView, WithStyles
                     $clientAllocationProducts[] = [
                         'price_key' => (string) ($approvedPrices['code'] ?? $productName),
                         'name' => $productName,
-                        'agent' => optional($periodCheckout->managerid)->name ?: $fallbackAgent,
-                        'qty' => (float) ($detail->qty ?? 0),
+                        'agent' => ($allocationRow['agent'] ?? null) ?: $fallbackAgent,
+                        'qty' => (float) ($allocatedProduct['qty'] ?? 0),
                         'package_qty' => static::approvedPackageQuantity($productName),
                         'unit_price_usd' => $unitPriceUsd,
                         'unit_price_uzs' => $unitPriceUzs,
                         'factory_price_usd' => $factoryPriceUsd,
                         'factory_price_uzs' => $factoryPriceUzs,
                         'actual_unit_price_usd' => $actualUnitPriceUsd,
-                        'actual_total_usd' => $actualUnitPriceUsd === null
-                            ? null
-                            : $actualUnitPriceUsd * (float) ($detail->qty ?? 0),
+                        'actual_total_usd' => isset($allocatedProduct['actual_total_usd'])
+                            ? (float) $allocatedProduct['actual_total_usd']
+                            : null,
                     ];
-                }
-            }
-
-            // Shu davrda checkout bo'lmagan eski qarz to'lovlarida FIFO orqali
-            // topilgan tarixiy mahsulotlar zaxira manba bo'lib qoladi.
-            if (empty($clientAllocationProducts)) {
-                foreach ($paymentAllocationRows->get($clientKey, collect()) as $allocationRow) {
-                    foreach ($allocationRow['products'] ?? [] as $allocatedProduct) {
-                        $productName = (string) ($allocatedProduct['name'] ?? 'Noma\'lum mahsulot');
-                        $approvedPrices = $approvedPriceService->pricesFor($productName);
-                        $actualUnitPriceUsd = isset($allocatedProduct['actual_unit_price_usd'])
-                            ? (float) $allocatedProduct['actual_unit_price_usd']
-                            : null;
-                        if ($actualUnitPriceUsd === null && ! $approvedPrices) {
-                            continue;
-                        }
-                        $factoryUnitPriceUsd = isset($allocatedProduct['factory_unit_price_usd'])
-                            ? (float) $allocatedProduct['factory_unit_price_usd']
-                            : null;
-                        $resolvedPrices = static::resolveReportPricesUzs(
-                            $approvedPrices,
-                            $actualUnitPriceUsd,
-                            $factoryUnitPriceUsd,
-                            $reportUsdRate
-                        );
-                        $unitPriceUzs = $resolvedPrices['sale_uzs'];
-                        $factoryPriceUzs = $resolvedPrices['factory_uzs'];
-                        $unitPriceUsd = Currency::documentAmountToUsd(
-                            $unitPriceUzs,
-                            2,
-                            $approvedPriceService->usdRate()
-                        );
-                        $factoryPriceUsd = Currency::documentAmountToUsd(
-                            $factoryPriceUzs,
-                            2,
-                            $approvedPriceService->usdRate()
-                        );
-                        $clientAllocationProducts[] = [
-                            'price_key' => (string) ($approvedPrices['code'] ?? $productName),
-                            'name' => $productName,
-                            'agent' => ($allocationRow['agent'] ?? null) ?: $fallbackAgent,
-                            'qty' => (float) ($allocatedProduct['qty'] ?? 0),
-                            'package_qty' => static::approvedPackageQuantity($productName),
-                            'unit_price_usd' => $unitPriceUsd,
-                            'unit_price_uzs' => $unitPriceUzs,
-                            'factory_price_usd' => $factoryPriceUsd,
-                            'factory_price_uzs' => $factoryPriceUzs,
-                            'actual_unit_price_usd' => $actualUnitPriceUsd,
-                            'actual_total_usd' => isset($allocatedProduct['actual_total_usd'])
-                                ? (float) $allocatedProduct['actual_total_usd']
-                                : null,
-                        ];
-                    }
                 }
             }
 
@@ -506,21 +439,8 @@ class CheckoutMonthExport implements FromView, WithStyles
                 ->values()
                 ->all();
 
-            // Har bir mijoz kesimida tasdiqlangan jami gross to'lovga eng yaqin
-            // bo'lsin. Gross = Excelda ko'rinadigan net to'lov + Venox bonus.
-            $grossClientPaymentUzs = (
-                (float) ($clientPayments[$clientKey] ?? 0)
-                + (float) ($clientBonusExpenses[$clientKey] ?? 0)
-            ) * $reportUsdRate;
-            $balancedQuantities = static::balanceApprovedQuantities(
-                collect($clientAllocationProducts)->pluck('qty')->all(),
-                collect($clientAllocationProducts)->pluck('unit_price_uzs')->all(),
-                $grossClientPaymentUzs,
-                collect($clientAllocationProducts)->pluck('package_qty')->all()
-            );
-
             foreach ($clientAllocationProducts as $index => $allocationProduct) {
-                $qty = (float) ($balancedQuantities[$index] ?? 0);
+                $qty = (float) ($allocationProduct['qty'] ?? 0);
                 if ($qty <= 0) {
                     continue;
                 }
