@@ -2411,6 +2411,10 @@ class CheckoutController extends Controller
         $startDate = Carbon::parse($validated['start_date'])->toDateString();
         $endDate = Carbon::parse($validated['end_date'])->toDateString();
 
+        // Hisobot formulalari Protected View rejimida ham 0 bo'lib ko'rinmasligi
+        // uchun XLSX ichiga hisoblangan natijalarni ham oldindan yozamiz.
+        config(['excel.exports.pre_calculate_formulas' => true]);
+
         return Excel::download(
             new CheckoutMonthExport($startDate, $endDate),
             'Mijozlar_hisoboti_' . $startDate . '_' . $endDate . '.xlsx'
