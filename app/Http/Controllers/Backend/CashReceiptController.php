@@ -49,12 +49,19 @@ class CashReceiptController extends Controller
         $keyword = trim((string) ($filters['search'] ?? ''));
         $query->when($keyword !== '', function ($query) use ($keyword) {
             $query->where(function ($query) use ($keyword) {
-                $query->where('id', $keyword)
-                    ->orWhere('price', 'like', '%' . $keyword . '%')
+                if (ctype_digit($keyword)) {
+                    $query->where('id', (int) $keyword);
+                } else {
+                    $query->whereRaw('1 = 0');
+                }
+
+                $query->orWhere('price', 'like', '%' . $keyword . '%')
                     ->orWhere('comment', 'like', '%' . $keyword . '%')
                     ->orWhereHas('clientname', fn ($q) => $q->where('name', 'like', '%' . $keyword . '%'))
                     ->orWhereHas('contracktname', fn ($q) => $q->where('number_work', 'like', '%' . $keyword . '%'))
-                    ->orWhereHas('tname', fn ($q) => $q->where('name', 'like', '%' . $keyword . '%'))
+                    ->orWhereHas('tname', fn ($q) => $q
+                        ->where('name_uz', 'like', '%' . $keyword . '%')
+                        ->orWhere('name_ru', 'like', '%' . $keyword . '%'))
                     ->orWhereHas('uname', fn ($q) => $q->where('name', 'like', '%' . $keyword . '%'));
             });
         })->when($filters['date_from'] ?? null, fn ($q, $date) => $q->whereDate('date', '>=', $date))
