@@ -157,6 +157,10 @@
                 return;
             }
 
+            if (row.closest('form[data-auto-filter="true"], .dashboard-filter')) {
+                return;
+            }
+
             if (row.querySelector('.btn, button, a[href*="excel"], a[href*="pdf"], a[href*="form"], a[href*="download"]') && !row.querySelector('table')) {
                 row.classList.add('dashboard-actions-row');
 

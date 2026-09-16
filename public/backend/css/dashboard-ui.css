@@ -71,11 +71,6 @@
 .card-tools-toggle {
     overflow: visible !important;
 }
-.dashboard-filter form[data-auto-filter="true"] .btn[type="submit"],
-form.dashboard-filter-form .btn[type="submit"],
-form.dashboard-filter-form button[type="submit"] {
-    display: none;
-}
 .dashboard-filter input[type="date"] {
     cursor: pointer;
 }
