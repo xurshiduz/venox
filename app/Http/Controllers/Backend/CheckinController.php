@@ -32,20 +32,38 @@ use DB;
 
 class CheckinController extends Controller
 {
-    public function index()
-    { 
-        
-        if(Auth::user()->hasAnyRole('admin|cashier')){
-            $data = Checkin::with('details')->orderBy('id', 'desc')->paginate(50);
-        } elseif(Auth::user()->hasAnyRole('diler_admin')) {
-            $data = Checkin::with('details')->where('dealer_id', Auth::user()->dealer_id)->orderBy('id', 'desc')->paginate(50);
-        } else {
-            $data = Checkin::with('details')->where('user_id', Auth::id())->orderBy('id', 'desc')->paginate(50);
+    public function index(Request $request)
+    {
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:120'],
+            'date_from' => ['nullable', 'date_format:Y-m-d'],
+            'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
+        ]);
+        $query = Checkin::query()->with(['details', 'warid', 'supid', 'userid', 'typeid']);
+
+        if (Auth::user()->hasAnyRole('diler_admin|dealer_admin')) {
+            $query->where('dealer_id', Auth::user()->dealer_id);
+        } elseif (! Auth::user()->hasAnyRole('admin|cashier')) {
+            $query->where('user_id', Auth::id());
         }
-        
-        $keyword = NULL;
+
+        $keyword = trim((string) ($filters['search'] ?? ''));
+        $query->when($keyword !== '', function ($query) use ($keyword) {
+            $query->where(function ($query) use ($keyword) {
+                $query->where('number_work', 'like', '%' . $keyword . '%')
+                    ->orWhere('reference', 'like', '%' . $keyword . '%')
+                    ->orWhereHas('supid', fn ($q) => $q->where('name', 'like', '%' . $keyword . '%'))
+                    ->orWhereHas('warid', fn ($q) => $q->where('name', 'like', '%' . $keyword . '%'))
+                    ->orWhereHas('userid', fn ($q) => $q->where('name', 'like', '%' . $keyword . '%'));
+            });
+        })->when($filters['date_from'] ?? null, fn ($q, $date) => $q->whereDate('date', '>=', $date))
+            ->when($filters['date_to'] ?? null, fn ($q, $date) => $q->whereDate('date', '<=', $date));
+
+        $data = $query->orderByDesc('date')->orderByDesc('id')->paginate(50)->withQueryString();
+        $dateFrom = $filters['date_from'] ?? null;
+        $dateTo = $filters['date_to'] ?? null;
         $currencyTypes = CurrencyType::pluck('name', 'id');
-        return view('backend.checkins.index', compact('data', 'keyword', 'currencyTypes'));
+        return view('backend.checkins.index', compact('data', 'keyword', 'dateFrom', 'dateTo', 'currencyTypes'));
     }
     
     public function sverka_index()
@@ -625,17 +643,10 @@ class CheckinController extends Controller
     }
 
     public function search(Request $request)
-    { 
-        $keyword = $request->input('search');
+    {
+        $request->validate(['search' => ['required', 'string', 'max:120']]);
 
-        $data = Checkin::with('details')->where(function ($query) use($keyword) {
-                $query->where('number_work', 'like', '%' . $keyword . '%');
-              })
-        ->orderBy('id', 'desc')->paginate(100);
-
-        $currencyTypes = CurrencyType::pluck('name', 'id');
-
-        return view('backend.checkins.index', compact('data', 'keyword', 'currencyTypes'));
+        return redirect()->route('checkins_index', ['search' => $request->input('search')]);
     }
 
     public function print($id = null)

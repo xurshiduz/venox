@@ -61,10 +61,11 @@ class CheckoutController extends Controller
             : null;
         $dateFrom = $validatedFilters['date_from'] ?? null;
         $dateTo = $validatedFilters['date_to'] ?? null;
+        $keyword = trim((string) ($validatedFilters['search'] ?? ''));
     
         $query = Checkout::where('type_id', 1);
         $this->applyCheckoutAccessScope($query, $user, $ctypeAlias);
-        $this->applyCheckoutListFilters($query, $selectedAgent, $dateFrom, $dateTo);
+        $this->applyCheckoutListFilters($query, $selectedAgent, $dateFrom, $dateTo, $keyword);
     
         // Ma'lumotlarni saralash va sahifalash
         $data = $query->orderByDesc('date')
@@ -83,7 +84,7 @@ class CheckoutController extends Controller
             'managers' => $managers,
             'types' => $types,
             'ctype' => $ctype ?? null, // Agar $ctypeAlias mavjud bo'lsa, $ctype ni o'tkazamiz
-            'keyword' => null,
+            'keyword' => $keyword,
             'shipment' => null,
             'finish' => null,
             'selmanager' => null,
@@ -112,10 +113,11 @@ class CheckoutController extends Controller
             : null;
         $dateFrom = $validatedFilters['date_from'] ?? null;
         $dateTo = $validatedFilters['date_to'] ?? null;
+        $keyword = trim((string) ($validatedFilters['search'] ?? ''));
 
         $query = Checkout::where('type_id', 1);
         $this->applyCheckoutAccessScope($query, Auth::user(), $ctypeAlias);
-        $this->applyCheckoutListFilters($query, $selectedAgent, $dateFrom, $dateTo);
+        $this->applyCheckoutListFilters($query, $selectedAgent, $dateFrom, $dateTo, $keyword);
 
         $data = $query->with([
                 'supid:id,name',
@@ -162,6 +164,7 @@ class CheckoutController extends Controller
             'agent_id' => ['nullable', 'integer', 'exists:users,id'],
             'date_from' => ['nullable', 'date_format:Y-m-d'],
             'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
+            'search' => ['nullable', 'string', 'max:120'],
         ]);
     }
 
@@ -179,7 +182,7 @@ class CheckoutController extends Controller
         });
     }
 
-    private function applyCheckoutListFilters($query, ?int $selectedAgent, ?string $dateFrom, ?string $dateTo): void
+    private function applyCheckoutListFilters($query, ?int $selectedAgent, ?string $dateFrom, ?string $dateTo, string $keyword = ''): void
     {
         $query->when($selectedAgent, function ($q) use ($selectedAgent) {
             $q->where('manager_id', $selectedAgent);
@@ -187,6 +190,14 @@ class CheckoutController extends Controller
             $q->whereDate('date', '>=', $dateFrom);
         })->when($dateTo, function ($q) use ($dateTo) {
             $q->whereDate('date', '<=', $dateTo);
+        })->when($keyword !== '', function ($q) use ($keyword) {
+            $q->where(function ($q) use ($keyword) {
+                $q->where('number_work', 'like', '%' . $keyword . '%')
+                    ->orWhere('transaction', 'like', '%' . $keyword . '%')
+                    ->orWhere('comment', 'like', '%' . $keyword . '%')
+                    ->orWhereHas('supid', fn ($client) => $client->where('name', 'like', '%' . $keyword . '%'))
+                    ->orWhereHas('managerid', fn ($manager) => $manager->where('name', 'like', '%' . $keyword . '%'));
+            });
         });
     }
     
@@ -2276,27 +2287,10 @@ class CheckoutController extends Controller
     }
 
     public function search(Request $request)
-    { 
-        
-        $keyword = $request->input('search');
-        $managers = User::role('sale')->get();
-        $data = Checkout::where(function ($query) use($keyword) {
-                $query->where('transaction', $keyword);
-              })
-        ->paginate(100);
-         
-        $types = CashReceiptType::where('status', 1)->get();
-        $keyword = NULL; 
-        $shipment       = NULL;
-        $finish         = NULL;
-        $selmanager     = NULL;
-        $fromdate       = Carbon::parse('21.02.2024')->format('d.m.Y');
-        $todate         = Carbon::now()->format('d.m.Y');
-        $clientselect = NULL;
-        $draft = NULL;
-        $sdata = NULL;
+    {
+        $request->validate(['search' => ['required', 'string', 'max:120']]);
 
-        return view('backend.checkouts.index', compact('data', 'keyword', 'types', 'managers', 'shipment', 'finish', 'selmanager', 'fromdate', 'todate', 'clientselect', 'draft','sdata'));
+        return redirect()->route('checkouts_index', ['search' => $request->input('search')]);
     }
 
     public function check($id = null)

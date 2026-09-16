@@ -19,29 +19,53 @@ use Carbon\Carbon;
 
 class CashReceiptController extends Controller
 {
-    public function index()
-    { 
-        if(Auth::user()->hasAnyRole('admin|cashier')){
-            $data = CashReceipt::where('status', 1)->orderBy('id', 'desc')->paginate(40);
-        } elseif(Auth::user()->hasAnyRole('diler_admin')) {
-            $data = CashReceipt::where('dealer_id', Auth::user()->dealer_id)->where('status', 1)->orderBy('id', 'desc')->paginate(40);
-        } else {
-            $data = CashReceipt::where('user_id', Auth::id())->where('status', 1)->orderBy('id', 'desc')->paginate(40);
-        }
-        $keyword = NULL; 
-        return view('backend.cash_receipts.index', compact('data', 'keyword'));
+    public function index(Request $request)
+    {
+        return $this->filteredIndex($request, 1);
     }
-    public function index_his()
-    { 
-        if(Auth::user()->hasAnyRole('admin|cashier')){
-            $data = CashReceipt::where('status', 0)->orderBy('id', 'desc')->paginate(40);
-        } elseif(Auth::user()->hasAnyRole('diler_admin')) {
-            $data = CashReceipt::where('dealer_id', Auth::user()->dealer_id)->where('status', 0)->orderBy('id', 'desc')->paginate(40);
-        } else {
-            $data = CashReceipt::where('user_id', Auth::id())->where('status', 0)->orderBy('id', 'desc')->paginate(40);
+
+    public function index_his(Request $request)
+    {
+        return $this->filteredIndex($request, 0);
+    }
+
+    private function filteredIndex(Request $request, int $status)
+    {
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:120'],
+            'date_from' => ['nullable', 'date_format:Y-m-d'],
+            'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
+        ]);
+
+        $query = CashReceipt::query()->with(['clientname', 'tname', 'uname', 'contracktname'])
+            ->where('status', $status);
+
+        if (Auth::user()->hasAnyRole('diler_admin|dealer_admin')) {
+            $query->where('dealer_id', Auth::user()->dealer_id);
+        } elseif (! Auth::user()->hasAnyRole('admin|cashier')) {
+            $query->where('user_id', Auth::id());
         }
-        $keyword = NULL; 
-        return view('backend.cash_receipts.index', compact('data', 'keyword'));
+
+        $keyword = trim((string) ($filters['search'] ?? ''));
+        $query->when($keyword !== '', function ($query) use ($keyword) {
+            $query->where(function ($query) use ($keyword) {
+                $query->where('id', $keyword)
+                    ->orWhere('price', 'like', '%' . $keyword . '%')
+                    ->orWhere('comment', 'like', '%' . $keyword . '%')
+                    ->orWhereHas('clientname', fn ($q) => $q->where('name', 'like', '%' . $keyword . '%'))
+                    ->orWhereHas('contracktname', fn ($q) => $q->where('number_work', 'like', '%' . $keyword . '%'))
+                    ->orWhereHas('tname', fn ($q) => $q->where('name', 'like', '%' . $keyword . '%'))
+                    ->orWhereHas('uname', fn ($q) => $q->where('name', 'like', '%' . $keyword . '%'));
+            });
+        })->when($filters['date_from'] ?? null, fn ($q, $date) => $q->whereDate('date', '>=', $date))
+            ->when($filters['date_to'] ?? null, fn ($q, $date) => $q->whereDate('date', '<=', $date));
+
+        $data = $query->orderByDesc('date')->orderByDesc('id')->paginate(40)->withQueryString();
+        $dateFrom = $filters['date_from'] ?? null;
+        $dateTo = $filters['date_to'] ?? null;
+        $filterRoute = $status ? 'cash_receipts_index' : 'cash_receipts_index_his';
+
+        return view('backend.cash_receipts.index', compact('data', 'keyword', 'dateFrom', 'dateTo', 'filterRoute'));
     }
 
     public function excel()

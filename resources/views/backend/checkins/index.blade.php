@@ -9,13 +9,33 @@
                     <div class="nk-block nk-block-lg">
                         @include('layouts.message.success')
                         @include('layouts.message.error')
-                        <div class="row">
-                            <div class="col-md-8 mb-3">
-                                <form method="POST" action="{{ route('checkins_search') }}">
-                                    @csrf
-                                    <input type="text" class="form-control" value="{{ $keyword ? $keyword : NULL }}" name="search" required placeholder="Поиск по № заявки и № спец-ии завода">
+                        <div class="card mb-3">
+                            <div class="card-inner py-3">
+                                <form method="GET" action="{{ route('checkins_index') }}">
+                                    <div class="row gy-2 align-items-end">
+                                        <div class="col-lg-4 col-md-6">
+                                            <label class="form-label mb-1">Qidirish</label>
+                                            <input type="text" class="form-control" value="{{ $keyword }}" name="search" placeholder="Hujjat, izoh, ta’minotchi yoki ombor">
+                                        </div>
+                                        <div class="col-lg-2 col-md-6">
+                                            <label class="form-label mb-1">Boshlanish sanasi</label>
+                                            <input type="date" class="form-control" name="date_from" value="{{ $dateFrom }}">
+                                        </div>
+                                        <div class="col-lg-2 col-md-6">
+                                            <label class="form-label mb-1">Tugash sanasi</label>
+                                            <input type="date" class="form-control" name="date_to" value="{{ $dateTo }}">
+                                        </div>
+                                        <div class="col-lg-4 col-md-6">
+                                            <div class="d-flex" style="gap: 8px;">
+                                                <button type="submit" class="btn btn-primary flex-grow-1">Qidirish</button>
+                                                <a href="{{ route('checkins_index') }}" class="btn btn-outline-light">Tozalash</a>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </form>
                             </div>
+                        </div>
+                        <div class="row justify-content-end">
                             <div class="col-md-2 mb-2">
                                <a href="{{ route('checkin_form_excel') }}" class="btn btn-warning btn-block">Excel</a> 
                             </div>
