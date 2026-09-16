@@ -43,6 +43,10 @@ return [
         'no_payment_type' => 'To‘lov turi yo‘q',
         'currency_rate' => 'Valyuta kursi',
         'close' => 'Yopish',
+        'confirm_action' => 'Rostdan ham shu amalni bajarmoqchimisiz?',
+        'confirm_delete' => 'Rostdan ham o‘chirmoqchimisiz?',
+        'confirm_cancel_payment' => 'Rostdan ham bu to‘lovni bekor qilmoqchimisiz?',
+        'confirm_restore_payment' => 'Rostdan ham bu to‘lovni qayta tiklamoqchimisiz?',
     ],
 
     'plan_count'                    => "Belgilangan oy KPI avval qo'shilgan",
@@ -369,6 +373,5 @@ return [
     ],
 
 ];
-
 
 

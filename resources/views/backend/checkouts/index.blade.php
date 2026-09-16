@@ -376,7 +376,7 @@
                                                 @endif
                                             @else
                                                 @if($item->total_price > 0)
-                                                    <a style="padding: 0px;" href="{{ route('checkout_done_pay', ['id' => $item->code]) }}"data-bs-toggle="modal" data-bs-target="#modalDefault{{ $item->id }}" class="btn btn-warning btn-block btn-sm">{{ trans('backend.ui.payment') }}</a>
+                                                    <a style="padding: 0px;" href="{{ route('checkout_done_pay', ['id' => $item->code]) }}"data-bs-toggle="modal" data-bs-target="#modalDefault{{ $item->id }}" class="btn btn-warning btn-block btn-sm" data-confirm="{{ trans('backend.ui.confirm_action') }}">{{ trans('backend.ui.payment') }}</a>
                                                 @endif
                                             @endif
                                         @endif
@@ -401,7 +401,7 @@
                                        <td style="padding: 2px; font-size: 12px; vertical-align: middle; text-transform: lowercase;" id="tsendsuccess{{ $item->id }}">
                                         @if($item->number_work)
                                            @if($item->shipment_status == 0 && $item->total_price > 0)
-                                            <a href="#" style="padding: 0px;" id="sendsuccess" data-id="{{ $item->id }}"  class="btn btn-primary btn-block btn-sm sendsuccess">{{ trans('backend.ui.delivered') }}</a>
+                                            <a href="#" style="padding: 0px;" id="sendsuccess" data-id="{{ $item->id }}"  class="btn btn-primary btn-block btn-sm sendsuccess" data-confirm="{{ trans('backend.ui.confirm_action') }}">{{ trans('backend.ui.delivered') }}</a>
                                            @elseif($item->shipment_status == 1)
                                             {{ trans('backend.ui.delivered') }}
                                            @endif
@@ -411,7 +411,7 @@
                                        </td>
                                       <td style="padding: 2px; font-size: 12px; vertical-align: middle;">{{ Carbon\Carbon::parse($item->date)->format('Y-m-d') . ' ' .  $item->created_at->format('H:i') }} </td>
 
-                                       <td class="table-actions"><a href="{{ route('delete_checkout', ['id' => $item->code])}}" class="btn btn-icon btn-sm btn-outline-danger" title="{{ trans('backend.table.delete') }}" aria-label="{{ trans('backend.table.delete') }}"><em class="icon ni ni-trash"></em></a></td>
+                                       <td class="table-actions"><a href="{{ route('delete_checkout', ['id' => $item->code])}}" class="btn btn-icon btn-sm btn-outline-danger" title="{{ trans('backend.table.delete') }}" aria-label="{{ trans('backend.table.delete') }}" data-confirm="{{ trans('backend.ui.confirm_delete') }}"><em class="icon ni ni-trash"></em></a></td>
                                     </tr>
 
                                     @if($item->number_work)

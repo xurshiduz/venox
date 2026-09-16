@@ -32,7 +32,7 @@
 .nk-content .card-inner { padding: 18px; }
 .dashboard-filter { overflow: visible !important; }
 .dashboard-filter form[data-auto-filter="true"] .btn[type="submit"] {
-    min-width: 112px;
+    display: none;
 }
 .dashboard-filter input[type="date"] {
     cursor: pointer;
@@ -121,15 +121,17 @@
 }
 .table-actions .btn,
 .nk-content .btn.btn-icon {
-    width: 34px;
-    min-width: 34px;
-    height: 34px;
-    min-height: 34px;
+    width: 38px;
+    min-width: 38px;
+    height: 38px;
+    min-height: 38px;
     padding: 0;
     border-radius: 8px;
+    border-width: 1.5px;
+    box-shadow: 0 4px 10px rgba(31, 45, 75, .06);
 }
 .table-actions .btn + .btn {
-    margin-left: 4px;
+    margin-left: 6px;
 }
 .nk-content .btn-outline-primary {
     color: var(--ui-primary);

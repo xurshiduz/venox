@@ -51,4 +51,18 @@
             field.focus();
         }
     });
+
+    document.addEventListener('click', function (event) {
+        var trigger = event.target.closest('[data-confirm]');
+
+        if (!trigger) {
+            return;
+        }
+
+        if (!window.confirm(trigger.dataset.confirm)) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+        }
+    });
 })();

@@ -23,7 +23,7 @@
                                             <label class="form-label mb-1">{{ trans('backend.ui.date_to') }}</label>
                                             <input type="date" class="form-control js-open-picker" name="date_to" value="{{ $dateTo }}">
                                         </div>
-                                        <div class="col-lg-4 col-md-6">
+                                        <div class="col-lg-2 col-md-6">
                                             <div class="d-flex" style="gap: 8px;">
                                                 <button type="submit" class="btn btn-primary flex-grow-1"><em class="icon ni ni-search"></em>{{ trans('backend.ui.search_action') }}</button>
                                                 <a href="{{ route($filterRoute) }}" class="btn btn-outline-light"><em class="icon ni ni-reload"></em>{{ trans('backend.ui.clear') }}</a>
@@ -83,9 +83,9 @@
                                       <td>{{ $item->status ? trans('backend.table.pay_success') : trans('backend.table.pay_cancel') }}</td>
                                       <td class="table-actions">
                                           @if($item->status)
-                                              <a href="{{ route('cash_receipt_status', ['id' => $item->code])}}" class="btn btn-icon btn-sm btn-outline-danger" title="{{ trans('backend.table.annulirovat') }}" aria-label="{{ trans('backend.table.annulirovat') }}"><em class="icon ni ni-cross-circle"></em></a>
+                                              <a href="{{ route('cash_receipt_status', ['id' => $item->code])}}" class="btn btn-icon btn-sm btn-outline-danger" title="{{ trans('backend.table.annulirovat') }}" aria-label="{{ trans('backend.table.annulirovat') }}" data-confirm="{{ trans('backend.ui.confirm_cancel_payment') }}"><em class="icon ni ni-cross-circle"></em></a>
                                           @else
-                                              <a href="{{ route('cash_receipt_status', ['id' => $item->code])}}" class="btn btn-icon btn-sm btn-outline-success" title="{{ trans('backend.table.return_pay') }}" aria-label="{{ trans('backend.table.return_pay') }}"><em class="icon ni ni-undo"></em></a>
+                                              <a href="{{ route('cash_receipt_status', ['id' => $item->code])}}" class="btn btn-icon btn-sm btn-outline-success" title="{{ trans('backend.table.return_pay') }}" aria-label="{{ trans('backend.table.return_pay') }}" data-confirm="{{ trans('backend.ui.confirm_restore_payment') }}"><em class="icon ni ni-undo"></em></a>
                                           @endif
                                       </td>
                                       <td width="80px" class="table-actions"><a href="{{ route('cash_receipt_form', ['id' => $item->code])}}" class="btn btn-icon btn-sm btn-outline-primary" title="{{ trans('backend.ui.edit') }}" aria-label="{{ trans('backend.ui.edit') }}"><em class="icon ni ni-edit"></em></a></td>

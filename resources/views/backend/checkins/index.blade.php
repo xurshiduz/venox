@@ -25,7 +25,7 @@
                                             <label class="form-label mb-1">{{ trans('backend.ui.date_to') }}</label>
                                             <input type="date" class="form-control js-open-picker" name="date_to" value="{{ $dateTo }}">
                                         </div>
-                                        <div class="col-lg-4 col-md-6">
+                                        <div class="col-lg-2 col-md-6">
                                             <div class="d-flex" style="gap: 8px;">
                                                 <button type="submit" class="btn btn-primary flex-grow-1"><em class="icon ni ni-search"></em>{{ trans('backend.ui.search_action') }}</button>
                                                 <a href="{{ route('checkins_index') }}" class="btn btn-outline-light"><em class="icon ni ni-reload"></em>{{ trans('backend.ui.clear') }}</a>
@@ -111,7 +111,7 @@
                                       <td>{{ $item->userid ? $item->userid->name : null  }}</td>
                                       <td>
                                           @if(!$item->source_system)
-                                          <a href="{{ route('delete_checkin', ['id' => $item->code])}}" class="btn btn-icon btn-sm btn-outline-danger" title="{{ trans('backend.table.delete') }}" aria-label="{{ trans('backend.table.delete') }}"><em class="icon ni ni-trash"></em></a>
+                                          <a href="{{ route('delete_checkin', ['id' => $item->code])}}" class="btn btn-icon btn-sm btn-outline-danger" title="{{ trans('backend.table.delete') }}" aria-label="{{ trans('backend.table.delete') }}" data-confirm="{{ trans('backend.ui.confirm_delete') }}"><em class="icon ni ni-trash"></em></a>
                                           @endif
                                       </td>
                                       <td>
@@ -121,7 +121,7 @@
                                           @elseif((int)$item->status === 1)
                                               <span class="badge badge-success">{{ trans('backend.ui.accepted') }}</span>
                                               @if($item->source_system === 'lidaz')
-                                                  <a class="btn btn-sm btn-outline-danger ml-1" href="{{ route('supplier_return_form', $item->code) }}">{{ trans('backend.ui.return_to_lidaz') }}</a>
+                                                  <a class="btn btn-sm btn-outline-danger ml-1" href="{{ route('supplier_return_form', $item->code) }}" data-confirm="{{ trans('backend.ui.confirm_action') }}">{{ trans('backend.ui.return_to_lidaz') }}</a>
                                               @endif
                                           @elseif((int)$item->status === 2)
                                               <span class="badge badge-danger">{{ trans('backend.ui.rejected') }}</span>
