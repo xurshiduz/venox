@@ -38,6 +38,12 @@
         submitForm(form, 120);
     });
 
+    if (window.jQuery) {
+        window.jQuery(document).on('change select2:select select2:clear', 'form[data-auto-filter="true"] select', function () {
+            submitForm(this.closest('form[data-auto-filter="true"]'), 120);
+        });
+    }
+
     document.addEventListener('click', function (event) {
         var field = event.target.closest('input[type="date"].js-open-picker');
 
