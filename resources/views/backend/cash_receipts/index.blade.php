@@ -74,7 +74,7 @@
                                     @foreach($data as $item)
                                     <tr class="text-center">
                                       <td width="180px">{{ $item->checkout_id ? $item->contracktname?->number_work : trans('backend.ui.for_debt') }}</td>
-                                      <td>{{ $item->client_id ? $item->clientname?->name : NULL }}</td>
+                                      <td>{{ $item->clientname?->name ?: $item->contracktname?->supid?->name }}</td>
                                       <td>{{ number_format($item->price, 2, '.', ' ') }}</td>
                                       <td>{{ $item->tname ? $item->tname->name : NULL }}</td>
                                       <!--<td>{{ $item->comment }}</td>-->

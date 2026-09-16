@@ -37,7 +37,7 @@ class CashReceiptController extends Controller
             'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
         ]);
 
-        $query = CashReceipt::query()->with(['clientname', 'tname', 'uname', 'contracktname'])
+        $query = CashReceipt::query()->with(['clientname', 'tname', 'uname', 'contracktname.supid'])
             ->where('status', $status);
 
         if (Auth::user()->hasAnyRole('diler_admin|dealer_admin')) {
@@ -58,6 +58,7 @@ class CashReceiptController extends Controller
                 $query->orWhere('price', 'like', '%' . $keyword . '%')
                     ->orWhere('comment', 'like', '%' . $keyword . '%')
                     ->orWhereHas('clientname', fn ($q) => $q->where('name', 'like', '%' . $keyword . '%'))
+                    ->orWhereHas('contracktname.supid', fn ($q) => $q->where('name', 'like', '%' . $keyword . '%'))
                     ->orWhereHas('contracktname', fn ($q) => $q->where('number_work', 'like', '%' . $keyword . '%'))
                     ->orWhereHas('tname', fn ($q) => $q
                         ->where('name_uz', 'like', '%' . $keyword . '%')
@@ -86,7 +87,7 @@ class CashReceiptController extends Controller
         }
 
         $receipts = $query
-            ->with(['clientname', 'tname', 'checkout'])
+            ->with(['clientname', 'tname', 'checkout.supid'])
             ->orderBy('date')
             ->orderBy('id')
             ->get();

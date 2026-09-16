@@ -46,7 +46,7 @@ class CashReceiptsExport implements FromArray, ShouldAutoSize, WithColumnFormatt
 
             return [
                 $receipt->date,
-                optional($receipt->clientname)->name,
+                optional($receipt->clientname)->name ?: optional(optional($receipt->checkout)->supid)->name,
                 $hasScheme ? ($schemeLabels[$checkout->commission_scheme] ?? $checkout->commission_scheme) : 'Belgilanmagan',
                 $amount,
                 $isClick ? $amount : null,
