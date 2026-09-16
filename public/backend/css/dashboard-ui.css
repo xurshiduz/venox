@@ -9,7 +9,7 @@
     --ui-border: #dfe6f1;
     --ui-surface: #ffffff;
     --ui-bg: #f5f7fb;
-    --ui-radius: 12px;
+    --ui-radius: 10px;
     --ui-shadow: 0 5px 18px rgba(31, 45, 75, .07);
 }
 
@@ -31,6 +31,12 @@
 }
 .nk-content .card-inner { padding: 18px; }
 .dashboard-filter { overflow: visible !important; }
+.dashboard-filter form[data-auto-filter="true"] .btn[type="submit"] {
+    min-width: 112px;
+}
+.dashboard-filter input[type="date"] {
+    cursor: pointer;
+}
 .dashboard-filter .form-label {
     color: #52617a;
     font-size: 12px;
@@ -71,25 +77,86 @@
 .dashboard-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .dashboard-actions .btn { min-width: 120px; }
 .dashboard-table-card .table-responsive { border-radius: var(--ui-radius); }
-.nk-content .table { margin-bottom: 0; color: #34425a; }
+.nk-content .table {
+    margin-bottom: 0;
+    color: #34425a;
+}
+.dashboard-data-table,
+.dashboard-table-card .table {
+    table-layout: auto;
+    min-width: 980px;
+}
 .nk-content .table thead th {
     position: sticky;
     top: 0;
     z-index: 2;
-    padding: 12px 10px;
+    padding: 13px 10px;
     border-color: var(--ui-border);
-    background: #eef2f8;
-    color: #465672;
-    font-size: 11px;
-    font-weight: 750;
-    letter-spacing: .025em;
+    background: #e9eef7;
+    color: #2f3d56;
+    font-size: 12.5px;
+    font-weight: 800;
+    letter-spacing: .01em;
     text-transform: none;
     vertical-align: middle;
+    white-space: nowrap;
 }
 .nk-content .table tbody td {
     padding: 11px 10px;
     border-color: #e7ecf4;
     vertical-align: middle;
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+.nk-content .table.text-nowrap tbody td,
+.nk-content .table .text-nowrap {
+    white-space: nowrap;
+}
+.nk-content .table a:not(.btn) {
+    color: #375acf;
+    font-weight: 650;
+}
+.table-actions {
+    white-space: nowrap !important;
+}
+.table-actions .btn,
+.nk-content .btn.btn-icon {
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+    min-height: 34px;
+    padding: 0;
+    border-radius: 8px;
+}
+.table-actions .btn + .btn {
+    margin-left: 4px;
+}
+.nk-content .btn-outline-primary {
+    color: var(--ui-primary);
+    border-color: rgba(79, 103, 246, .35);
+}
+.nk-content .btn-outline-primary:hover {
+    color: #fff;
+    background: var(--ui-primary);
+    border-color: var(--ui-primary);
+}
+.nk-content .btn-outline-success {
+    color: var(--ui-success);
+    border-color: rgba(24, 184, 143, .35);
+}
+.nk-content .btn-outline-success:hover {
+    color: #fff;
+    background: var(--ui-success);
+    border-color: var(--ui-success);
+}
+.nk-content .btn-outline-danger {
+    color: var(--ui-danger);
+    border-color: rgba(232, 83, 71, .35);
+}
+.nk-content .btn-outline-danger:hover {
+    color: #fff;
+    background: var(--ui-danger);
+    border-color: var(--ui-danger);
 }
 .nk-content .table tbody tr:nth-child(even) { background: #fafbfe; }
 .nk-content .table tbody tr:hover { background: #f0f4ff; }
