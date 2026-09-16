@@ -13,8 +13,8 @@
             <th>Аввалги қарзи</th>
             <th>Товар Тўлиқ Номи ва Ҳажми</th>
             <th>Миқдори (шт/л)</th>
-            <th>Тасдиқланган сотув нархи (USD)</th>
             <th>Мижозга ҳақиқий сотилган нарх (USD)</th>
+            <th>Тасдиқланган сотув нархи (USD)</th>
             <th>Завод нархи</th>
             <th>Устига қўйилган фоиз (%)</th>
             <th>Тасдиқланган прайс бўйича жами</th>
@@ -38,8 +38,8 @@
                 <td>{{ $row['debt_before_payment'] }}</td>
                 <td>{!! nl2br(e($row['product'])) !!}</td>
                 <td>{!! nl2br(e($row['qty'])) !!}</td>
-                <td>{{ $row['unit_price_usd_formula'] ?? $row['unit_price_usd'] }}</td>
                 <td>{{ $row['actual_unit_price_usd'] }}</td>
+                <td>{{ $row['unit_price_usd_formula'] ?? $row['unit_price_usd'] }}</td>
                 <td>{{ $row['factory_price_usd_formula'] ?? ($row['factory_price_usd'] ?: null) }}</td>
                 <td>{{ $row['markup_percent_formula'] ?? ($row['markup_percent'] !== null ? $row['markup_percent'] / 100 : null) }}</td>
                 <td>{{ $row['approved_total_usd_formula'] ?? $row['approved_total_usd'] }}</td>

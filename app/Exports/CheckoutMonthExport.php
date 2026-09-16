@@ -760,9 +760,9 @@ class CheckoutMonthExport implements FromView, WithStyles
         return [
             'unit_price_usd' => '=' . static::excelNumber($unitPriceUzs) . '/$S$2',
             'factory_price_usd' => '=' . static::excelNumber($factoryPriceUzs) . '/$S$2',
-            'markup_percent' => sprintf('=IFERROR((H%d-J%d)/J%d,"")', $row, $row, $row),
-            'approved_total_usd' => sprintf('=G%d*H%d', $row, $row),
-            'actual_total_usd' => sprintf('=G%d*I%d', $row, $row),
+            'markup_percent' => sprintf('=IFERROR((I%d-J%d)/J%d,"")', $row, $row, $row),
+            'approved_total_usd' => sprintf('=G%d*I%d', $row, $row),
+            'actual_total_usd' => sprintf('=G%d*H%d', $row, $row),
             'factory_total_usd' => sprintf('=G%d*J%d', $row, $row),
         ];
     }

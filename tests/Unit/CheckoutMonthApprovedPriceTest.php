@@ -253,9 +253,9 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $this->assertSame([
             'unit_price_usd' => '=207000/$S$2',
             'factory_price_usd' => '=192000/$S$2',
-            'markup_percent' => '=IFERROR((H3-J3)/J3,"")',
-            'approved_total_usd' => '=G3*H3',
-            'actual_total_usd' => '=G3*I3',
+            'markup_percent' => '=IFERROR((I3-J3)/J3,"")',
+            'approved_total_usd' => '=G3*I3',
+            'actual_total_usd' => '=G3*H3',
             'factory_total_usd' => '=G3*J3',
         ], CheckoutMonthExport::lineExcelFormulas(3, 207000, 192000));
     }
