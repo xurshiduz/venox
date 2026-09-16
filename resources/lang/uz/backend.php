@@ -1,50 +1,7 @@
 <?php
 
 return [
-    'ui' => [
-        'search' => 'Qidirish',
-        'search_action' => 'Topish',
-        'date_from' => 'Boshlanish sanasi',
-        'date_to' => 'Tugash sanasi',
-        'clear' => 'Tozalash',
-        'all_agents' => 'Barcha agentlar',
-        'agent' => 'Agent',
-        'excel' => 'Excel',
-        'pdf' => 'PDF',
-        'cancelled_payments' => 'Bekor qilingan to‘lovlar',
-        'cash_search_hint' => 'Mijoz, shartnoma, summa yoki to‘lov turi',
-        'checkin_search_hint' => 'Hujjat, izoh, ta’minotchi yoki ombor',
-        'checkout_search_hint' => 'Hujjat, mijoz, agent yoki izoh',
-        'contract_number' => 'Shartnoma raqami',
-        'actions' => 'Amallar',
-        'for_debt' => 'Qarz uchun',
-        'edit' => 'Tahrirlash',
-        'type' => 'Tur',
-        'rate' => 'Kurs',
-        'note' => 'Izoh',
-        'label' => 'Yorliq',
-        'status' => 'Holati',
-        'accept' => 'Qabul qilish',
-        'reject' => 'Rad etish',
-        'accepted' => 'Qabul qilingan',
-        'rejected' => 'Rad etilgan',
-        'pending' => 'Kutilmoqda',
-        'return_to_lidaz' => 'LIDAZga qaytarish',
-        'accept_confirm' => 'Jo‘natmani qabul qilib qoldiqqa qo‘shasizmi?',
-        'reject_confirm' => 'Jo‘natmani rad etasizmi?',
-        'today' => 'Bugungi',
-        'cash' => 'Kassa',
-        'debt' => 'Qarz',
-        'paid' => 'To‘langan',
-        'payment' => 'To‘lov',
-        'delivered' => 'Yetkazilgan',
-        'draft' => 'Qoralama',
-        'draft_short' => 'Qor.',
-        'no_payment_type' => 'To‘lov turi yo‘q',
-        'currency_rate' => 'Valyuta kursi',
-        'close' => 'Yopish',
-    ],
-
+    
     'plan_count'                    => "Belgilangan oy KPI avval qo'shilgan",
     'post_update'                   => 'Yangilandi',
     'post_create'                   => "Qo'shildi",
@@ -55,7 +12,7 @@ return [
     'block_dublicate'               => "Ushbu blok avval qo'shilgan",
     'post_deleted'                  => "O'chirildi",
     'apply_delete'                  => "O'chirishni tasdiqlang",
-
+        
     'menu' => [
         'top_client'                => 'Top mijozlar (Filter)',
         'home'                      => 'Bosh sahifa',
@@ -114,7 +71,7 @@ return [
         'inventory_report'          => 'Inventarizatsiya hisoboti',
         'debtors'                   => 'Qarzdorlar',
     ],
-
+    
     'input' => [
         'barcode'               => 'Ehtiyot qismning shtrix kodi',
         'select_date'           => 'Sanani tanlang',
@@ -147,14 +104,14 @@ return [
         'document_name'         => 'Hujjatdagi nomlanishi',
         'prinyal'               => 'Qabul qildi',
     ],
-
+    
     'auth' => [
         'login'                 => 'Login',
         'password'              => 'Parol (Mahfiy kod)',
         'loginin'               => 'Kirish',
         'remember'              => 'Eslab qolish',
     ],
-
+    
     'table' => [
         'change_item'           => "Nima o'zgardi",
         'ip_address'            => 'IP Manzil',
@@ -333,7 +290,7 @@ return [
         'signout'               => 'Chiqish',
         'no'                    => "Yo'q",
     ],
-
+    
     'index' => [
         'price'                 => 'Ehtiyot qismlar va narxlari',
         'price_desc'            => "Ehtiyot qismlar ro'yhati va narxlari haqida",
@@ -371,4 +328,4 @@ return [
 ];
 
 
-
+    

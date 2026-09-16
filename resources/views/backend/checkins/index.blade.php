@@ -9,35 +9,35 @@
                     <div class="nk-block nk-block-lg">
                         @include('layouts.message.success')
                         @include('layouts.message.error')
-                        <div class="card dashboard-filter mb-3">
+                        <div class="card mb-3">
                             <div class="card-inner py-3">
                                 <form method="GET" action="{{ route('checkins_index') }}">
                                     <div class="row gy-2 align-items-end">
                                         <div class="col-lg-4 col-md-6">
-                                            <label class="form-label mb-1">{{ trans('backend.ui.search') }}</label>
-                                            <input type="text" class="form-control" value="{{ $keyword }}" name="search" placeholder="{{ trans('backend.ui.checkin_search_hint') }}">
+                                            <label class="form-label mb-1">Qidirish</label>
+                                            <input type="text" class="form-control" value="{{ $keyword }}" name="search" placeholder="Hujjat, izoh, ta’minotchi yoki ombor">
                                         </div>
                                         <div class="col-lg-2 col-md-6">
-                                            <label class="form-label mb-1">{{ trans('backend.ui.date_from') }}</label>
+                                            <label class="form-label mb-1">Boshlanish sanasi</label>
                                             <input type="date" class="form-control" name="date_from" value="{{ $dateFrom }}">
                                         </div>
                                         <div class="col-lg-2 col-md-6">
-                                            <label class="form-label mb-1">{{ trans('backend.ui.date_to') }}</label>
+                                            <label class="form-label mb-1">Tugash sanasi</label>
                                             <input type="date" class="form-control" name="date_to" value="{{ $dateTo }}">
                                         </div>
                                         <div class="col-lg-4 col-md-6">
                                             <div class="d-flex" style="gap: 8px;">
-                                                <button type="submit" class="btn btn-primary flex-grow-1"><em class="icon ni ni-search"></em>{{ trans('backend.ui.search_action') }}</button>
-                                                <a href="{{ route('checkins_index') }}" class="btn btn-outline-light"><em class="icon ni ni-reload"></em>{{ trans('backend.ui.clear') }}</a>
+                                                <button type="submit" class="btn btn-primary flex-grow-1">Qidirish</button>
+                                                <a href="{{ route('checkins_index') }}" class="btn btn-outline-light">Tozalash</a>
                                             </div>
                                         </div>
                                     </div>
                                 </form>
                             </div>
                         </div>
-                        <div class="row dashboard-actions">
+                        <div class="row justify-content-end">
                             <div class="col-md-2 mb-2">
-                               <a href="{{ route('checkin_form_excel') }}" class="btn btn-warning btn-block"><em class="icon ni ni-download"></em>{{ trans('backend.ui.excel') }}</a>
+                               <a href="{{ route('checkin_form_excel') }}" class="btn btn-warning btn-block">Excel</a> 
                             </div>
                             @hasanyrole('admin|sale|cashier')
                             <div class="col-md-2 mb-2">
@@ -46,25 +46,25 @@
                             @endhasanyrole
                         </div>
 
-                        <div class="card dashboard-table-card">
+                        <div class="card">
                             <div class="table-responsive">
                                 <table class="table table-bordered text-nowrap">
                                   <thead>
                                     <tr class="text-center">
                                       <th width="160px">{{ trans('backend.table.doc_number') }}</th>
                                       <th>{{ trans('backend.input.warehouse') }}</th>
-                                      <th>{{ trans('backend.ui.type') }}</th>
+                                      <th>Тип</th>
                                       <th>{{ trans('backend.table.supplier') }}</th>
                                       <th>{{ trans('backend.table.vid_tovar') }}</th>
-                                      <th>{{ trans('backend.ui.rate') }}</th>
+                                      <th>Курс</th>
                                       <th width="50px">{{ trans('backend.table.edit') }}</th>
-                                      <th>{{ trans('backend.ui.note') }}</th>
-                                      <th>{{ trans('backend.ui.label') }}</th>
+                                      <th>Примечание</th>
+                                      <th>Этикетка</th>
                                       <th>{{ trans('backend.table.in_summs') }}</th>
                                       <th width="150px">{{ trans('backend.table.data_add') }}</th>
                                       <th width="110px">{{ trans('backend.table.add_user') }}</th>
                                       <th width="50px">{{ trans('backend.table.delete') }}</th>
-                                      <th>{{ trans('backend.ui.status') }}</th>
+                                      <th>Holati</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -116,17 +116,17 @@
                                       </td>
                                       <td>
                                           @if($item->source_system === 'lidaz' && (int)$item->status === 0)
-                                              <a class="btn btn-sm btn-success" href="{{ route('checkin_done_status', ['id' => $item->code]) }}" onclick="return confirm({{ json_encode(trans('backend.ui.accept_confirm')) }})">{{ trans('backend.ui.accept') }}</a>
-                                              <a class="btn btn-sm btn-danger" href="{{ route('checkin_cancel_status', ['id' => $item->code]) }}" onclick="return confirm({{ json_encode(trans('backend.ui.reject_confirm')) }})">{{ trans('backend.ui.reject') }}</a>
+                                              <a class="btn btn-sm btn-success" href="{{ route('checkin_done_status', ['id' => $item->code]) }}" onclick="return confirm('Jo‘natmani qabul qilib qoldiqqa qo‘shasizmi?')">Qabul qilish</a>
+                                              <a class="btn btn-sm btn-danger" href="{{ route('checkin_cancel_status', ['id' => $item->code]) }}" onclick="return confirm('Jo‘natmani rad etasizmi?')">Rad etish</a>
                                           @elseif((int)$item->status === 1)
-                                              <span class="badge badge-success">{{ trans('backend.ui.accepted') }}</span>
+                                              <span class="badge badge-success">Qabul qilingan</span>
                                               @if($item->source_system === 'lidaz')
-                                                  <a class="btn btn-sm btn-outline-danger ml-1" href="{{ route('supplier_return_form', $item->code) }}">{{ trans('backend.ui.return_to_lidaz') }}</a>
+                                                  <a class="btn btn-sm btn-outline-danger ml-1" href="{{ route('supplier_return_form', $item->code) }}">LIDAZga qaytarish</a>
                                               @endif
                                           @elseif((int)$item->status === 2)
-                                              <span class="badge badge-danger">{{ trans('backend.ui.rejected') }}</span>
+                                              <span class="badge badge-danger">Rad etilgan</span>
                                           @else
-                                              <span class="badge badge-warning">{{ trans('backend.ui.pending') }}</span>
+                                              <span class="badge badge-warning">Kutilmoqda</span>
                                           @endif
                                       </td>
                                     </tr>
