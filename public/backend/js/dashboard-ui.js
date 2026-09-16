@@ -55,6 +55,88 @@
         });
     }
 
+    function createIcon(iconName) {
+        var icon = document.createElement('em');
+        icon.className = 'icon ni ni-' + iconName;
+
+        return icon;
+    }
+
+    function actionConfig(link) {
+        var text = (link.textContent || '').trim().toLowerCase();
+        var href = (link.getAttribute('href') || '').toLowerCase();
+
+        if (!text || link.querySelector('img, em, svg') || link.classList.contains('btn')) {
+            return null;
+        }
+
+        if (/(редакт|o'zgart|ўзгарт|tahrir|edit)/i.test(text)) {
+            return { icon: 'edit', style: 'btn-outline-primary', confirm: false };
+        }
+
+        if (/(удал|delete|o'chir|ўчир|ochir)/i.test(text) || /delete|status/.test(href)) {
+            return { icon: 'trash', style: 'btn-outline-danger', confirm: true, message: 'confirm_delete' };
+        }
+
+        if (/(excel|xls|юклаб|yuklab|скач|download)/i.test(text) || /excel|download/.test(href)) {
+            return { icon: 'download', style: 'btn-outline-success', confirm: false };
+        }
+
+        if (/(pdf|print|печать|chop|чоп|ko'rish|кўриш|посмотреть|view)/i.test(text) || /print|pdf|check/.test(href)) {
+            return { icon: 'eye', style: 'btn-outline-primary', confirm: false };
+        }
+
+        return null;
+    }
+
+    function initDashboardEnhancements() {
+        document.querySelectorAll('.nk-content table.table').forEach(function (table) {
+            if (table.closest('.no-ui-enhance, .print-page, [data-no-ui-enhance="true"]')) {
+                return;
+            }
+
+            table.classList.add('dashboard-data-table');
+            var card = table.closest('.card');
+
+            if (card) {
+                card.classList.add('dashboard-table-card');
+            }
+        });
+
+        document.querySelectorAll('.nk-content .table td a[href]').forEach(function (link) {
+            var config = actionConfig(link);
+
+            if (!config) {
+                return;
+            }
+
+            var label = (link.textContent || '').trim();
+            link.textContent = '';
+            link.classList.add('btn', 'btn-icon', 'btn-sm', config.style);
+            link.setAttribute('title', link.getAttribute('title') || label);
+            link.setAttribute('aria-label', link.getAttribute('aria-label') || label);
+            link.appendChild(createIcon(config.icon));
+            var cell = link.closest('td');
+            if (cell) {
+                cell.classList.add('table-actions');
+            }
+
+            if (config.confirm && !link.hasAttribute('data-confirm')) {
+                link.setAttribute('data-confirm', document.documentElement.lang === 'uz'
+                    ? "Rostdan ham shu amalni bajarmoqchimisiz?"
+                    : 'Вы действительно хотите выполнить это действие?');
+            }
+        });
+
+        document.querySelectorAll('.nk-content form').forEach(function (form) {
+            if (form.closest('.no-ui-enhance, [data-no-ui-enhance="true"]')) {
+                return;
+            }
+
+            form.classList.add('dashboard-form');
+        });
+    }
+
     function submitForm(form, delay) {
         if (!form || form.dataset.submitting === '1') {
             return;
@@ -90,7 +172,10 @@
         submitForm(form, typingDelay);
     });
 
-    document.addEventListener('DOMContentLoaded', initAutoFilterForms);
+    document.addEventListener('DOMContentLoaded', function () {
+        initAutoFilterForms();
+        initDashboardEnhancements();
+    });
 
     document.addEventListener('change', function (event) {
         var field = event.target;
