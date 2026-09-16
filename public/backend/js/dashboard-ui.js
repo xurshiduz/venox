@@ -159,6 +159,12 @@
 
             if (row.querySelector('.btn, button, a[href*="excel"], a[href*="pdf"], a[href*="form"], a[href*="download"]') && !row.querySelector('table')) {
                 row.classList.add('dashboard-actions-row');
+
+                row.querySelectorAll(':scope > [class*="col-"]').forEach(function (column) {
+                    if (!column.textContent.trim() && !column.querySelector('input, select, textarea, button, a, table')) {
+                        column.classList.add('dashboard-empty-column');
+                    }
+                });
             }
         });
 

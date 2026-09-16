@@ -170,15 +170,37 @@ form.dashboard-filter-form button[type="submit"] {
 .nk-content .btn-success { background: var(--ui-success); border-color: var(--ui-success); }
 .nk-content .btn-warning { background: var(--ui-warning); border-color: var(--ui-warning); color: #fff; }
 .nk-content .btn-danger { background: var(--ui-danger); border-color: var(--ui-danger); }
-.dashboard-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
-.dashboard-actions .btn { min-width: 120px; }
+.dashboard-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+}
+.dashboard-actions .btn {
+    min-width: 150px;
+    padding-left: 18px;
+    padding-right: 18px;
+}
 .dashboard-actions-row {
     align-items: center;
     row-gap: 10px;
     margin-bottom: 14px;
+    justify-content: flex-end;
 }
 .dashboard-actions-row > [class*="col-"] {
-    margin-bottom: 8px;
+    width: auto;
+    flex: 0 0 auto;
+    max-width: none;
+    margin-bottom: 0;
+}
+.dashboard-actions-row > .dashboard-empty-column {
+    display: none !important;
+}
+.dashboard-actions-row > [class*="col-"] .btn-block,
+.dashboard-actions-row > [class*="col-"] .btn {
+    width: auto;
+    min-width: 150px;
 }
 .dashboard-toolbar,
 .nk-content .form-inline.dashboard-toolbar {
@@ -445,7 +467,10 @@ form.dashboard-filter-form button[type="submit"] {
 @media (max-width: 767.98px) {
     .nk-content { padding: 16px 10px; }
     .nk-content .card-inner { padding: 14px; }
-    .dashboard-actions { justify-content: stretch; }
+    .dashboard-actions {
+        flex-wrap: wrap;
+        justify-content: stretch;
+    }
     .dashboard-actions .btn { flex: 1 1 140px; }
     .dashboard-actions-row > [class*="col-"] {
         width: 100%;
