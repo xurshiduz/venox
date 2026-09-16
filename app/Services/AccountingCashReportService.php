@@ -239,6 +239,13 @@ class AccountingCashReportService
             ->map(function (Collection $group): array {
                 $product = $group->first();
                 $product['qty'] = (float) $group->sum('qty');
+                $actualTotal = (float) $group->sum(fn (array $row) =>
+                    (float) ($row['actual_total_usd'] ?? 0)
+                );
+                $product['actual_total_usd'] = $actualTotal;
+                $product['actual_unit_price_usd'] = $product['qty'] > 0
+                    ? $actualTotal / $product['qty']
+                    : null;
 
                 return $product;
             })
@@ -372,6 +379,8 @@ class AccountingCashReportService
                     'name' => optional($detail->prodid)->name ?: 'Noma’lum tovar',
                     'qty' => $coveredQty,
                     'unit' => optional(optional($detail->prodid)->unitid)->name ?? 'dona',
+                    'actual_unit_price_usd' => $lineUsd / $qty,
+                    'actual_total_usd' => $coveredUsd,
                 ];
                 $remaining -= $coveredUsd;
             }

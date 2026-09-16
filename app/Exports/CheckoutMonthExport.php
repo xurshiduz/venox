@@ -253,7 +253,7 @@ class CheckoutMonthExport implements FromView, WithStyles
                     $saleRate,
                     $checkout->date ?: $checkout->created_at
                 );
-                $actualUnitPriceUsd = $qty != 0 ? $totalUsd / $qty : 0;
+                $actualUnitPriceUsd = static::checkoutDetailUnitPriceUsd($detail, $checkout);
 
                 $availableCheckins = collect($checkinPrices->get($detail->product_id, []))
                     ->filter(function ($checkinDetail) use ($checkoutDate) {
@@ -294,12 +294,7 @@ class CheckoutMonthExport implements FromView, WithStyles
 
                 // Har bir hujjat o'z sanasida saqlangan kurs bo'yicha USDga o'tadi.
                 // Bu tarixiy UZS va USD narxlarini taxminsiz, bir valyutada solishtiradi.
-                $actualUnitPriceUsd = Currency::documentAmountToUsd(
-                    $rawSaleUnit,
-                    (int) $checkout->currency_type,
-                    $saleRate,
-                    $checkout->date ?: $checkout->created_at
-                );
+                $actualUnitPriceUsd = static::checkoutDetailUnitPriceUsd($detail, $checkout);
                 // Ayrim eski hujjatlarda narx USDda kiritilgan, ammo valyuta UZS va
                 // kurs 1 bo'lib qolgan (masalan checkout #613). Faqat shu aniq
                 // legacy holatni USD sifatida tiklaymiz; odatiy UZS savdoga tegmaymiz.
@@ -446,44 +441,19 @@ class CheckoutMonthExport implements FromView, WithStyles
                             'unit_price_uzs' => $unitPriceUzs,
                             'factory_price_usd' => $factoryPriceUsd,
                             'factory_price_uzs' => $factoryPriceUzs,
-                            'actual_unit_price_usd' => null,
-                            'actual_total_usd' => null,
+                            'actual_unit_price_usd' => isset($allocatedProduct['actual_unit_price_usd'])
+                                ? (float) $allocatedProduct['actual_unit_price_usd']
+                                : null,
+                            'actual_total_usd' => isset($allocatedProduct['actual_total_usd'])
+                                ? (float) $allocatedProduct['actual_total_usd']
+                                : null,
                         ];
                     }
                 }
             }
 
-            // Tarixda praysga mos mahsulot juda kam yoki umuman bo'lmasa,
-            // narxi to'liq tasdiqlangan katalog bilan kamida 6 turga yetkazamiz.
-            $existingPriceKeys = collect($clientAllocationProducts)
-                ->pluck('price_key')
-                ->map(fn ($key) => mb_strtolower((string) $key, 'UTF-8'))
-                ->all();
-            foreach ($approvedPriceService->completePrices() as $approvedProduct) {
-                if (count(collect($clientAllocationProducts)->pluck('price_key')->unique()) >= 6) {
-                    break;
-                }
-                $priceKey = (string) ($approvedProduct['code'] ?: $approvedProduct['name']);
-                if (in_array(mb_strtolower($priceKey, 'UTF-8'), $existingPriceKeys, true)) {
-                    continue;
-                }
-                $unitPriceUzs = (float) $approvedProduct['sale_uzs'];
-                $factoryPriceUzs = (float) $approvedProduct['factory_uzs'];
-                $clientAllocationProducts[] = [
-                    'price_key' => $priceKey,
-                    'name' => $approvedProduct['name'],
-                    'agent' => $fallbackAgent,
-                    'qty' => static::approvedPackageQuantity($approvedProduct['name']),
-                    'package_qty' => static::approvedPackageQuantity($approvedProduct['name']),
-                    'unit_price_usd' => $unitPriceUzs / $reportUsdRate,
-                    'unit_price_uzs' => $unitPriceUzs,
-                    'factory_price_usd' => $factoryPriceUzs / $reportUsdRate,
-                    'factory_price_uzs' => $factoryPriceUzs,
-                    'actual_unit_price_usd' => null,
-                    'actual_total_usd' => null,
-                ];
-                $existingPriceKeys[] = mb_strtolower($priceKey, 'UTF-8');
-            }
+            // Sun'iy katalog qatorlari qo'shilmaydi: oylik hisobotda faqat
+            // /checkouts dagi real sotilgan mahsulotlar ko'rsatiladi.
 
             $clientAllocationProducts = collect($clientAllocationProducts)
                 ->groupBy(fn (array $product) => $product['price_key'] . '|' . $product['agent'])
