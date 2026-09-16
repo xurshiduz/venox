@@ -44,7 +44,9 @@ class AccountingCashReportService
             ? collect()
             : Checkout::query()
                 ->where('status', 1)
-                ->where('checkout_tip_id', 1)
+                // "Qarz uchun" to'lov barcha faol sotuv turlarini qoplaydi.
+                // Faqat checkout_tip_id=1 ni olish 2-turdagi haqiqiy savdolarni
+                // FIFOdan tushirib qoldirib, Excelda mahsulotsiz qator yaratardi.
                 ->where('type_id', 1)
                 ->whereIn('client_id', $unlinkedClientIds)
                 ->whereDate('date', '<=', $filters['to'])
