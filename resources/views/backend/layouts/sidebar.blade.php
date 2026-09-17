@@ -78,7 +78,16 @@
                         </ul>
                     </li>
                     @endhasanyrole
-                    
+
+                    @hasanyrole('admin|cashier|arrival|report|dealer_admin')
+                    <li class="nk-menu-item {{ Request::routeIs('reorder_requests.*') ? 'active' : '' }}">
+                        <a href="{{ route('reorder_requests.index') }}" class="nk-menu-link">
+                            <span class="nk-menu-icon"><em class="icon ni ni-alert-circle"></em></span>
+                            <span class="nk-menu-text">{{ trans('backend.ui.reorder_requests') }}</span>
+                        </a>
+                    </li>
+                    @endhasanyrole
+
                     @hasanyrole('admin|cashier')
                     <li class="nk-menu-item {{ Request::routeIs('cash_expenditures_index') || Request::routeIs('cash_expenditure_form') ? 'active' : '' }}">
                         <a href="{{ route('cash_expenditures_index') }}" class="nk-menu-link">

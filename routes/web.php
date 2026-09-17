@@ -34,6 +34,9 @@ Route::group(
         Route::get('/dashboard_month/{type}', 'Backend\DashboardController@dashboard_month')->name('dashboard_month');
         Route::get('/inventory_report', 'Backend\DashboardController@inventory_report')->name('inventory_report');
         Route::post('/inventory_report', 'Backend\DashboardController@inventory_report')->name('inventory_report_post');
+        Route::get('/reorder_requests', 'Backend\ReorderRequestController@index')
+            ->middleware('role:admin|cashier|arrival|report|dealer_admin')
+            ->name('reorder_requests.index');
         //API
         Route::get('/topclienttwo_api', 'Backend\DashboardController@topclienttwo_api')->name('topclienttwo_api');
         //API Warehouse
