@@ -7,19 +7,45 @@
             <div class="nk-content-body">
                 <div class="components-preview mx-auto">
                     <div class="nk-block nk-block-lg">
-                        <div class="row">
-                            <div class="col-md-8 mb-3">
-                                <!--<form method="POST" action="{{ route('products_search') }}">
-                                    @csrf
-                                    <input type="text" class="form-control" value="{{ $keyword ? $keyword : NULL }}" name="search" required placeholder="Поиск по имя и логин">
-                                </form>-->
+                        @if(session('success'))
+                            <div class="alert alert-success">{{ session('success') }}</div>
+                        @endif
+                        @if(session('error'))
+                            <div class="alert alert-danger">{{ session('error') }}</div>
+                        @endif
+
+                        <form method="GET" action="{{ $archived ? route('users_noactive') : route('users_index') }}" class="card card-bordered mb-3">
+                            <div class="card-inner">
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-lg-6 col-md-5">
+                                        <label class="form-label">{{ trans('backend.ui.search') }}</label>
+                                        <input type="search" class="form-control" name="search" value="{{ $keyword }}" placeholder="{{ trans('backend.ui.user_search_hint') }}">
+                                    </div>
+                                    <div class="col-lg-3 col-md-3">
+                                        <label class="form-label">{{ trans('backend.ui.role') }}</label>
+                                        <select class="form-select" name="role">
+                                            <option value="">{{ trans('backend.ui.all_roles') }}</option>
+                                            @foreach($roles as $role)
+                                                <option value="{{ $role->name }}" {{ $selectedRole === $role->name ? 'selected' : '' }}>{{ $role->name_full }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="col-lg-3 col-md-4 d-flex gap-2">
+                                        <button type="submit" class="btn btn-warning flex-grow-1">{{ trans('backend.ui.search_action') }}</button>
+                                        <a href="{{ $archived ? route('users_noactive') : route('users_index') }}" class="btn btn-light">{{ trans('backend.ui.clear') }}</a>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="col-md-2 mb-2">
-                               <a href="{{ route('users_noactive') }}" class="btn btn-danger btn-block">Не активный</a> 
+                        </form>
+
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                            <div class="btn-group">
+                                <a href="{{ route('users_index') }}" class="btn {{ !$archived ? 'btn-primary' : 'btn-outline-primary' }}">{{ trans('backend.ui.active_users') }}</a>
+                                <a href="{{ route('users_noactive') }}" class="btn {{ $archived ? 'btn-danger' : 'btn-outline-danger' }}">{{ trans('backend.ui.archived_users') }}</a>
                             </div>
-                            <div class="col-md-2 mb-2">
-                               <a href="{{ route('user_form') }}" class="btn btn-primary btn-block">Добавить</a> 
-                            </div>
+                            @unless($archived)
+                                <a href="{{ route('user_form') }}" class="btn btn-primary">{{ trans('backend.ui.add') }}</a>
+                            @endunless
                         </div>
 
                         <div class="card">
@@ -27,38 +53,46 @@
                                 <table class="table table-bordered">
                                   <thead>
                                     <tr class="text-center">
-                                      <th scope="col">Юзернаем</th>
-                                      <th scope="col">Тел</th>
+                                      <th scope="col">Login</th>
+                                      <th scope="col">{{ trans('backend.table.phone') }}</th>
                                       <th>{{ trans('backend.menu.dealers') }}</th>
                                       <th scope="col">{{ trans('backend.table.client_buy') }}</th>
-                                      <th scope="col">Наименование</th>
+                                      <th scope="col">{{ trans('backend.table.name') }}</th>
                                       <!--<th scope="col">QR Code</th>-->
-                                      <th scope="col">Роль</th>
-                                      <th scope="col">Дата</th>
-                                      <th width="150px">Действия</th>
-                                      <th width="150px">Статус</th>
+                                      <th scope="col">{{ trans('backend.ui.role') }}</th>
+                                      <th scope="col">{{ trans('backend.table.date') }}</th>
+                                      <th width="190px">{{ trans('backend.ui.actions') }}</th>
                                     </tr>
                                   </thead>
                                   <tbody>
                                     @foreach($data as $item)
                                     <tr class="text-center">
-                                      <td>{{ $item->username }}<hr style="margin: 3px;">{{ $item->text_password }}</td>
+                                      <td>{{ $item->username }}</td>
                                       <td>{{ $item->phone }}</td>
                                       <td>{{ $item->dealerid ? $item->dealerid->name : null}} </td>
                                       <td><a href="{{ route('user_checkouts', ['id' => $item->code]) }}">{{ $item->checkouts()->count() }} {{ trans('backend.table.qty_short_t') }}</a></td>
                                       <td>{{ $item->name }}</td>
                                       <!--<td>{{ $item->code }}</td>-->
-                                      <td>@foreach($item->uroles as $role) {{ $role->rolenameid->name_full }} @endforeach</td>
+                                      <td>@foreach($item->uroles as $userRole) {{ optional($userRole->rolenameid)->name_full }}@if(!$loop->last), @endif @endforeach</td>
                                       <td>{{ $item->created_at->format('Y-m-d H:i') }}</td>
-                                      <td>@if($item->username != 'admin')<a href="{{ route('user_form', ['id' => $item->code])}}" style="text-decoration:underline;">Редактировать</a>@endif</td>
                                       <td>
-                                        @if($item->uroles()->whereIn('role_id', [1])->count() == 0)
-                                          @if($item->status == 1) 
-                                              <a href="{!! route('lock_user', ['id'=> $item->code]) !!}"  class="btn btn-danger btn-sm btn-block"> Заблокироват</a> 
-                                          @else 
-                                              <a href="{!! route('unlock_user', ['id'=> $item->code]) !!}"  class="btn btn-primary btn-sm btn-block">Активировать</a> 
-                                          @endif 
-                                        @endif 
+                                        <div class="d-flex flex-wrap justify-content-center gap-1">
+                                            @if(!$archived && $item->username != 'admin')
+                                                <a href="{{ route('user_form', ['id' => $item->code])}}" class="btn btn-outline-primary btn-sm">{{ trans('backend.ui.edit') }}</a>
+                                            @endif
+
+                                            @if($archived)
+                                                <form method="POST" action="{{ route('user_restore', ['id' => $item->code]) }}" onsubmit="return confirm(@json(trans('backend.ui.restore_confirm')))">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-success btn-sm">{{ trans('backend.ui.restore') }}</button>
+                                                </form>
+                                            @elseif((int) $item->id !== (int) auth()->id() && !$item->hasRole('admin'))
+                                                <form method="POST" action="{{ route('user_archive', ['id' => $item->code]) }}" onsubmit="return confirm(@json(trans('backend.ui.archive_confirm')))">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm">{{ trans('backend.ui.archive') }}</button>
+                                                </form>
+                                            @endif
+                                        </div>
                                       </td>
                                     </tr>
                                     @endforeach
@@ -66,6 +100,9 @@
                                 </table>
                             </div>
                         </div>
+                        @if($data->isEmpty())
+                            <div class="alert alert-light text-center mt-3">{{ trans('backend.ui.no_users_found') }}</div>
+                        @endif
                     </div>
 
                     @include('backend.nav')

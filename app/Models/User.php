@@ -10,6 +10,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Jetstream\HasProfilePhoto;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
+use Illuminate\Database\Eloquent\Builder;
 
 class User extends Authenticatable
 {
@@ -19,6 +20,30 @@ class User extends Authenticatable
     use Notifiable;
     use TwoFactorAuthenticatable;
     use HasRoles;
+
+    /**
+     * Archived users must behave like deleted users throughout the system.
+     * Controllers that manage the archive can explicitly remove this scope.
+     */
+    protected static function booted(): void
+    {
+        static::addGlobalScope('active', function (Builder $builder): void {
+            $statusColumn = $builder->getModel()->qualifyColumn('status');
+            $builder->where(function (Builder $activeQuery) use ($statusColumn): void {
+                $activeQuery->where($statusColumn, 1)->orWhereNull($statusColumn);
+            });
+        });
+    }
+
+    public function scopeWithArchived(Builder $query): Builder
+    {
+        return $query->withoutGlobalScope('active');
+    }
+
+    public function scopeOnlyArchived(Builder $query): Builder
+    {
+        return $query->withoutGlobalScope('active')->where($this->qualifyColumn('status'), 0);
+    }
 
     /**
      * The attributes that are mass assignable.

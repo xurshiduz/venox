@@ -19,17 +19,55 @@ use Auth;
 
 class UserController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $keyword = NULL;
-        $data = User::orderBy('id', 'desc')->paginate(20);
-        
-        if(Auth::user()->hasAnyRole('admin')){
-            $data = User::where('username', '!=','esengul')->orderBy('id', 'desc')->paginate(20);
+        return $this->userList($request, false);
+    }
+
+    public function noactive(Request $request)
+    {
+        return $this->userList($request, true);
+    }
+
+    private function userList(Request $request, bool $archived)
+    {
+        $keyword = trim((string) $request->query('search', ''));
+        $selectedRole = trim((string) $request->query('role', ''));
+        $query = $archived
+            ? User::onlyArchived()
+            : User::query();
+
+        $query->with(['dealerid', 'uroles.rolenameid']);
+
+        if (Auth::user()->hasAnyRole('admin')) {
+            $query->where('username', '!=', 'esengul');
         } else {
-            $data = User::where('dealer_id', Auth::user()->dealer_id)->orderBy('id', 'desc')->paginate(20);
+            $query->where('dealer_id', Auth::user()->dealer_id);
         }
-        return view('backend.user.index', compact('data', 'keyword'));
+
+        if ($keyword !== '') {
+            $query->where(function ($builder) use ($keyword) {
+                $builder->where('name', 'like', '%' . $keyword . '%')
+                    ->orWhere('username', 'like', '%' . $keyword . '%')
+                    ->orWhere('phone', 'like', '%' . $keyword . '%')
+                    ->orWhere('email', 'like', '%' . $keyword . '%');
+            });
+        }
+
+        if ($selectedRole !== '') {
+            $query->role($selectedRole);
+        }
+
+        $data = $query->orderByDesc('id')->paginate(20)->withQueryString();
+        $roles = Role::where('status', 1)->orderBy('name_full')->get();
+
+        return view('backend.user.index', compact(
+            'data',
+            'keyword',
+            'selectedRole',
+            'roles',
+            'archived'
+        ));
     }
     
     public function checkouts($id)
@@ -156,16 +194,25 @@ class UserController extends Controller
         return redirect()->route('home');
     }
 
-    public function lock_user($id)
+    public function archive(Request $request, $id)
     {
-        User::where('code', $id)->update(['status' => 0]);
-        return back();
+        $user = User::withArchived()->where('code', $id)->firstOrFail();
+
+        if ((int) $user->id === (int) Auth::id() || $user->hasRole('admin')) {
+            return back()->with('error', trans('backend.ui.user_archive_forbidden'));
+        }
+
+        $user->update(['status' => 0]);
+
+        return redirect()->route('users_index')->with('success', trans('backend.ui.user_archived'));
     }
-    
-    public function unlock_user($id)
+
+    public function restore(Request $request, $id)
     {
-        User::where('code', $id)->update(['status' => 1]);
-        return back();
+        $user = User::withArchived()->where('code', $id)->firstOrFail();
+        $user->update(['status' => 1]);
+
+        return redirect()->route('users_noactive')->with('success', trans('backend.ui.user_restored'));
     }
 
     public function block(Request $request, $id)

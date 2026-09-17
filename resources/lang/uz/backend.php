@@ -47,6 +47,20 @@ return [
         'confirm_delete' => 'Rostdan ham o‘chirmoqchimisiz?',
         'confirm_cancel_payment' => 'Rostdan ham bu to‘lovni bekor qilmoqchimisiz?',
         'confirm_restore_payment' => 'Rostdan ham bu to‘lovni qayta tiklamoqchimisiz?',
+        'user_search_hint' => 'Ism, login, telefon yoki email bo‘yicha qidirish',
+        'all_roles' => 'Barcha rollar',
+        'role' => 'Rol',
+        'active_users' => 'Faol foydalanuvchilar',
+        'archived_users' => 'Arxivlanganlar',
+        'archive' => 'Arxivlash',
+        'restore' => 'Arxivdan chiqarish',
+        'archive_confirm' => 'Foydalanuvchini arxivlamoqchimisiz? U tizimdagi faol ro‘yxatlarda ko‘rinmaydi.',
+        'restore_confirm' => 'Foydalanuvchini arxivdan chiqarib, qayta faollashtirmoqchimisiz?',
+        'user_archived' => 'Foydalanuvchi arxivlandi.',
+        'user_restored' => 'Foydalanuvchi qayta faollashtirildi.',
+        'user_archive_forbidden' => 'O‘zingizni yoki administratorni arxivlab bo‘lmaydi.',
+        'no_users_found' => 'Foydalanuvchilar topilmadi.',
+        'add' => 'Qo‘shish',
     ],
 
     'plan_count'                    => "Belgilangan oy KPI avval qo'shilgan",
@@ -373,5 +387,3 @@ return [
     ],
 
 ];
-
-

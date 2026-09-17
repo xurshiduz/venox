@@ -234,19 +234,18 @@ Route::group(
         //My Profile
         Route::get('mypassword', 'Backend\UserController@p_form')->name('mypassword_form');
         Route::post('mypassword', 'Backend\UserController@p_save');
-        //User Lock and Unlock
-        Route::get('/lock_user/{id}', 'Backend\UserController@lock_user')->name('lock_user');
         Route::get('/theme/{id}/status', 'Backend\UserController@theme')->name('theme_user');
-        Route::get('/unlock_user/{id}', 'Backend\UserController@unlock_user')->name('unlock_user');
         //User
-        Route::get('/users', 'Backend\UserController@index')->name('users_index');
-        Route::get('/user_checkouts/{id}', 'Backend\UserController@checkouts')->name('user_checkouts');
-        
-        Route::get('/user_noactive', 'Backend\UserController@noactive')->name('users_noactive');
-        Route::get('/user_roles', 'Backend\UserController@role')->name('users_role');
-        Route::get('/user/form/{id?}', 'Backend\UserController@form')->name('user_form');
-        Route::post('/user/form/{id?}', 'Backend\UserController@save');
-        Route::get('/user/{id}/status', 'Backend\UserController@status')->name('user_status');
+        Route::middleware('role:admin|dealer_admin')->group(function () {
+            Route::get('/users', 'Backend\UserController@index')->name('users_index');
+            Route::get('/user_checkouts/{id}', 'Backend\UserController@checkouts')->name('user_checkouts');
+            Route::get('/user_noactive', 'Backend\UserController@noactive')->name('users_noactive');
+            Route::post('/user/{id}/archive', 'Backend\UserController@archive')->name('user_archive');
+            Route::post('/user/{id}/restore', 'Backend\UserController@restore')->name('user_restore');
+            Route::get('/user_roles', 'Backend\UserController@role')->name('users_role');
+            Route::get('/user/form/{id?}', 'Backend\UserController@form')->name('user_form');
+            Route::post('/user/form/{id?}', 'Backend\UserController@save');
+        });
         //END User
     
         Route::get('/checkin_sverka', 'Backend\CheckinController@sverka_index')->name('checkins_sverka_index');
