@@ -17,6 +17,10 @@ class ApprovedProductPriceService
         $normalized = $this->normalize($productName);
 
         foreach ($this->rules() as $rule) {
+            if (! $this->matchesRuleBrand($normalized, $rule)) {
+                continue;
+            }
+
             $matches = true;
             foreach ($rule['needles'] as $needle) {
                 if (strpos($normalized, $needle) === false) {
@@ -36,6 +40,22 @@ class ApprovedProductPriceService
         }
 
         return null;
+    }
+
+    /**
+     * BOSS price list currently contains Venox products.  Token-only matching
+     * (for example "20w50" + "20l") must not apply those prices to BLAZER or
+     * another brand which happens to have the same viscosity and package size.
+     */
+    private function matchesRuleBrand(string $normalizedProductName, array $rule): bool
+    {
+        $normalizedRuleName = $this->normalize((string) ($rule['name'] ?? ''));
+
+        if (strpos($normalizedRuleName, 'venox') !== false) {
+            return strpos($normalizedProductName, 'venox') !== false;
+        }
+
+        return true;
     }
 
     public function usdRate(): float

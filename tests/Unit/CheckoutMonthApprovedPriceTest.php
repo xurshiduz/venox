@@ -61,6 +61,21 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $this->assertEqualsWithDelta(16.13445378, 192000 / $service->usdRate(), 0.00000001);
     }
 
+    /** @dataProvider nonVenoxProductProvider */
+    public function test_venox_price_rules_do_not_match_other_brands(string $product): void
+    {
+        $this->assertNull((new ApprovedProductPriceService())->pricesFor($product));
+    }
+
+    public function nonVenoxProductProvider(): array
+    {
+        return [
+            ['BLAZER OIL 20W-50 CNG/LNG 20L'],
+            ['BLAZER OIL 15W-40 CNG/LNG 20L'],
+            ['CLARO 10W-40 SN 4L'],
+        ];
+    }
+
     public function test_default_approved_price_rules_have_stable_unique_codes(): void
     {
         $rules = ApprovedProductPriceService::defaultRules();
