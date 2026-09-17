@@ -245,7 +245,7 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $this->assertNull($totals['actual_total_usd']);
     }
 
-    public function test_venox_cash_is_quantity_times_sale_and_factory_price_difference(): void
+    public function test_venox_cash_is_quantity_times_approved_and_factory_price_difference(): void
     {
         $venoxCash = CheckoutMonthExport::venoxCashUsd(10, 65, 53);
 
@@ -263,17 +263,17 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $this->assertSame(160.0, $venoxCash);
     }
 
-    public function test_venox_cash_subtracts_the_two_displayed_total_columns(): void
+    public function test_venox_cash_subtracts_approved_total_and_factory_total_columns(): void
     {
         $venoxCash = CheckoutMonthExport::venoxCashTotalUsd(
             [2, 4],
-            [null, 17.5],
+            [17, 17.5],
             [16, 16]
         );
 
-        $this->assertSame(-26.0, $venoxCash);
+        $this->assertSame(8.0, $venoxCash);
         $this->assertSame(
-            '=SUM(M3:M5)-SUM(N3:N5)',
+            '=SUM(L3:L5)-SUM(N3:N5)',
             CheckoutMonthExport::venoxCashExcelFormula(3, 5)
         );
     }

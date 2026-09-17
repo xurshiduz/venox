@@ -500,12 +500,11 @@ class CheckoutMonthExport implements FromView, WithStyles
                 $row['paid_usd'],
                 $row['bonus_expense_usd']
             );
-            // Venox kassasi bonus foizi emas. U aynan real sotilgan summa bilan
-            // zavod tannarxi orasidagi marja. Narxi hujjatda yo'q qatorlar
-            // taxminiy 0 bilan marjani buzmasligi uchun hisobga olinmaydi.
+            // Venox kassasi faqat ko'rsatilgan ikki ustun farqidir:
+            // tasdiqlangan prays bo'yicha jami minus zavod narxi jami.
             $venoxCashUsd = static::venoxCashTotalUsd(
                 $row['quantities'],
-                $row['actual_unit_prices_usd'],
+                $row['unit_prices'],
                 $row['factory_prices']
             );
             $firstRowIndex = count($rows);
@@ -680,11 +679,11 @@ class CheckoutMonthExport implements FromView, WithStyles
         return $total;
     }
 
-    /** Venox bonus is the displayed actual-sale total minus factory total. */
+    /** Venox kassa is approved-price total minus factory-price total. */
     public static function venoxCashExcelFormula(int $startRow, int $endRow): string
     {
         return sprintf(
-            '=SUM(M%d:M%d)-SUM(N%d:N%d)',
+            '=SUM(L%d:L%d)-SUM(N%d:N%d)',
             $startRow,
             $endRow,
             $startRow,
