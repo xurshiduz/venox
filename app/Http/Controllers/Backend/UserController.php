@@ -9,11 +9,8 @@ use App\Models\Role;
 use App\Models\Warehouse;
 use App\Models\Dealer;
 use App\Models\ProductCategory;
-use App\Models\Checkout;
-use App\Models\CashReceiptType;
 
 use Illuminate\Http\Request;
-use Carbon\Carbon;
 use Str;
 use Auth;
 
@@ -71,25 +68,15 @@ class UserController extends Controller
     }
     
     public function checkouts($id)
-    { 
-        $cid = User::where('code',$id)->first();
-        $fromdate       = Carbon::parse(Checkout::orderBy('id', 'asc')->first()->created_at)->format('d.m.Y');
-        $todate         = Carbon::now()->format('d.m.Y');
-        $managers = User::role('sale')->get();
-        
-        $shipment       = NULL;
-        $finish         = NULL;
-        $selmanager = $cid->id;
-        
-        if(Auth::user()->hasAnyRole('admin|cashier')){
-            $data = Checkout::where('manager_id', $selmanager)->where('type_id', 1)->orderBy('id', 'desc')->paginate(20);
-        } else {
-            $data = Checkout::where('manager_id', $selmanager)->where('user_id', Auth::id())->where('type_id', 1)->orderBy('id', 'desc')->paginate(20);
-        }
-         
-        $types = CashReceiptType::all();
-        $keyword = NULL; 
-        return view('backend.checkouts.index', compact('data', 'keyword', 'types', 'managers', 'fromdate', 'todate', 'selmanager', 'shipment', 'finish'));
+    {
+        $user = User::where('code', $id)->firstOrFail();
+
+        // Savdolar sahifasining barcha filtrlari va view ma'lumotlari bitta
+        // controllerda shakllansin. Aks holda bu eski endpoint yangi viewga
+        // yetishmaydigan o'zgaruvchilarni yuborib, sahifani xatoga tushiradi.
+        return redirect()->route('checkouts_index', [
+            'agent_id' => $user->id,
+        ]);
     }
 
     public function role()

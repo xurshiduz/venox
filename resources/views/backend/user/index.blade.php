@@ -1,5 +1,48 @@
 @extends('layouts.backend')
 
+@section('css')
+<style>
+    .user-actions-column {
+        min-width: 230px;
+        width: 230px;
+    }
+
+    .user-action-buttons {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        flex-wrap: nowrap;
+    }
+
+    .user-action-buttons form {
+        display: inline-flex;
+        margin: 0;
+    }
+
+    .user-action-buttons .btn {
+        min-width: 96px;
+        white-space: nowrap;
+    }
+
+    @media (max-width: 767.98px) {
+        .user-actions-column {
+            min-width: 150px;
+            width: 150px;
+        }
+
+        .user-action-buttons {
+            flex-direction: column;
+        }
+
+        .user-action-buttons .btn,
+        .user-action-buttons form {
+            width: 100%;
+        }
+    }
+</style>
+@endsection
+
 @section('content')
 <div class="nk-content ">
     <div class="container-fluid">
@@ -26,7 +69,7 @@
                                         <select class="form-select" name="role">
                                             <option value="">{{ trans('backend.ui.all_roles') }}</option>
                                             @foreach($roles as $role)
-                                                <option value="{{ $role->name }}" {{ $selectedRole === $role->name ? 'selected' : '' }}>{{ $role->name_full }}</option>
+                                                <option value="{{ $role->name }}" {{ $selectedRole === $role->name ? 'selected' : '' }}>{{ $role->name === 'sale' ? trans('backend.ui.agent') : $role->name_full }}</option>
                                             @endforeach
                                         </select>
                                     </div>
@@ -61,7 +104,7 @@
                                       <!--<th scope="col">QR Code</th>-->
                                       <th scope="col">{{ trans('backend.ui.role') }}</th>
                                       <th scope="col">{{ trans('backend.table.date') }}</th>
-                                      <th width="190px">{{ trans('backend.ui.actions') }}</th>
+                                      <th class="user-actions-column">{{ trans('backend.ui.actions') }}</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -73,10 +116,10 @@
                                       <td><a href="{{ route('user_checkouts', ['id' => $item->code]) }}">{{ $item->checkouts()->count() }} {{ trans('backend.table.qty_short_t') }}</a></td>
                                       <td>{{ $item->name }}</td>
                                       <!--<td>{{ $item->code }}</td>-->
-                                      <td>@foreach($item->uroles as $userRole) {{ optional($userRole->rolenameid)->name_full }}@if(!$loop->last), @endif @endforeach</td>
+                                      <td>@foreach($item->uroles as $userRole) {{ optional($userRole->rolenameid)->name === 'sale' ? trans('backend.ui.agent') : optional($userRole->rolenameid)->name_full }}@if(!$loop->last), @endif @endforeach</td>
                                       <td>{{ $item->created_at->format('Y-m-d H:i') }}</td>
-                                      <td>
-                                        <div class="d-flex flex-wrap justify-content-center gap-1">
+                                      <td class="user-actions-column">
+                                        <div class="user-action-buttons">
                                             @if(!$archived && $item->username != 'admin')
                                                 <a href="{{ route('user_form', ['id' => $item->code])}}" class="btn btn-outline-primary btn-sm">{{ trans('backend.ui.edit') }}</a>
                                             @endif

@@ -94,7 +94,7 @@
                                                 @foreach(App\Models\Role::where('status', 1)->get() as $country)
                                                     <div class="custom-control custom-checkbox pb-1">
                                                         <input type="checkbox" class="custom-control-input" {{ $item && $item->uroles()->where('role_id', $country->id)->count() ? 'checked' : NULL }} name="type[]" value="{{ $country->name }}" id="{{ $country->name }}">
-                                                        <label class="custom-control-label" for="{{ $country->name }}">{{ $country->name_full }}</label>
+                                                        <label class="custom-control-label" for="{{ $country->name }}">{{ $country->name === 'sale' ? trans('backend.ui.agent') : $country->name_full }}</label>
                                                     </div>
                                                 @endforeach
                                             </div>
@@ -106,7 +106,7 @@
                                                 @foreach(App\Models\Role::all() as $country)
                                                     <div class="custom-control custom-checkbox pb-1">
                                                         <input type="checkbox" class="custom-control-input" {{ $item && $item->uroles()->where('role_id', $country->id)->count() ? 'checked' : NULL }} name="type[]" value="{{ $country->name }}" id="{{ $country->name }}">
-                                                        <label class="custom-control-label" for="{{ $country->name }}">{{ $country->name_full }}</label>
+                                                        <label class="custom-control-label" for="{{ $country->name }}">{{ $country->name === 'sale' ? trans('backend.ui.agent') : $country->name_full }}</label>
                                                     </div>
                                                 @endforeach
                                             </div>
