@@ -64,6 +64,7 @@ class CheckoutMonthExport implements FromView, WithStyles
             ->whereHas('checkid', function ($query) use ($periodEnd) {
                 $query->where('status', 1)
                     ->where('type_id', 1)
+                    ->where('source_system', 'lidaz')
                     ->whereDate('date', '<=', $periodEnd->toDateString());
             })
             ->get()
@@ -742,7 +743,7 @@ class CheckoutMonthExport implements FromView, WithStyles
         );
     }
 
-    /** Fill every report price from approved prices, then real checkout values. */
+    /** Sale price comes from the approved list; factory price comes from LIDAZ checkin. */
     public static function resolveReportPricesUzs(
         ?array $approvedPrices,
         ?float $actualUnitPriceUsd,
@@ -751,16 +752,16 @@ class CheckoutMonthExport implements FromView, WithStyles
     ): array {
         $fallbackSale = max(0, (float) $actualUnitPriceUsd) * $usdRate;
         $sale = (float) ($approvedPrices['sale_uzs'] ?? 0);
-        $factory = (float) ($approvedPrices['factory_uzs'] ?? 0);
+        $factory = max(0, (float) $factoryUnitPriceUsd) * $usdRate;
 
         if ($sale <= 0) {
             $sale = $fallbackSale;
         }
+        // Faqat LIDAZ kirimi topilmagan eski mahsulotlarda tasdiqlangan zavod
+        // narxi zaxira sifatida ishlaydi.
         if ($factory <= 0) {
-            $factory = max(0, (float) $factoryUnitPriceUsd) * $usdRate;
+            $factory = (float) ($approvedPrices['factory_uzs'] ?? 0);
         }
-        // Eski checkoutda tannarx saqlanmagan bo'lsa, qatorni bo'sh/0
-        // qoldirmaslik uchun real sotuv narxi eng oxirgi zaxira bo'ladi.
         if ($factory <= 0) {
             $factory = $fallbackSale;
         }

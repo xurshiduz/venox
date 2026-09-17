@@ -353,6 +353,19 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $this->assertSame(238000.0, $prices['factory_uzs']);
     }
 
+    public function test_lidaz_checkin_factory_price_overrides_approved_factory_price(): void
+    {
+        $prices = CheckoutMonthExport::resolveReportPricesUzs(
+            ['sale_uzs' => 207000, 'factory_uzs' => 192000],
+            17.50,
+            15.25,
+            11900
+        );
+
+        $this->assertSame(207000.0, $prices['sale_uzs']);
+        $this->assertSame(181475.0, $prices['factory_uzs']);
+    }
+
     public function test_saved_period_commission_bonus_is_used_when_linked_checkout_has_zero_bonus(): void
     {
         $linked = new Checkout(['id' => 10, 'date' => '2026-09-10', 'kpi_percent' => 0, 'venox_bonus_percent' => 0]);

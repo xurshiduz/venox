@@ -432,7 +432,9 @@ class AccountingCashReportService
         $query = CheckinDetail::query()
             ->with('checkid')
             ->whereHas('checkid', function ($query) {
-                $query->where('status', 1)->where('type_id', 1);
+                $query->where('status', 1)
+                    ->where('type_id', 1)
+                    ->where('source_system', 'lidaz');
             })
             ->where('checkin_details.product_id', $detail->product_id)
             ->where('checkin_details.status', 1)
