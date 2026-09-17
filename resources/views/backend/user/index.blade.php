@@ -3,8 +3,48 @@
 @section('css')
 <style>
     .user-actions-column {
-        min-width: 230px;
-        width: 230px;
+        min-width: 220px;
+        width: 220px;
+    }
+
+    .users-filter-card {
+        margin-bottom: 18px;
+        overflow: visible;
+    }
+
+    .users-filter-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .users-list-card {
+        overflow: hidden;
+    }
+
+    .users-list-toolbar {
+        min-height: 64px;
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        border-bottom: 1px solid var(--ui-border);
+        background: var(--ui-surface);
+    }
+
+    .users-list-toolbar .btn-group,
+    .users-list-toolbar .btn {
+        position: static;
+        margin: 0;
+    }
+
+    .users-table {
+        min-width: 1220px;
+    }
+
+    .users-role-column {
+        min-width: 320px;
     }
 
     .user-action-buttons {
@@ -26,6 +66,22 @@
     }
 
     @media (max-width: 767.98px) {
+        .users-filter-actions,
+        .users-list-toolbar {
+            align-items: stretch;
+            flex-direction: column;
+        }
+
+        .users-filter-actions .btn,
+        .users-list-toolbar .btn,
+        .users-list-toolbar .btn-group {
+            width: 100%;
+        }
+
+        .users-list-toolbar .btn-group .btn {
+            width: 50%;
+        }
+
         .user-actions-column {
             min-width: 150px;
             width: 150px;
@@ -57,7 +113,7 @@
                             <div class="alert alert-danger">{{ session('error') }}</div>
                         @endif
 
-                        <form method="GET" action="{{ $archived ? route('users_noactive') : route('users_index') }}" class="card card-bordered mb-3">
+                        <form method="GET" action="{{ $archived ? route('users_noactive') : route('users_index') }}" class="card card-bordered users-filter-card">
                             <div class="card-inner">
                                 <div class="row g-2 align-items-end">
                                     <div class="col-lg-6 col-md-5">
@@ -73,7 +129,7 @@
                                             @endforeach
                                         </select>
                                     </div>
-                                    <div class="col-lg-3 col-md-4 d-flex gap-2">
+                                    <div class="col-lg-3 col-md-4 users-filter-actions">
                                         <button type="submit" class="btn btn-warning flex-grow-1">{{ trans('backend.ui.search_action') }}</button>
                                         <a href="{{ $archived ? route('users_noactive') : route('users_index') }}" class="btn btn-light">{{ trans('backend.ui.clear') }}</a>
                                     </div>
@@ -81,19 +137,18 @@
                             </div>
                         </form>
 
-                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                            <div class="btn-group">
-                                <a href="{{ route('users_index') }}" class="btn {{ !$archived ? 'btn-primary' : 'btn-outline-primary' }}">{{ trans('backend.ui.active_users') }}</a>
-                                <a href="{{ route('users_noactive') }}" class="btn {{ $archived ? 'btn-danger' : 'btn-outline-danger' }}">{{ trans('backend.ui.archived_users') }}</a>
+                        <div class="card users-list-card">
+                            <div class="users-list-toolbar">
+                                <div class="btn-group" role="group">
+                                    <a href="{{ route('users_index') }}" class="btn {{ !$archived ? 'btn-primary' : 'btn-outline-primary' }}">{{ trans('backend.ui.active_users') }}</a>
+                                    <a href="{{ route('users_noactive') }}" class="btn {{ $archived ? 'btn-danger' : 'btn-outline-danger' }}">{{ trans('backend.ui.archived_users') }}</a>
+                                </div>
+                                @unless($archived)
+                                    <a href="{{ route('user_form') }}" class="btn btn-primary">{{ trans('backend.ui.add') }}</a>
+                                @endunless
                             </div>
-                            @unless($archived)
-                                <a href="{{ route('user_form') }}" class="btn btn-primary">{{ trans('backend.ui.add') }}</a>
-                            @endunless
-                        </div>
-
-                        <div class="card">
                             <div class="table-responsive">
-                                <table class="table table-bordered">
+                                <table class="table table-bordered users-table">
                                   <thead>
                                     <tr class="text-center">
                                       <th scope="col">Login</th>
@@ -102,7 +157,7 @@
                                       <th scope="col">{{ trans('backend.table.client_buy') }}</th>
                                       <th scope="col">{{ trans('backend.table.name') }}</th>
                                       <!--<th scope="col">QR Code</th>-->
-                                      <th scope="col">{{ trans('backend.ui.role') }}</th>
+                                      <th scope="col" class="users-role-column">{{ trans('backend.ui.role') }}</th>
                                       <th scope="col">{{ trans('backend.table.date') }}</th>
                                       <th class="user-actions-column">{{ trans('backend.ui.actions') }}</th>
                                     </tr>
@@ -116,7 +171,7 @@
                                       <td><a href="{{ route('user_checkouts', ['id' => $item->code]) }}">{{ $item->checkouts()->count() }} {{ trans('backend.table.qty_short_t') }}</a></td>
                                       <td>{{ $item->name }}</td>
                                       <!--<td>{{ $item->code }}</td>-->
-                                      <td>@foreach($item->uroles as $userRole) {{ optional($userRole->rolenameid)->name === 'sale' ? trans('backend.ui.agent') : optional($userRole->rolenameid)->name_full }}@if(!$loop->last), @endif @endforeach</td>
+                                      <td class="users-role-column">@foreach($item->uroles as $userRole) {{ optional($userRole->rolenameid)->name === 'sale' ? trans('backend.ui.agent') : optional($userRole->rolenameid)->name_full }}@if(!$loop->last), @endif @endforeach</td>
                                       <td>{{ $item->created_at->format('Y-m-d H:i') }}</td>
                                       <td class="user-actions-column">
                                         <div class="user-action-buttons">
@@ -139,13 +194,15 @@
                                       </td>
                                     </tr>
                                     @endforeach
+                                    @if($data->isEmpty())
+                                    <tr>
+                                        <td colspan="8" class="text-center py-4 text-muted">{{ trans('backend.ui.no_users_found') }}</td>
+                                    </tr>
+                                    @endif
                                   </tbody>
                                 </table>
                             </div>
                         </div>
-                        @if($data->isEmpty())
-                            <div class="alert alert-light text-center mt-3">{{ trans('backend.ui.no_users_found') }}</div>
-                        @endif
                     </div>
 
                     @include('backend.nav')
