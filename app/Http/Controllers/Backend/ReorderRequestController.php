@@ -23,7 +23,6 @@ class ReorderRequestController extends Controller
 
         $remainingPercent = (float) ($filters['remaining_percent'] ?? 10);
         $remainingRatio = $remainingPercent / 100;
-        $soldRatio = 1 - $remainingRatio;
         $maxDays = (int) ($filters['max_days'] ?? 30);
         $minReceivedQty = (float) ($filters['min_received_qty'] ?? 10);
         $keyword = trim((string) ($filters['search'] ?? ''));
@@ -36,6 +35,7 @@ class ReorderRequestController extends Controller
             ->join('checkins as dated_checkin', 'dated_checkin.id', '=', 'dated_incoming.checkin_id')
             ->where('dated_incoming.status', 1)
             ->where('dated_checkin.status', 1)
+            ->where('dated_checkin.type_id', 1)
             ->groupBy('dated_incoming.product_id', 'dated_incoming.warehouse_id')
             ->select([
                 'dated_incoming.product_id',
@@ -53,6 +53,7 @@ class ReorderRequestController extends Controller
             })
             ->where('latest_incoming.status', 1)
             ->where('latest_checkin.status', 1)
+            ->where('latest_checkin.type_id', 1)
             ->groupBy('latest_incoming.product_id', 'latest_incoming.warehouse_id')
             ->selectRaw('MAX(latest_incoming.id) as detail_id');
 
@@ -92,6 +93,7 @@ class ReorderRequestController extends Controller
             }, 'sold_qty')
             ->where('incoming.status', 1)
             ->where('checkin.status', 1)
+            ->where('checkin.type_id', 1)
             ->where('incoming.qty', '>=', $minReceivedQty)
             ->where('checkin.date', '>=', Carbon::today()->subDays($maxDays)->toDateString())
             ->where('stock.stock', '>=', 0)
@@ -113,11 +115,11 @@ class ReorderRequestController extends Controller
             $candidates->where('warehouse.dealer_id', Auth::user()->dealer_id);
         }
 
-        // Sotuv summasining aliasini WHERE ichida ishonchli ishlatish uchun
-        // nomzodlarni subqueryga o'raymiz (MySQL va SQLite bilan mos).
+        // Ombordagi real qoldiq asosiy mezon hisoblanadi. Sotuvlar izoh va
+        // tezlikni ko'rsatish uchun olinadi, lekin noto'liq eski sotuv yozuvi
+        // zayavkani yashirib yubormasligi kerak.
         $query = DB::query()
-            ->fromSub($candidates, 'reorder_candidates')
-            ->whereRaw('sold_qty >= received_qty * ?', [$soldRatio]);
+            ->fromSub($candidates, 'reorder_candidates');
 
         $requests = $query
             ->orderByRaw('(remaining_qty / NULLIF(received_qty, 0)) ASC')

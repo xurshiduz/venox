@@ -42,6 +42,7 @@ class ReorderRequestControllerTest extends TestCase
         Schema::create('checkins', function (Blueprint $table): void {
             $table->id();
             $table->date('date');
+            $table->unsignedTinyInteger('type_id')->default(1);
             $table->unsignedTinyInteger('status')->default(1);
         });
         Schema::create('checkin_details', function (Blueprint $table): void {
@@ -78,10 +79,15 @@ class ReorderRequestControllerTest extends TestCase
             ['id' => 1, 'name' => 'Tez sotilgan mahsulot', 'barcode' => '1001', 'unit_id' => 1],
             ['id' => 2, 'name' => 'Sekin sotilgan mahsulot', 'barcode' => '1002', 'unit_id' => 1],
         ]);
-        DB::table('checkins')->insert(['id' => 1, 'date' => '2026-09-14', 'status' => 1]);
+        DB::table('checkins')->insert([
+            ['id' => 1, 'date' => '2026-09-14', 'type_id' => 1, 'status' => 1],
+            // Keyinroq qilingan qaytaruv haqiqiy oxirgi kirimni almashtirmasligi kerak.
+            ['id' => 2, 'date' => '2026-09-16', 'type_id' => 4, 'status' => 1],
+        ]);
         DB::table('checkin_details')->insert([
             ['id' => 1, 'checkin_id' => 1, 'product_id' => 1, 'warehouse_id' => 1, 'qty' => 500, 'status' => 1],
             ['id' => 2, 'checkin_id' => 1, 'product_id' => 2, 'warehouse_id' => 1, 'qty' => 500, 'status' => 1],
+            ['id' => 3, 'checkin_id' => 2, 'product_id' => 1, 'warehouse_id' => 1, 'qty' => 5, 'status' => 1],
         ]);
         DB::table('checkouts')->insert(['id' => 1, 'date' => '2026-09-16', 'status' => 1]);
         DB::table('checkout_details')->insert([
@@ -90,7 +96,7 @@ class ReorderRequestControllerTest extends TestCase
         ]);
         DB::table('warehouse_stocks')->insert([
             ['product_id' => 1, 'warehouse_id' => 1, 'stock' => 40],
-            ['product_id' => 2, 'warehouse_id' => 1, 'stock' => 40],
+            ['product_id' => 2, 'warehouse_id' => 1, 'stock' => 400],
         ]);
     }
 
