@@ -670,9 +670,6 @@ class CheckoutMonthExport implements FromView, WithStyles
     ): float {
         $total = 0.0;
         foreach ($quantities as $index => $qty) {
-            if (! isset($saleUnitPricesUsd[$index]) || $saleUnitPricesUsd[$index] === null) {
-                continue;
-            }
             $total += static::venoxCashUsd(
                 (float) $qty,
                 (float) ($saleUnitPricesUsd[$index] ?? 0),
@@ -683,15 +680,11 @@ class CheckoutMonthExport implements FromView, WithStyles
         return $total;
     }
 
-    /** Venox margin for rows whose real checkout price is available. */
+    /** Venox bonus is the displayed actual-sale total minus factory total. */
     public static function venoxCashExcelFormula(int $startRow, int $endRow): string
     {
         return sprintf(
-            '=SUMIF(H%d:H%d,">=0",M%d:M%d)-SUMIF(H%d:H%d,">=0",N%d:N%d)',
-            $startRow,
-            $endRow,
-            $startRow,
-            $endRow,
+            '=SUM(M%d:M%d)-SUM(N%d:N%d)',
             $startRow,
             $endRow,
             $startRow,

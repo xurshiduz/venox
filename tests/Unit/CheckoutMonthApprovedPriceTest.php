@@ -263,7 +263,7 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $this->assertSame(160.0, $venoxCash);
     }
 
-    public function test_venox_cash_ignores_rows_without_real_sale_price(): void
+    public function test_venox_cash_subtracts_the_two_displayed_total_columns(): void
     {
         $venoxCash = CheckoutMonthExport::venoxCashTotalUsd(
             [2, 4],
@@ -271,9 +271,9 @@ class CheckoutMonthApprovedPriceTest extends TestCase
             [16, 16]
         );
 
-        $this->assertSame(6.0, $venoxCash);
+        $this->assertSame(-26.0, $venoxCash);
         $this->assertSame(
-            '=SUMIF(H3:H5,">=0",M3:M5)-SUMIF(H3:H5,">=0",N3:N5)',
+            '=SUM(M3:M5)-SUM(N3:N5)',
             CheckoutMonthExport::venoxCashExcelFormula(3, 5)
         );
     }
