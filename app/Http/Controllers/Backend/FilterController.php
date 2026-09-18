@@ -46,7 +46,16 @@ class FilterController extends Controller
     
     
     public function filter(Request $request)
-    { 
+    {
+        $request->validate([
+            'fromdate' => ['required', 'date_format:d.m.Y'],
+            'todate' => ['required', 'date_format:d.m.Y', 'after_or_equal:fromdate'],
+            'manager' => ['nullable'],
+            'warehouse' => ['nullable'],
+            'client_id' => ['nullable'],
+            'barcode' => ['nullable', 'string', 'max:255'],
+        ]);
+
         $managers = User::role('sale')->get();
         $types = CashReceiptType::all();
         $keyword = $request->input('search');
@@ -56,12 +65,20 @@ class FilterController extends Controller
         
         $shipment       = $request->shipment;
         $finish         = $request->finish;
-        $selmanager     = $request->manager;
-        $warehouse      = $request->warehouse;
-        $barcode        = $request->barcode;
-        $client_id        = $request->client_id;
+        $selmanager     = $request->input('manager', 'all');
+        $warehouse      = $request->input('warehouse', 'all');
+        $barcode        = trim((string) $request->barcode);
+        $client_id      = $request->input('client_id', 'all');
         
-        $result = Checkout::query()->whereBetween('created_at', [Carbon::parse($fromdate)->startOfDay()->format('Y-m-d H:i:s'), Carbon::parse($todate)->endOfDay()->format('Y-m-d H:i:s')])->orderBy('id', 'desc');
+        $result = Checkout::query()
+            ->with(['supid:id,name', 'managerid:id,name', 'currencytypeid:id,belgi'])
+            ->withCount('details')
+            ->withSum('details as details_sum_total_price', 'total_price')
+            ->whereBetween('created_at', [
+                Carbon::createFromFormat('d.m.Y', $fromdate)->startOfDay(),
+                Carbon::createFromFormat('d.m.Y', $todate)->endOfDay(),
+            ])
+            ->orderBy('id', 'desc');
         
         if($shipment){
             $result = $result->where('shipment_status', 1);
@@ -81,24 +98,21 @@ class FilterController extends Controller
         
         if($barcode){
             $prid = Product::where('barcode', $barcode)->first();
-            
-            $pid[] = NULL;
-            
-            foreach(CheckoutDetail::where('product_id', $prid->id)->get() as $mtseh){
-                $pid[] = $mtseh->checkout_id;
+
+            if ($prid) {
+                $result->whereHas('details', function ($query) use ($prid) {
+                    $query->where('product_id', $prid->id);
+                });
+            } else {
+                // Noto'g'ri shtrix-kod butun sahifani xatoga tushirmasligi kerak.
+                $result->whereRaw('1 = 0');
             }
-            
-            $result = $result->whereIn('id', $pid);
         }
         
         if($warehouse != 'all'){
-            $wid[] = NULL;
-            
-            foreach(CheckoutDetail::where('warehouse_id', $warehouse)->get() as $mtseh){
-                $wid[] = $mtseh->checkout_id;
-            }
-            
-            $result = $result->whereIn('id', $wid);
+            $result->whereHas('details', function ($query) use ($warehouse) {
+                $query->where('warehouse_id', $warehouse);
+            });
         }
         
         $data = $result->paginate(20)->appends($request->all());
