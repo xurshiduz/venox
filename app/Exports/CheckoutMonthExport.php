@@ -64,7 +64,6 @@ class CheckoutMonthExport implements FromView, WithStyles
             ->whereHas('checkid', function ($query) use ($periodEnd) {
                 $query->where('status', 1)
                     ->where('type_id', 1)
-                    ->where('source_system', 'lidaz')
                     ->whereDate('date', '<=', $periodEnd->toDateString());
             })
             ->get()
@@ -276,12 +275,20 @@ class CheckoutMonthExport implements FromView, WithStyles
                     // so'm narxlari valyuta belgisi USD va kurs 1 bilan qolgan.
                     // LIDAZning katta birlik narxlari doim so'm bo'lgani uchun
                     // ularni hujjat sanasidagi kurs bilan USDga o'tkazamiz.
-                    $latestCheckinPriceUsd = AccountingCashReportService::lidazUnitPriceToUsd(
-                        $rawCheckinUnit,
-                        (int) ($latestCheckin->currency_type ?? optional($checkin)->currency_type ?? 2),
-                        $checkinRate,
-                        $checkinDate
-                    );
+                    $checkinCurrencyType = (int) ($latestCheckin->currency_type ?? optional($checkin)->currency_type ?? 2);
+                    $latestCheckinPriceUsd = optional($checkin)->source_system === 'lidaz'
+                        ? AccountingCashReportService::lidazUnitPriceToUsd(
+                            $rawCheckinUnit,
+                            $checkinCurrencyType,
+                            $checkinRate,
+                            $checkinDate
+                        )
+                        : Currency::documentAmountToUsd(
+                            $rawCheckinUnit,
+                            $checkinCurrencyType,
+                            $checkinRate,
+                            $checkinDate
+                        );
                 }
 
                 // Har bir hujjat o'z sanasida saqlangan kurs bo'yicha USDga o'tadi.
