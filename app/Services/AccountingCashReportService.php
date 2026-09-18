@@ -422,7 +422,12 @@ class AccountingCashReportService
         if (! $checkout) {
             $storedCost = (float) $detail->tan_price;
             return $storedCost > 0
-                ? $this->toUsd($storedCost, (int) $detail->currency_type, (float) $detail->currency_type_price)
+                ? Currency::documentAmountToUsd(
+                    $storedCost,
+                    (int) $detail->currency_type,
+                    (float) $detail->currency_type_price,
+                    optional($detail)->created_at
+                )
                 : 0.0;
         }
         $key = implode(':', [(int) $detail->product_id, (int) $detail->warehouse_id, (string) $date]);
@@ -431,36 +436,49 @@ class AccountingCashReportService
             return $this->legacyCostCache[$key];
         }
 
-        $query = CheckinDetail::query()
-            ->with('checkid')
-            ->whereHas('checkid', function ($query) {
-                $query->where('status', 1)
-                    ->where('type_id', 1)
-                    ->where('source_system', 'lidaz');
-            })
-            ->where('checkin_details.product_id', $detail->product_id)
-            ->where('checkin_details.status', 1)
-            ->where('checkin_details.price', '>', 0);
+        $latestCheckin = function (?int $warehouseId) use ($detail, $date) {
+            $query = CheckinDetail::query()
+                ->with('checkid')
+                ->whereHas('checkid', function ($query) {
+                    $query->where('status', 1)
+                        ->where('type_id', 1);
+                })
+                ->where('checkin_details.product_id', $detail->product_id)
+                ->where('checkin_details.status', 1)
+                // 1.00 narxli qatorlar eski inventarizatsiya/texnik backfill bo'lib,
+                // real xarid tannarxi hisoblanmaydi.
+                ->where('checkin_details.price', '>', 1);
 
-        if ($detail->warehouse_id) {
-            $query->where('checkin_details.warehouse_id', $detail->warehouse_id);
-        }
-        if ($date) {
-            $query->whereHas('checkid', function ($query) use ($date) {
-                $query->whereDate('date', '<=', $date);
-            });
-        }
+            if ($warehouseId) {
+                $query->where('checkin_details.warehouse_id', $warehouseId);
+            }
+            if ($date) {
+                $query->whereHas('checkid', function ($query) use ($date) {
+                    $query->whereDate('date', '<=', $date);
+                });
+            }
 
-        $checkin = $query
-            ->join('checkins', 'checkins.id', '=', 'checkin_details.checkin_id')
-            ->select('checkin_details.*')
-            ->orderByDesc('checkins.date')
-            ->orderByDesc('checkin_details.id')
-            ->first();
+            return $query
+                ->join('checkins', 'checkins.id', '=', 'checkin_details.checkin_id')
+                ->select('checkin_details.*')
+                ->orderByDesc('checkins.date')
+                ->orderByDesc('checkin_details.id')
+                ->first();
+        };
+
+        $checkin = $latestCheckin($detail->warehouse_id ? (int) $detail->warehouse_id : null);
+        if (! $checkin && $detail->warehouse_id) {
+            $checkin = $latestCheckin(null);
+        }
         if (! $checkin) {
             $storedCost = (float) $detail->tan_price;
             return $this->legacyCostCache[$key] = $storedCost > 0
-                ? $this->toUsd($storedCost, (int) $detail->currency_type, (float) $detail->currency_type_price)
+                ? Currency::documentAmountToUsd(
+                    $storedCost,
+                    (int) $detail->currency_type,
+                    (float) $detail->currency_type_price,
+                    $date ?: optional($detail)->created_at
+                )
                 : 0.0;
         }
 
@@ -468,12 +486,19 @@ class AccountingCashReportService
         $currencyRate = (float) ($checkin->currency_type_price ?: optional($checkin->checkid)->currency_type_price);
         $checkinDate = optional($checkin->checkid)->date ?? $checkin->created_at;
 
-        return $this->legacyCostCache[$key] = static::lidazUnitPriceToUsd(
-            (float) $checkin->price,
-            $currencyType,
-            $currencyRate,
-            $checkinDate
-        );
+        return $this->legacyCostCache[$key] = optional($checkin->checkid)->source_system === 'lidaz'
+            ? static::lidazUnitPriceToUsd(
+                (float) $checkin->price,
+                $currencyType,
+                $currencyRate,
+                $checkinDate
+            )
+            : Currency::documentAmountToUsd(
+                (float) $checkin->price,
+                $currencyType,
+                $currencyRate,
+                $checkinDate
+            );
     }
 
     /**
