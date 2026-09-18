@@ -22,7 +22,7 @@
             <th>Завод нархи жами</th>
             <th>Тўланган</th>
             <th>Маҳсулотга боғланмаган тўлов (USD)</th>
-            <th>Бонус харажатлар (KPI + Venox bonus)</th>
+            <th>Бонус харажатлар (Venox bonus)</th>
             <th>Қолдиқ умумий қарз</th>
             <th>Venox касса</th>
             <th>{{ $reportUsdRate }}</th>

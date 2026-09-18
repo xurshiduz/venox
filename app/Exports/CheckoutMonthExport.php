@@ -163,7 +163,7 @@ class CheckoutMonthExport implements FromView, WithStyles
             // Bog'langan to'lov faqat o'z checkout foizlarini ishlatadi.
             // Bog'lanmagan "qarz uchun" to'lovda esa AccountingCashReportService
             // aynan FIFO qoplangan hujjatlar ulushini hisoblab qaytaradi.
-            $reportBonusUsd = static::reportBonusAmountUsd(
+            $reportBonusUsd = static::venoxBonusAmountUsd(
                 $usd,
                 $payment->checkout,
                 $cashReportRow
@@ -180,8 +180,8 @@ class CheckoutMonthExport implements FromView, WithStyles
         }
 
         $closingDebts = $this->clientDebtTotalsUsd($clientIds->map(fn ($id) => (string) $id)->all(), $periodEnd);
-        // Bu hisobotdagi bonus xarajatlari checkout formasidagi KPI + Venox
-        // bonus yig'indisidir. Agent ulushi bu ustunga kirmaydi.
+        // Bu hisobotdagi bonus xarajati checkout formasidagi faqat "Venox bonus"
+        // ulushidir. KPI va agent ulushi bu ustunga kirmaydi.
         $clientBonusExpenses = collect($paymentBonusExpensesByClient);
         $groupedRows = [];
 
@@ -269,14 +269,18 @@ class CheckoutMonthExport implements FromView, WithStyles
                         ? (float) $latestCheckin->total_price / $checkinQty
                         : (float) $latestCheckin->price;
                     $rawCheckinUnit = $checkinUnitPrice;
-                    $checkinRate = (float) (optional($checkin)->currency_type_price ?: Currency::usdRateForDate(optional($checkin)->date ?? $latestCheckin->created_at));
-                    // Kirim qatorining valyutasi eski sarlavhadagi xato belgidan
-                    // ishonchliroq; har bir hujjat o'z tarixiy kursida USDga o'tadi.
-                    $latestCheckinPriceUsd = Currency::documentAmountToUsd(
+                    $checkinDate = optional($checkin)->date ?? $latestCheckin->created_at;
+                    $checkinRate = (float) ($latestCheckin->currency_type_price
+                        ?: optional($checkin)->currency_type_price);
+                    // Eski LIDAZ kirimlarida 36 000, 139 150, 154 880 kabi
+                    // so'm narxlari valyuta belgisi USD va kurs 1 bilan qolgan.
+                    // LIDAZning katta birlik narxlari doim so'm bo'lgani uchun
+                    // ularni hujjat sanasidagi kurs bilan USDga o'tkazamiz.
+                    $latestCheckinPriceUsd = AccountingCashReportService::lidazUnitPriceToUsd(
                         $rawCheckinUnit,
                         (int) ($latestCheckin->currency_type ?? optional($checkin)->currency_type ?? 2),
-                        (float) ($latestCheckin->currency_type_price ?: $checkinRate),
-                        optional($checkin)->date ?? $latestCheckin->created_at
+                        $checkinRate,
+                        $checkinDate
                     );
                 }
 

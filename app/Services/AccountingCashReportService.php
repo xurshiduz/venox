@@ -464,11 +464,45 @@ class AccountingCashReportService
 
         $currencyType = (int) ($checkin->currency_type ?: optional($checkin->checkid)->currency_type);
         $currencyRate = (float) ($checkin->currency_type_price ?: optional($checkin->checkid)->currency_type_price);
+        $checkinDate = optional($checkin->checkid)->date ?? $checkin->created_at;
 
-        return $this->legacyCostCache[$key] = $this->toUsd(
+        return $this->legacyCostCache[$key] = static::lidazUnitPriceToUsd(
             (float) $checkin->price,
             $currencyType,
-            $currencyRate
+            $currencyRate,
+            $checkinDate
+        );
+    }
+
+    /**
+     * LIDAZ API birlik narxini USDga o'tkazadi.
+     * Eski yozuvlarda UZS narx currency_type=USD va rate=1 bilan saqlangan.
+     */
+    public static function lidazUnitPriceToUsd(
+        float $amount,
+        ?int $currencyType,
+        ?float $documentRate,
+        $documentDate = null
+    ): float {
+        if ($amount <= 0) {
+            return 0.0;
+        }
+
+        $rate = $documentRate && $documentRate > 1
+            ? $documentRate
+            : Currency::usdRateForDate($documentDate);
+
+        // LIDAZdagi 1 000 va undan katta birlik narxi UZSdir. Valyuta belgisi
+        // xato bo'lsa ham shu qoida 4 400 000 -> 369.75 USD kabi tiklaydi.
+        if ($amount >= 1000 && $rate > 1) {
+            return $amount / $rate;
+        }
+
+        return Currency::documentAmountToUsd(
+            $amount,
+            $currencyType,
+            $rate,
+            $documentDate
         );
     }
 

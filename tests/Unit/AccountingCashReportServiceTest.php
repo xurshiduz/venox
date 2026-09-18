@@ -72,6 +72,24 @@ class AccountingCashReportServiceTest extends TestCase
         $this->assertEqualsWithDelta(2175, $result['factory'], 0.000001);
     }
 
+    /** @dataProvider legacyLidazUzsPriceProvider */
+    public function test_legacy_lidaz_uzs_price_is_always_converted_to_usd(float $uzs): void
+    {
+        $this->assertEqualsWithDelta(
+            $uzs / 11900,
+            AccountingCashReportService::lidazUnitPriceToUsd($uzs, 1, 11900, '2026-09-01'),
+            0.000001
+        );
+    }
+
+    public function legacyLidazUzsPriceProvider(): array
+    {
+        return [
+            [4400000], [139150], [278300], [13800], [69575], [540000],
+            [36000], [8500], [154880], [13915], [40000],
+        ];
+    }
+
     public function test_linked_checkout_currency_corrects_legacy_receipt_currency(): void
     {
         $service = new AccountingCashReportService();
