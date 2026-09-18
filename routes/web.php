@@ -384,6 +384,7 @@ Route::group(
         Route::get('/transfer_select/{id}/delete', 'Backend\TransferController@delete')->name('transfers_delete');
         Route::get('/transfer_done/{id}/select/{page?}', 'Backend\TransferController@done_status')->name('transfers_done_status');
         Route::post('/transfer_qty', 'Backend\TransferController@qty')->name('qty_transfer');
+        Route::post('/client-transfer-products', 'Backend\TransferController@clientProducts')->name('client_transfer_products');
         Route::post('/client_transfer_change', 'Backend\TransferController@client_change')->name('client_transfer_change');
         Route::post('/date_transfer_change', 'Backend\TransferController@select_transfer_date')->name('date_transfer_change');
         Route::get('/transfer_delete/{id}', 'Backend\TransferController@delete_transfer')->name('delete_transfer');

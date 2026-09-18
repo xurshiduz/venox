@@ -26,6 +26,21 @@ class Transfer extends Model
     {
         return $this->belongsTo('App\Models\Warehouse', 'warehouse_in');
     }
+
+    public function clientoutid()
+    {
+        return $this->belongsTo(Client::class, 'client_out_id');
+    }
+
+    public function clientinid()
+    {
+        return $this->belongsTo(Client::class, 'client_in_id');
+    }
+
+    public function isClientTransfer(): bool
+    {
+        return $this->transfer_type === 'client';
+    }
     
     public function managerid()
     {

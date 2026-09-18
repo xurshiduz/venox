@@ -14,11 +14,13 @@ use App\Models\Transfer;
 use App\Models\Checkout;
 use App\Models\Product;
 use App\Models\History;
+use App\Models\Client;
 
 use Carbon\Carbon;
 use Excel;
 use Auth;
 use Str;
+use DB;
 
 class TransferController extends Controller
 {
@@ -33,16 +35,26 @@ class TransferController extends Controller
     {
         $item = null;
         $warehouses = Warehouse::whereNull('factory_id')->where('status', 1)->get();
+        $clients = Client::where('status', 1)->orderBy('name')->get(['id', 'name', 'phone']);
 
         if($id) {
             $item = Transfer::where('code', $id)->first();
         }
         
-        return view('backend.transfers.form', compact('item', 'warehouses'));
+        return view('backend.transfers.form', compact('item', 'warehouses', 'clients'));
     }
 
     public function save(Request $request, $id = null)
     {
+        $transferType = $request->input('transfer_type', 'warehouse');
+        if (!in_array($transferType, ['warehouse', 'client'], true)) {
+            abort(422, 'O‘tkazma turi noto‘g‘ri.');
+        }
+
+        if ($transferType === 'client') {
+            return $this->saveClientTransfer($request, $id);
+        }
+
         if($request->product_id){
             $chprid = $request->product_id;
         } else {
@@ -56,6 +68,9 @@ class TransferController extends Controller
             $data['reference'] = $request->reference;
             $data['warehouse_out'] = $request->warehouse_out;
             $data['warehouse_in'] = $request->warehouse_in;
+            $data['transfer_type'] = 'warehouse';
+            $data['client_out_id'] = null;
+            $data['client_in_id'] = null;
             $pid = Product::where('barcode', $chprid)->orWhere('barcode', '0'. $chprid)->orWhere('name', $request->product_id)->orWhere('fullname', $request->product_id)->first();
             if ($id) {
                 $item = Transfer::where('code', $id)->first();
@@ -137,6 +152,37 @@ class TransferController extends Controller
         $brid = request()->brid; //qty Keladi
         $cid = request()->cid; //ID keladi
         $item = TransferDetail::findOrFail($cid);
+        $transfer = $item->transfid;
+        $newQty = (float) $brid;
+
+        if ($newQty <= 0) {
+            return response()->json(['message' => 'Miqdor 0 dan katta bo‘lishi kerak.'], 422);
+        }
+
+        if ($transfer && $transfer->isClientTransfer()) {
+            $available = $this->clientProductAvailableQty(
+                $transfer->client_out_id,
+                $item->product_id,
+                $item->id
+            );
+
+            if ($newQty > $available) {
+                return response()->json([
+                    'message' => 'Manba mijozda yetarli mahsulot yo‘q. Mavjud: ' . $available,
+                ], 422);
+            }
+
+            $item->update([
+                'qty' => $newQty,
+                'total_price' => $newQty * (float) $item->unit_price,
+            ]);
+
+            return response()->json([
+                'qty' => $item->qty,
+                'total_price' => $item->total_price,
+            ]);
+        }
+
         $oldqty = $item->qty;
         $item->update(['qty' => $brid]);
         $pid = Product::find($item->product_id);
@@ -226,6 +272,15 @@ class TransferController extends Controller
     public function delete(Request $request, $id)
     {
         $item = TransferDetail::where('code',$id)->first();
+        if (!$item) {
+            return back()->with('error', 'Mahsulot topilmadi.');
+        }
+
+        if ($item->transfid && $item->transfid->isClientTransfer()) {
+            $item->delete();
+            return back()->with('success', 'Mahsulot o‘tkazmadan olib tashlandi.');
+        }
+
         $pid = Product::find($item->product_id);
         if(WarehouseStock::where('warehouse_id', $item->warehouse_out)->where('product_id', $item->product_id)->count()){
             $wsid = WarehouseStock::where('warehouse_id', $item->warehouse_out)->where('product_id', $item->product_id)->first();
@@ -293,5 +348,209 @@ class TransferController extends Controller
             return redirect()->to('/transfers?page='. $page);
         }
         return redirect()->route('transfers_index');
+    }
+
+    public function clientProducts(Request $request)
+    {
+        $request->validate([
+            'client_id' => 'required|integer|exists:clients,id',
+            'model' => 'nullable|string|max:255',
+        ]);
+
+        $search = trim((string) $request->input('model'));
+        $productIds = CheckoutDetail::query()
+            ->whereHas('checkid', function ($query) use ($request) {
+                $query->where('client_id', $request->client_id)->where('status', 1);
+            })
+            ->pluck('product_id')
+            ->merge(
+                TransferDetail::query()
+                    ->whereHas('transfid', function ($query) use ($request) {
+                        $query->where('transfer_type', 'client')
+                            ->where('client_in_id', $request->client_id);
+                    })
+                    ->pluck('product_id')
+            )
+            ->unique()
+            ->values();
+
+        $products = Product::query()
+            ->whereIn('id', $productIds)
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($inner) use ($search) {
+                    $inner->where('name', 'like', '%' . $search . '%')
+                        ->orWhere('fullname', 'like', '%' . $search . '%')
+                        ->orWhere('barcode', 'like', '%' . $search . '%');
+                });
+            })
+            ->limit(30)
+            ->get(['id', 'name', 'fullname', 'barcode']);
+
+        return response()->json($products->filter(function ($product) use ($request) {
+            return $this->clientProductAvailableQty($request->client_id, $product->id) > 0;
+        })->values());
+    }
+
+    private function saveClientTransfer(Request $request, ?string $id)
+    {
+        $validated = $request->validate([
+            'date' => 'required',
+            'client_out_id' => 'required|integer|exists:clients,id|different:client_in_id',
+            'client_in_id' => 'required|integer|exists:clients,id',
+            'reference' => 'nullable|string|max:1000',
+        ], [
+            'client_out_id.different' => 'Manba va qabul qiluvchi mijoz bir xil bo‘lishi mumkin emas.',
+        ]);
+
+        $productInput = $request->product_id ?: $request->modal_product;
+        $product = Product::query()
+            ->where(function ($query) use ($productInput) {
+                $query->where('barcode', $productInput)
+                    ->orWhere('barcode', '0' . $productInput)
+                    ->orWhere('name', $productInput)
+                    ->orWhere('fullname', $productInput);
+            })
+            ->first();
+
+        if (!$product) {
+            return back()->withInput()->with('error', trans('backend.no_product'));
+        }
+
+        return DB::transaction(function () use ($request, $validated, $product, $id) {
+            $fallbackWarehouse = Warehouse::whereNull('factory_id')->where('status', 1)->value('id');
+            if (!$fallbackWarehouse) {
+                return back()->withInput()->with('error', 'Faol ombor topilmadi.');
+            }
+
+            $header = [
+                'date' => Carbon::parse($validated['date'])->format('Y-m-d'),
+                'reference' => $validated['reference'] ?? null,
+                'transfer_type' => 'client',
+                'client_out_id' => $validated['client_out_id'],
+                'client_in_id' => $validated['client_in_id'],
+                // Eski majburiy ustunlar bilan moslik uchun. Mijoz o‘tkazmasida sklad qoldig‘iga tegilmaydi.
+                'warehouse_out' => $fallbackWarehouse,
+                'warehouse_in' => $fallbackWarehouse,
+            ];
+
+            if ($id) {
+                $item = Transfer::where('code', $id)->lockForUpdate()->firstOrFail();
+                if (!$item->isClientTransfer()) {
+                    return back()->with('error', 'Boshlangan sklad o‘tkazmasi turini o‘zgartirib bo‘lmaydi.');
+                }
+                $item->update($header);
+            } else {
+                $item = Transfer::create($header + [
+                    'user_id' => Auth::id(),
+                    'code' => (string) Str::uuid(),
+                ]);
+            }
+
+            $available = $this->clientProductAvailableQty($item->client_out_id, $product->id);
+            if ($available < 1) {
+                return back()->withInput()->with('error', 'Tanlangan mahsulot manba mijozda mavjud emas.');
+            }
+
+            $price = $this->clientProductPrice($item->client_out_id, $product->id);
+            if (!$price) {
+                return back()->withInput()->with('error', 'Mahsulotning mijozga sotilgan narxi topilmadi.');
+            }
+
+            $detail = TransferDetail::where('transfer_id', $item->id)
+                ->where('product_id', $product->id)
+                ->where('unit_price', $price['price'])
+                ->where('currency_type', $price['currency_type'])
+                ->first();
+
+            if ($detail) {
+                $detail->increment('qty');
+                $detail->update(['total_price' => $detail->qty * (float) $detail->unit_price]);
+            } else {
+                TransferDetail::create([
+                    'transfer_id' => $item->id,
+                    'warehouse_out' => $fallbackWarehouse,
+                    'warehouse_in' => $fallbackWarehouse,
+                    'product_id' => $product->id,
+                    'qty' => 1,
+                    'unit_price' => $price['price'],
+                    'total_price' => $price['price'],
+                    'currency_type' => $price['currency_type'],
+                    'currency_type_price' => $price['currency_type_price'],
+                    'unit_id' => $product->unit_id,
+                    'code' => (string) Str::uuid(),
+                ]);
+            }
+
+            return redirect()->route('transfer_form', ['id' => $item->code])
+                ->with('success', 'Mahsulot miqdori va sotilgan narxi bilan mijoz o‘tkazmasiga qo‘shildi.');
+        });
+    }
+
+    private function clientProductAvailableQty(int $clientId, int $productId, ?int $excludingDetailId = null): float
+    {
+        $purchased = (float) CheckoutDetail::query()
+            ->where('product_id', $productId)
+            ->whereHas('checkid', function ($query) use ($clientId) {
+                $query->where('client_id', $clientId)->where('status', 1);
+            })
+            ->sum('qty');
+
+        $incoming = (float) TransferDetail::query()
+            ->where('product_id', $productId)
+            ->whereHas('transfid', function ($query) use ($clientId) {
+                $query->where('transfer_type', 'client')->where('client_in_id', $clientId);
+            })
+            ->sum('qty');
+
+        $outgoingQuery = TransferDetail::query()
+            ->where('product_id', $productId)
+            ->whereHas('transfid', function ($query) use ($clientId) {
+                $query->where('transfer_type', 'client')->where('client_out_id', $clientId);
+            });
+
+        if ($excludingDetailId) {
+            $outgoingQuery->where('id', '!=', $excludingDetailId);
+        }
+
+        return max(0, $purchased + $incoming - (float) $outgoingQuery->sum('qty'));
+    }
+
+    private function clientProductPrice(int $clientId, int $productId): ?array
+    {
+        $checkoutDetail = CheckoutDetail::query()
+            ->where('product_id', $productId)
+            ->where('qty', '>', 0)
+            ->whereHas('checkid', function ($query) use ($clientId) {
+                $query->where('client_id', $clientId)->where('status', 1);
+            })
+            ->with('checkid:id,date')
+            ->latest('id')
+            ->first();
+
+        $incomingDetail = TransferDetail::query()
+            ->where('product_id', $productId)
+            ->whereHas('transfid', function ($query) use ($clientId) {
+                $query->where('transfer_type', 'client')->where('client_in_id', $clientId);
+            })
+            ->latest('id')
+            ->first();
+
+        if (!$checkoutDetail && !$incomingDetail) {
+            return null;
+        }
+
+        if ($incomingDetail && (!$checkoutDetail || $incomingDetail->created_at->gte($checkoutDetail->created_at))) {
+            return [
+                'price' => (float) $incomingDetail->unit_price,
+                'currency_type' => $incomingDetail->currency_type ?: 1,
+                'currency_type_price' => $incomingDetail->currency_type_price ?: 1,
+            ];
+        }
+
+        return [
+            'price' => (float) $checkoutDetail->price,
+            'currency_type' => $checkoutDetail->currency_type ?: 1,
+            'currency_type_price' => $checkoutDetail->currency_type_price ?: 1,
+        ];
     }
 }

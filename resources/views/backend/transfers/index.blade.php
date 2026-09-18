@@ -28,6 +28,7 @@
                                     <tr class="text-center">
                                       <th>{{ trans('backend.table.doc_number') }}</th>
                                       <th>{{ trans('backend.table.manager') }}</th>
+                                      <th>O‘tkazma</th>
                                       <th>{{ trans('backend.table.vid_tovar') }}</th>
                                       @hasanyrole('admin')
                                       <th>{{ trans('backend.table.post_edit_short') }}</th>
@@ -51,6 +52,13 @@
                                         </a>
                                       </td>
                                       <td>{{ $item->managerid ? $item->managerid->name : ($item->userid ? $item->userid->name : null)  }}</td>
+                                      <td>
+                                        @if($item->transfer_type === 'client')
+                                          {{ $item->clientoutid ? $item->clientoutid->name : '—' }} → {{ $item->clientinid ? $item->clientinid->name : '—' }}
+                                        @else
+                                          {{ $item->warehouseoutid ? $item->warehouseoutid->name : '—' }} → {{ $item->warehouseinid ? $item->warehouseinid->name : '—' }}
+                                        @endif
+                                      </td>
                                       <td>{{ $item->details()->count() }}</td>
                                       @hasanyrole('admin')
                                       <td><a href="{{ route('transfer_form', ['id' => $item->code])}}" style="text-decoration:underline;">{{ trans('backend.table.post_edit_short') }}</a></td>

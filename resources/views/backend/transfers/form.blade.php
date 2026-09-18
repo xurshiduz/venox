@@ -15,6 +15,8 @@
                             <div class="card-inner" style="padding: 0.75rem;">
                                 <div class="preview-block">
                                     {!! Form::open(['class' => 'invoice-repeater']) !!}
+                                    @php($isClientTransfer = $item && $item->transfer_type === 'client')
+                                    <input type="hidden" name="transfer_type" id="transfer_type" value="{{ $isClientTransfer ? 'client' : 'warehouse' }}">
                                     <div class="row gy-1">
                                         <div class="col-lg-2 col-md-3 col-sm-4 d-none d-md-block">
                                             <div class="form-group">
@@ -29,10 +31,32 @@
                                         </div>
                                         <div class="col-lg-2 col-md-3 col-sm-4">
                                             <div class="form-group">
-                                                <label class="form-label">С {{ trans('backend.input.warehouse') }}</label>
+                                                <label class="form-label">Qayerdan</label>
                                                 <div class="form-control-wrap">
-                                                    <select class="form-select js-select2" name="warehouse_out" required data-search="on">
-                                                        <option>{{ trans('backend.table.in_select_ware') }}</option>
+                                                    <select class="form-select" id="source_type" {{ $item ? 'disabled' : '' }}>
+                                                        <option value="warehouse" {{ !$isClientTransfer ? 'selected' : '' }}>Skladdan</option>
+                                                        <option value="client" {{ $isClientTransfer ? 'selected' : '' }}>Mijozdan</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-lg-2 col-md-3 col-sm-4">
+                                            <div class="form-group">
+                                                <label class="form-label">Qayerga</label>
+                                                <div class="form-control-wrap">
+                                                    <select class="form-select" id="destination_type" disabled>
+                                                        <option value="warehouse" {{ !$isClientTransfer ? 'selected' : '' }}>Skladga</option>
+                                                        <option value="client" {{ $isClientTransfer ? 'selected' : '' }}>Mijozga</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-lg-2 col-md-3 col-sm-4 warehouse-transfer-field">
+                                            <div class="form-group">
+                                                <label class="form-label">Skladdan</label>
+                                                <div class="form-control-wrap">
+                                                    <select class="form-select js-select2 transfer-entity" name="warehouse_out" data-search="on">
+                                                        <option value="">{{ trans('backend.table.in_select_ware') }}</option>
                                                         @foreach($warehouses as $warehouse)
                                                         <option @if($item && $item->warehouse_out == $warehouse->id) selected @endif value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
                                                         @endforeach
@@ -40,14 +64,41 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="col-lg-2 col-md-3 col-sm-4">
+                                        <div class="col-lg-2 col-md-3 col-sm-4 warehouse-transfer-field">
                                             <div class="form-group">
-                                                <label class="form-label">На {{ trans('backend.input.warehouse') }}</label>
+                                                <label class="form-label">Skladga</label>
                                                 <div class="form-control-wrap">
-                                                    <select class="form-select js-select2" name="warehouse_in" required data-search="on">
-                                                        <option>{{ trans('backend.table.in_select_ware') }}</option>
+                                                    <select class="form-select js-select2 transfer-entity" name="warehouse_in" data-search="on">
+                                                        <option value="">{{ trans('backend.table.in_select_ware') }}</option>
                                                         @foreach($warehouses as $warehouse)
                                                         <option @if($item && $item->warehouse_in == $warehouse->id) selected @endif value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="col-lg-2 col-md-3 col-sm-4 client-transfer-field d-none">
+                                            <div class="form-group">
+                                                <label class="form-label">Mijozdan</label>
+                                                <div class="form-control-wrap">
+                                                    <select class="form-select js-select2 transfer-entity" name="client_out_id" data-search="on">
+                                                        <option value="">Mijozni tanlang</option>
+                                                        @foreach($clients as $client)
+                                                        <option @if($item && $item->client_out_id == $client->id) selected @endif value="{{ $client->id }}">{{ $client->name }}{{ $client->phone ? ' — '.$client->phone : '' }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-lg-2 col-md-3 col-sm-4 client-transfer-field d-none">
+                                            <div class="form-group">
+                                                <label class="form-label">Mijozga</label>
+                                                <div class="form-control-wrap">
+                                                    <select class="form-select js-select2 transfer-entity" name="client_in_id" data-search="on">
+                                                        <option value="">Mijozni tanlang</option>
+                                                        @foreach($clients as $client)
+                                                        <option @if($item && $item->client_in_id == $client->id) selected @endif value="{{ $client->id }}">{{ $client->name }}{{ $client->phone ? ' — '.$client->phone : '' }}</option>
                                                         @endforeach
                                                     </select>
                                                 </div>
@@ -141,6 +192,18 @@
                                     <div class="table-responsive pt-2">
                                         <table class="table table-bordered d-none d-md-inline-table">
                                             <thead>
+                                                @if($isClientTransfer)
+                                                <tr>
+                                                    <th>Mahsulot</th>
+                                                    <th>Shtrix-kod</th>
+                                                    <th>Mijozdan</th>
+                                                    <th>Mijozga</th>
+                                                    <th>Birlik narxi</th>
+                                                    <th>Jami narxi</th>
+                                                    <th width="150px">Miqdor</th>
+                                                    <th><em class="icon ni ni-trash"></em></th>
+                                                </tr>
+                                                @else
                                                 <tr>
                                                     <th>Наименование</th>
                                                     <th>Штрихкод</th>
@@ -151,11 +214,24 @@
                                                     <th width="150px">Кол.во</th>
                                                     <th><em class="icon ni ni-trash"></em></th>
                                                 </tr>
+                                                @endif
                                             </thead>
                                             <tbody>
                                                 
                                                 @foreach($item->details()->orderBy('id', 'desc')->get() as $detail)
                                                 <input type="hidden" id="model" class="model" value="{{ $detail->id }}">
+                                                @if($isClientTransfer)
+                                                <tr>
+                                                    <td>{{$loop->iteration}}) {{ $detail->prodid->name }}</td>
+                                                    <td>{{ $detail->prodid->barcode }}</td>
+                                                    <td>{{ $item->clientoutid ? $item->clientoutid->name : '—' }}</td>
+                                                    <td>{{ $item->clientinid ? $item->clientinid->name : '—' }}</td>
+                                                    <td>{{ number_format($detail->unit_price, 2, '.', ' ') }} {{ $detail->currency_type == 1 ? 'USD' : 'so‘m' }}</td>
+                                                    <td class="transfer-total-{{ $detail->id }}">{{ number_format($detail->total_price, 2, '.', ' ') }} {{ $detail->currency_type == 1 ? 'USD' : 'so‘m' }}</td>
+                                                    <td style="padding: 0px;"><input style="width: 100%; border: 0px; text-align: center; height: 36px;" type="number" step="0.001" class="discount" data-id="{{ $detail->id }}" value="{{ $detail->qty }}" min="0.001"></td>
+                                                    <td width="50px"><a href="{{ route('transfers_delete', ['id' => $detail->code]) }}"><em class="icon ni ni-trash"></em></a></td>
+                                                </tr>
+                                                @else
                                                 <tr>
                                                     <td>{{$loop->iteration}}) {{ $detail->prodid->name }}</td>
                                                     <td>{{ $detail->prodid->barcode }}</b></td>
@@ -168,6 +244,7 @@
                                                     </td>
                                                     <td width="50px"><a href="{{ route('transfers_delete', ['id' => $detail->code]) }}"><em class="icon ni ni-trash"></em></a></td>
                                                 </tr>
+                                                @endif
                                                 @endforeach
                                             </tbody>
                                         </table>
@@ -189,13 +266,13 @@
                                                 <input type="hidden" id="model" class="model" value="{{ $detail->id }}">
                                                 <tr>
                                                     <td colspan="3" class="text-center">{{$loop->iteration}}) {{ $detail->prodid->name }} <b>{{ $detail->prodid->barcode }}</b></td>
-                                                    <td colspan="2" class="text-center">{{ $detail->warehouseoutid ? $detail->warehouseoutid->num_code : NULL }} {{ $detail->warehouseinid ? $detail->warehouseinid->num_code : NULL }}</td>
+                                                    <td colspan="2" class="text-center">@if($isClientTransfer){{ $item->clientoutid ? $item->clientoutid->name : '—' }} → {{ $item->clientinid ? $item->clientinid->name : '—' }}<br>{{ number_format($detail->unit_price, 2, '.', ' ') }} {{ $detail->currency_type == 1 ? 'USD' : 'so‘m' }}@else{{ $detail->warehouseoutid ? $detail->warehouseoutid->num_code : NULL }} {{ $detail->warehouseinid ? $detail->warehouseinid->num_code : NULL }}@endif</td>
                                                 </tr>
                                                 <tr>
                                                     <td style="padding: 0px;">
                                                             <input style="width: 100%; border: 0px; text-align: center; height: 36px;" type="number" class="discount" placeholder="number" data-id="{{ $detail->id }}" value="{{ $detail->qty }}" min="1">
                                                     </td>
-                                                    <td width="100px" class="d-none d-md-block" style="border: 0px">{{ $detail->prodid->stockid->where('warehouse_id', $item->warehouse_out)->sum('stock') }} {{ $detail->prodid->unitid ? $detail->prodid->unitid->name : null}}</td>
+                                                    <td width="100px" class="d-none d-md-block" style="border: 0px">@if(!$isClientTransfer){{ $detail->prodid->stockid->where('warehouse_id', $item->warehouse_out)->sum('stock') }} {{ $detail->prodid->unitid ? $detail->prodid->unitid->name : null}}@endif</td>
                                                     <td width="50px"><a href="{{ route('transfers_delete', ['id' => $detail->code]) }}"><em class="icon ni ni-trash"></em></a></td>
                                                 </tr>
                                                 @endforeach
@@ -292,6 +369,24 @@
 
 @section('script')
 <script>
+    function syncTransferMode() {
+        var mode = $('#source_type').val() || $('#transfer_type').val() || 'warehouse';
+        $('#transfer_type').val(mode);
+        $('#destination_type').val(mode);
+
+        var isClient = mode === 'client';
+        $('.warehouse-transfer-field').toggleClass('d-none', isClient);
+        $('.client-transfer-field').toggleClass('d-none', !isClient);
+        $('[name="warehouse_out"], [name="warehouse_in"]').prop('disabled', isClient).prop('required', !isClient);
+        $('[name="client_out_id"], [name="client_in_id"]').prop('disabled', !isClient).prop('required', isClient);
+        $('#modelName').val('');
+        $('.modelList').empty();
+    }
+
+    $('#source_type').on('change', syncTransferMode);
+    syncTransferMode();
+</script>
+<script>
     $("input[data-type='currency']").on({
         keyup: function() {
           formatCurrency($(this));
@@ -365,12 +460,14 @@
                 brid: brid
             },
             success: function(data) {
-                if (data.status) {
-                    //$('#price_id'+cid).val(data.price);
+                if (data.total_price !== undefined) {
+                    $('.transfer-total-' + cid).text(Number(data.total_price).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
                 }
             },
             error: function(ajaxContext) {
-                alert(ajaxContext.responseText)
+                var response = ajaxContext.responseJSON || {};
+                alert(response.message || 'Miqdorni saqlashda xatolik yuz berdi.');
+                window.location.reload();
             }
         });
     });
@@ -432,14 +529,18 @@
             var model = $(this).val();
             if(this.value.length > 2) {
                 setTimeout(function (){
+                    var clientMode = $('#transfer_type').val() === 'client';
                     $.ajax({
                         type: 'POST',
-                        url: '{{ route("products_api") }}', 
-                        data: {'model': model},
+                        url: clientMode ? '{{ route("client_transfer_products") }}' : '{{ route("products_api") }}',
+                        data: {
+                            'model': model,
+                            'client_id': $('[name="client_out_id"]').val()
+                        },
                         success:function (data) {
                             $(".modelList").empty();
                             $.each(data, function (index, item){
-                                $(".modelList").append($('<option>',{ value: item.fullname }));
+                                $(".modelList").append($('<option>',{ value: item.fullname || item.name || item.barcode }));
                             });
                         }
                     });
@@ -451,10 +552,14 @@
         $('#searchmodal').change(function() {
             var model = $(this).val();
             if(this.value.length > 5) {
+                var clientMode = $('#transfer_type').val() === 'client';
                 $.ajax({
                     type: 'POST',
-                    url: '{{ route("products_api") }}', 
-                    data: {'model': model},
+                    url: clientMode ? '{{ route("client_transfer_products") }}' : '{{ route("products_api") }}',
+                    data: {
+                        'model': model,
+                        'client_id': $('[name="client_out_id"]').val()
+                    },
                     success:function (data) {
                         $(".modeltable").empty();
                         
