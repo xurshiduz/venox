@@ -90,6 +90,15 @@ class AccountingCashReportServiceTest extends TestCase
         ];
     }
 
+    public function test_legacy_lidaz_uzs_price_uses_report_rate_when_saved_rate_is_one(): void
+    {
+        $this->assertEqualsWithDelta(
+            13.01512605042,
+            AccountingCashReportService::lidazUnitPriceToUsd(154880, 1, 1, null),
+            0.000001
+        );
+    }
+
     public function test_linked_checkout_currency_corrects_legacy_receipt_currency(): void
     {
         $service = new AccountingCashReportService();

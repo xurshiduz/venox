@@ -756,7 +756,15 @@ class CheckoutMonthExport implements FromView, WithStyles
     ): array {
         $fallbackSale = max(0, (float) $actualUnitPriceUsd) * $usdRate;
         $sale = (float) ($approvedPrices['sale_uzs'] ?? 0);
-        $factory = max(0, (float) $factoryUnitPriceUsd) * $usdRate;
+        $factoryUnitUsd = max(0, (float) $factoryUnitPriceUsd);
+        // Yakuniy himoya: eski LIDAZ yozuvidagi UZS birlik narxi valyuta
+        // metama'lumoti xato bo'lgani sabab USD sifatida yetib kelishi mumkin.
+        // Hisobotdagi odatiy birlik USD narxlari 1000 dan kichik; 1000+
+        // qiymatni UZS deb kursga bo'lib, keyin yagona UZS bazaga o'tkazamiz.
+        if ($factoryUnitUsd >= 1000 && $usdRate > 1) {
+            $factoryUnitUsd /= $usdRate;
+        }
+        $factory = $factoryUnitUsd * $usdRate;
 
         if ($sale <= 0) {
             $sale = $fallbackSale;

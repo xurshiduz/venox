@@ -10,6 +10,8 @@ use Illuminate\Support\Collection;
 
 class AccountingCashReportService
 {
+    private const LEGACY_LIDAZ_USD_RATE = 11900.0;
+
     private array $legacyCostCache = [];
 
     public function rows(array $filters): Collection
@@ -488,9 +490,21 @@ class AccountingCashReportService
             return 0.0;
         }
 
-        $rate = $documentRate && $documentRate > 1
-            ? $documentRate
-            : Currency::usdRateForDate($documentDate);
+        $rate = $documentRate && $documentRate > 1 ? $documentRate : 0.0;
+        if ($rate <= 1) {
+            try {
+                $rate = Currency::usdRateForDate($documentDate);
+            } catch (\Throwable $exception) {
+                $rate = 0.0;
+            }
+        }
+
+        // Ayrim eski LIDAZ hujjatlarida valyuta ham, kurs ham 1 bo'lib
+        // saqlangan. Valyuta jadvalidan ham kurs topilmasa, ushbu hisobotda
+        // ishlatiladigan tasdiqlangan tarixiy kurs bilan tiklaymiz.
+        if ($rate <= 1) {
+            $rate = self::LEGACY_LIDAZ_USD_RATE;
+        }
 
         // LIDAZdagi 1 000 va undan katta birlik narxi UZSdir. Valyuta belgisi
         // xato bo'lsa ham shu qoida 4 400 000 -> 369.75 USD kabi tiklaydi.

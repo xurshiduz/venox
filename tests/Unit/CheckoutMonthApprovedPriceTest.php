@@ -439,6 +439,19 @@ class CheckoutMonthApprovedPriceTest extends TestCase
         $this->assertSame(1500.0, $breakdown['net_usd']);
     }
 
+    public function test_report_normalizes_legacy_uzs_factory_price_that_arrives_as_usd(): void
+    {
+        $prices = CheckoutMonthExport::resolveReportPricesUzs(
+            ['sale_uzs' => 207000, 'factory_uzs' => 192000],
+            17.60,
+            154880,
+            11900
+        );
+
+        $this->assertSame(207000.0, $prices['sale_uzs']);
+        $this->assertSame(154880.0, $prices['factory_uzs']);
+    }
+
     public function test_unlinked_payment_uses_the_exact_fifo_venox_amount(): void
     {
         $this->assertSame(6.0432, CheckoutMonthExport::venoxBonusAmountUsd(150.42, null, [
