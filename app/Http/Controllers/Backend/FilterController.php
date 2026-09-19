@@ -70,52 +70,57 @@ class FilterController extends Controller
         $barcode        = trim((string) $request->barcode);
         $client_id      = $request->input('client_id', 'all');
         
-        $result = Checkout::query()
-            ->with(['supid:id,name', 'managerid:id,name', 'currencytypeid:id,belgi'])
-            ->withCount('details')
-            ->withSum('details as details_sum_total_price', 'total_price')
-            ->whereBetween('created_at', [
-                Carbon::createFromFormat('d.m.Y', $fromdate)->startOfDay(),
-                Carbon::createFromFormat('d.m.Y', $todate)->endOfDay(),
+        $result = CheckinDetail::query()
+            ->with([
+                'prodid:id,name,barcode',
+                'warehouseid:id,name',
+                'checkid:id,date,client_id,reference,user_id,code',
+                'checkid.supid:id,name',
+                'checkid.userid:id,name',
             ])
-            ->orderBy('id', 'desc');
-        
+            ->join('checkins', 'checkin_details.checkin_id', '=', 'checkins.id')
+            ->select('checkin_details.*')
+            ->whereBetween('checkins.date', [
+                Carbon::createFromFormat('d.m.Y', $fromdate)->format('Y-m-d'),
+                Carbon::createFromFormat('d.m.Y', $todate)->format('Y-m-d'),
+            ]);
+
         if($shipment){
-            $result = $result->where('shipment_status', 1);
+            $result = $result->where('checkins.status', 1);
         }
-        
+
         if($finish){
-            $result = $result->where('status', 1);
+            $result = $result->where('checkins.status', 1);
         }
-        
+
         if($selmanager != 'all'){
-            $result = $result->where('manager_id', $selmanager);
+            $result = $result->where('checkins.user_id', $selmanager);
         }
-        
+
         if($client_id != 'all'){
-            $result = $result->where('client_id', $client_id);
+            $result = $result->where('checkins.client_id', $client_id);
         }
-        
+
         if($barcode){
             $prid = Product::where('barcode', $barcode)->first();
 
             if ($prid) {
-                $result->whereHas('details', function ($query) use ($prid) {
-                    $query->where('product_id', $prid->id);
-                });
+                $result->where('checkin_details.product_id', $prid->id);
             } else {
-                // Noto'g'ri shtrix-kod butun sahifani xatoga tushirmasligi kerak.
                 $result->whereRaw('1 = 0');
             }
         }
-        
+
         if($warehouse != 'all'){
-            $result->whereHas('details', function ($query) use ($warehouse) {
-                $query->where('warehouse_id', $warehouse);
-            });
+            $result->where('checkin_details.warehouse_id', $warehouse);
         }
-        
-        $data = $result->paginate(20)->appends($request->all());
+
+        $data = $result
+            ->orderBy('checkins.date', 'desc')
+            ->orderBy('checkin_details.id', 'desc')
+            ->paginate(20)
+            ->appends($request->all());
+
         return view('backend.filter.filter', compact('data', 'keyword', 'types', 'managers', 'shipment', 'finish', 'selmanager', 'fromdate', 'todate'));
     }
     
