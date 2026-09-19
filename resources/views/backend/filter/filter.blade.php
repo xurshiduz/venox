@@ -28,7 +28,8 @@
                                     <tr class="text-center">
                                       <th width="150px">Дата прихода</th>
                                       <th>Товар</th>
-                                      <th width="140px">Штрих-код</th>
+                                      <th width="140px">Штрих-код товара</th>
+                                      <th width="150px">Уникал баркод</th>
                                       <th width="100px">Кол-во</th>
                                       <th width="120px">Цена</th>
                                       <th width="120px">Сумма</th>
@@ -42,7 +43,8 @@
                                     <tr class="text-center">
                                       <td>{{ $item->checkid ? \Carbon\Carbon::parse($item->checkid->date)->format('d.m.Y') : '—' }}</td>
                                       <td>{{ optional($item->prodid)->name ?: '—' }}</td>
-                                      <td>{{ optional($item->prodid)->barcode ?: ($item->barcode ?: '—') }}</td>
+                                      <td>{{ optional($item->prodid)->barcode ?: ($item->product_barcode ?: '—') }}</td>
+                                      <td>{{ $item->product_barcode ?: ($item->barcode ?: '—') }}</td>
                                       <td>{{ number_format((float) $item->qty, 2, '.', ' ') }}</td>
                                       <td>{{ number_format((float) $item->price, 2, '.', ' ') }}</td>
                                       <td>{{ number_format((float) $item->total_price, 2, '.', ' ') }}</td>

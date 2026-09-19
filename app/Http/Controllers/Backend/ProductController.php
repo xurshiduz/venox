@@ -751,7 +751,7 @@ class ProductController extends Controller
         $item->update($data);
         $cid = Checkin::where('code', $checkid)->first()->id;
         
-        CheckinDetail::create(['checkin_id' => $cid, 'unit_id' => $item->unit_id, 'product_id' => $item->id, 'code' => Str::uuid(), 'qty' => 1, 'barcode' => 'A' . mt_rand(1000,9999) . time() . mt_rand(10,99)]);
+        CheckinDetail::create(['checkin_id' => $cid, 'unit_id' => $item->unit_id, 'product_id' => $item->id, 'product_barcode' => $item->barcode, 'code' => Str::uuid(), 'qty' => 1, 'barcode' => 'A' . mt_rand(1000,9999) . time() . mt_rand(10,99)]);
         return redirect()->route('checkin_form', ['id' => $checkid]);
     }
 

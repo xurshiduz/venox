@@ -66,6 +66,7 @@ class CheckinController extends Controller
                 CheckinDetail::create([
                     'checkin_id' => $item->id,
                     'product_id' => $product->id,
+                    'product_barcode' => $product->barcode,
                     'warehouse_id' => 2,
                     'category_id' => $product->category_id,
                     'qty' => $detail['qty'],

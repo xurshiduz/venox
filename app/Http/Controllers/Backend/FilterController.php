@@ -79,7 +79,8 @@ class FilterController extends Controller
                 'checkid.userid:id,name',
             ])
             ->join('checkins', 'checkin_details.checkin_id', '=', 'checkins.id')
-            ->select('checkin_details.*')
+            ->join('products', 'checkin_details.product_id', '=', 'products.id')
+            ->select('checkin_details.*', 'products.barcode as product_barcode')
             ->whereBetween('checkins.date', [
                 Carbon::createFromFormat('d.m.Y', $fromdate)->format('Y-m-d'),
                 Carbon::createFromFormat('d.m.Y', $todate)->format('Y-m-d'),
@@ -105,9 +106,16 @@ class FilterController extends Controller
             $prid = Product::where('barcode', $barcode)->first();
 
             if ($prid) {
-                $result->where('checkin_details.product_id', $prid->id);
+                $result->where(function ($query) use ($prid, $barcode) {
+                    $query->where('checkin_details.product_id', $prid->id)
+                        ->orWhere('checkin_details.product_barcode', $barcode)
+                        ->orWhere('products.barcode', $barcode);
+                });
             } else {
-                $result->whereRaw('1 = 0');
+                $result->where(function ($query) use ($barcode) {
+                    $query->where('checkin_details.product_barcode', $barcode)
+                        ->orWhere('products.barcode', $barcode);
+                });
             }
         }
 

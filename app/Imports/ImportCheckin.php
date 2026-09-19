@@ -36,6 +36,7 @@ class ImportCheckin implements ToCollection
                         'warehouse_id' => $wareid,
                         'category_id' => 1,
                         'product_id' => $pid->id,
+                        'product_barcode' => $pid->barcode,
                         'currency_type' => $checkin->currency_type,
                         'currency_type_price' => $checkin->currency_type_price,
                         'qty' => Str::replace(' ', '', Str::replace(' ', '', $row[1])),

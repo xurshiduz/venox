@@ -133,6 +133,7 @@
                                                     <th>{{ trans('backend.input.name') }}</th>
                                                     <th width="16px" style="padding:0">Фото</th>
                                                     <th>{{ trans('backend.input.barcode_short') }}</th>
+                                                    <th>Уникал баркод</th>
                                                     <th>{{ trans('backend.table.stock') }}</th>
                                                     <th>Блок</th>
                                                     <th>Цена за ед.</th>
@@ -163,7 +164,8 @@
                                                             </div>
                                                         @endif
                                                     </td>
-                                                    <td>{{ $detail->prodid->barcode }}</td>
+                                                    <td>{{ $detail->product_barcode ?: $detail->prodid->barcode ?: '—' }}</td>
+                                                    <td>{{ $detail->barcode ?: '—' }}</td>
                                                     <td width="100px">{{ $detail->prodid->stockid->where('warehouse_id', $item->warehouse_id)->sum('stock') }} {{ $detail->prodid->unitid ? $detail->prodid->unitid->name : NULL}}</td>
                                                     <td width="100px" style="padding: 0px;">
                                                         {{ $detail->blockid ? $detail->blockid->row . '-блок ' . ($detail->blockcellid ? $detail->blockcellid->cell . '-' . $detail->blockcellid->cell_number : null) : null }}
