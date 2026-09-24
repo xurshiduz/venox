@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 
 // TEMP: productionda yetishmayotgan transfer va kirim ustunlarini yaratish uchun.
-Route::get('/system/run-inventory-migrations-9e7c4b12f6a3', function () {
+Route::get('/system/inventory-refresh-9e7c4b12f6a3', function () {
     $migrations = [
         'database/migrations/2026_09_18_180000_add_client_mode_to_transfers.php',
         'database/migrations/2026_09_19_165923_add_product_barcode_to_checkin_details_table.php',
