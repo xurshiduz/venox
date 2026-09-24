@@ -3,7 +3,6 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 
 Route::get('/checkout_today_send_public', 'Backend\CheckoutController@today_send')->name('checkout_today_send_public');
 
@@ -24,15 +23,6 @@ Route::group(
         Route::post('/iscompact', 'Backend\HomeController@iscompact')->name('iscompact');
         Route::post('/global-usd-rate', 'Backend\CurrencyController@saveGlobalUsdRate')->name('global_usd_rate.update');
         Route::middleware('role:admin')->group(function () {
-            // TEMP: productiondagi inventar ustunlarini tekshirish uchun.
-            Route::get('/inventory_health', function () {
-                return response()->json([
-                    'transfer_type' => Schema::hasColumn('transfers', 'transfer_type'),
-                    'client_out_id' => Schema::hasColumn('transfers', 'client_out_id'),
-                    'client_in_id' => Schema::hasColumn('transfers', 'client_in_id'),
-                    'product_barcode' => Schema::hasColumn('checkin_details', 'product_barcode'),
-                ]);
-            });
             Route::get('/approved-product-prices', 'Backend\ApprovedProductPriceController@index')
                 ->name('approved_product_prices.index');
             Route::put('/approved-product-prices/{approvedPrice}', 'Backend\ApprovedProductPriceController@update')
