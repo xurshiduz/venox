@@ -3,26 +3,15 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
-// TEMP: productionda yetishmayotgan transfer va kirim ustunlarini yaratish uchun.
-Route::get('/system/inventory-refresh-9e7c4b12f6a3', function () {
-    $migrations = [
-        'database/migrations/2026_09_18_180000_add_client_mode_to_transfers.php',
-        'database/migrations/2026_09_19_165923_add_product_barcode_to_checkin_details_table.php',
-    ];
-    $outputs = [];
-
-    foreach ($migrations as $migration) {
-        Artisan::call('migrate', [
-            '--path' => $migration,
-            '--force' => true,
-        ]);
-        $outputs[$migration] = trim(Artisan::output());
-    }
-
+// TEMP: productiondagi inventar ustunlarini tekshirish uchun.
+Route::get('/system/inventory-status-9e7c4b12f6a3', function () {
     return response()->json([
-        'ok' => true,
-        'output' => $outputs,
+        'transfer_type' => Schema::hasColumn('transfers', 'transfer_type'),
+        'client_out_id' => Schema::hasColumn('transfers', 'client_out_id'),
+        'client_in_id' => Schema::hasColumn('transfers', 'client_in_id'),
+        'product_barcode' => Schema::hasColumn('checkin_details', 'product_barcode'),
     ]);
 })->middleware([
     'auth:sanctum',
