@@ -15,6 +15,7 @@ use App\Exports\DayExcel;
 use App\Exports\CheckoutMonthExport;
 use App\Exports\AccountingCashReportExport;
 use App\Services\AccountingCashReportService;
+use App\Services\ApprovedProductPriceService;
 use App\Services\ContractBonusService;
 
 use App\Models\CashExpenditure;
@@ -1627,8 +1628,16 @@ class CheckoutController extends Controller
     public function accountingCashReportExcel(Request $request)
     {
         $this->ensureCheckoutCommissionColumns();
-        $rows = app(AccountingCashReportService::class)->rows($this->cashReportFilters($request));
-        return Excel::download(new AccountingCashReportExport($rows), 'kassa-hisoboti-'.date('Y-m-d').'.xlsx');
+        $filters = $this->cashReportFilters($request);
+        $rows = app(AccountingCashReportService::class)->rows($filters);
+        $usdRate = app(ApprovedProductPriceService::class)->usdRate();
+        $periodLabel = Carbon::parse($filters['from'])->format('d.m.Y')
+            .' — '.Carbon::parse($filters['to'])->format('d.m.Y');
+
+        return Excel::download(
+            new AccountingCashReportExport($rows, $usdRate, $periodLabel),
+            'kassa-hisoboti-'.date('Y-m-d').'.xlsx'
+        );
     }
 
     public function accountingCashReportPdf(Request $request)

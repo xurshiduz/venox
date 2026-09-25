@@ -6,7 +6,8 @@
     <table class="table table-bordered table-striped align-middle">
         <thead class="table-light">
             <tr>
-                <th>№</th><th>Sana</th><th>Agent</th><th style="min-width:260px">Tovar</th><th>Klient</th>
+                <th>№</th><th>Sana</th><th>Agent</th><th style="min-width:260px">Tovar</th>
+                <th>Zavod narxi</th><th>Sotilish narxi</th><th>Klient</th>
                 <th>Bonus / bez bonus</th><th>Prihod summa (USD)</th><th>Summa USD</th><th>KPI</th>
                 <th>Fiksa agent</th><th>Venox bonus kassa</th><th>Zavod kassa</th><th>Amal</th>
             </tr>
@@ -15,7 +16,7 @@
             @forelse($rows as $row)
                 @php
                     $rowProducts = collect($row['products']);
-                    $previewProducts = $rowProducts->take(2);
+                    $displayProducts = ($showAllProducts ?? false) ? $rowProducts : $rowProducts->take(2);
                     $productModalId = 'cash-products-' . ($row['receipt_id'] ?? $loop->index) . '-' . $loop->index;
                     $checkoutCodes = collect(explode(',', (string) ($row['checkout_code'] ?? '')))->map(fn ($code) => trim($code))->filter()->values();
                     $checkoutModalId = 'cash-checkouts-' . ($row['receipt_id'] ?? $loop->index) . '-' . $loop->index;
@@ -25,7 +26,7 @@
                     <td>{{ \Carbon\Carbon::parse($row['date'])->format('d.m.Y') }}</td>
                     <td>{{ $row['agent'] }}</td>
                     <td>
-                        @forelse($previewProducts as $product)
+                        @forelse($displayProducts as $product)
                             <div class="text-truncate" style="max-width:310px" title="{{ $product['name'] }}">
                                 {{ $product['name'] }} — <b>{{ number_format($product['qty'], 3, '.', ' ') }} {{ $product['unit'] }}</b>
                             </div>
@@ -41,6 +42,20 @@
                                 <span>{{ $rowProducts->count() }} ta tovar</span>
                             </button>
                         @endif
+                    </td>
+                    <td class="text-end">
+                        @forelse($displayProducts as $product)
+                            <div>{{ $product['factory_unit_price_usd'] !== null ? number_format($product['factory_unit_price_usd'], 2, '.', ' ') : '—' }}</div>
+                        @empty
+                            <span class="text-muted">—</span>
+                        @endforelse
+                    </td>
+                    <td class="text-end">
+                        @forelse($displayProducts as $product)
+                            <div>{{ number_format($product['actual_total_usd'], 2, '.', ' ') }}</div>
+                        @empty
+                            <span class="text-muted">—</span>
+                        @endforelse
                     </td>
                     <td>{{ $row['client'] }}</td>
                     <td>{{ $schemeLabels[$row['scheme']] ?? $row['scheme'] }}</td>
@@ -61,14 +76,14 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="13" class="text-center py-5 text-soft">Tanlangan filtr bo‘yicha ma’lumot yo‘q.</td></tr>
+                <tr><td colspan="15" class="text-center py-5 text-soft">Tanlangan filtr bo‘yicha ma’lumot yo‘q.</td></tr>
             @endforelse
         </tbody>
         @php $reportTotals = $totals ?? $rows; @endphp
         @if($rows->isNotEmpty())
             <tfoot class="table-light">
                 <tr class="fw-bold">
-                    <td colspan="6" class="text-end">Umumiy jami:</td>
+                    <td colspan="8" class="text-end">Umumiy jami:</td>
                     <td>{{ number_format($reportTotals->sum('purchase_cost_usd'), 2, '.', ' ') }}</td>
                     <td>{{ number_format($reportTotals->sum('payment_usd'), 2, '.', ' ') }}</td>
                     <td>{{ number_format($reportTotals->sum('kpi'), 2, '.', ' ') }}</td>
