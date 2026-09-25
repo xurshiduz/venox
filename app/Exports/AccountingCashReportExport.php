@@ -17,6 +17,8 @@ class AccountingCashReportExport implements FromArray, WithHeadings, WithCustomS
     private Collection $rows;
     private float $usdRate;
     private string $periodLabel;
+    private ?array $reportRows = null;
+    private array $mergeRanges = [];
 
     public function __construct(Collection $rows, float $usdRate, string $periodLabel)
     {
@@ -32,22 +34,7 @@ class AccountingCashReportExport implements FromArray, WithHeadings, WithCustomS
 
     public function array(): array
     {
-        $schemeLabels = ['' => 'Belgilanmagan', 'special' => 'Spes', 'contract' => 'Shartnoma', 'venox_bonus' => 'Venox bonus'];
-        $data = $this->rows->values()->map(function ($row, $index) use ($schemeLabels) {
-            return [
-                $index + 1,
-                $row['date'],
-                $row['agent'],
-                collect($row['products'])->map(fn ($p) => $p['name'].' — '.number_format($p['qty'], 3, '.', ' ').' '.$p['unit'])->implode("\n"),
-                collect($row['products'])->map(fn ($p) => $p['factory_unit_price_usd'] !== null
-                    ? number_format($p['factory_unit_price_usd'], 2, '.', '')
-                    : '—')->implode("\n"),
-                collect($row['products'])->map(fn ($p) => number_format($p['actual_total_usd'], 2, '.', ''))->implode("\n"),
-                $row['client'],
-                $schemeLabels[$row['scheme']] ?? $row['scheme'],
-                $row['purchase_cost_usd'], $row['payment_usd'], $row['kpi'], $row['agent_amount'], $row['venox'], $row['factory'],
-            ];
-        })->all();
+        $data = $this->reportRows();
 
         $data[] = ['', '', '', 'JAMI', '', '', '', '',
             $this->rows->sum('purchase_cost_usd'), $this->rows->sum('payment_usd'),
@@ -58,6 +45,59 @@ class AccountingCashReportExport implements FromArray, WithHeadings, WithCustomS
         return $data;
     }
 
+    private function reportRows(): array
+    {
+        if ($this->reportRows !== null) {
+            return $this->reportRows;
+        }
+
+        $schemeLabels = ['' => 'Belgilanmagan', 'special' => 'Spes', 'contract' => 'Shartnoma', 'venox_bonus' => 'Venox bonus'];
+        $data = [];
+
+        foreach ($this->rows->values() as $receiptIndex => $row) {
+            $products = collect($row['products'] ?? [])->values();
+            if ($products->isEmpty()) {
+                $products = collect([null]);
+            }
+
+            $startRow = count($data) + 3;
+            foreach ($products as $productIndex => $product) {
+                $first = $productIndex === 0;
+                $data[] = [
+                    $first ? $receiptIndex + 1 : null,
+                    $first ? $row['date'] : null,
+                    $first ? $row['agent'] : null,
+                    $product
+                        ? $product['name'].' — '.number_format($product['qty'], 3, '.', ' ').' '.$product['unit']
+                        : 'To‘lovga mos tovar qolmagan',
+                    $product && $product['factory_unit_price_usd'] !== null
+                        ? (float) $product['factory_unit_price_usd']
+                        : null,
+                    $product && $product['actual_total_usd'] !== null
+                        ? (float) $product['actual_total_usd']
+                        : null,
+                    $first ? $row['client'] : null,
+                    $first ? ($schemeLabels[$row['scheme']] ?? $row['scheme']) : null,
+                    $first ? $row['purchase_cost_usd'] : null,
+                    $first ? $row['payment_usd'] : null,
+                    $first ? $row['kpi'] : null,
+                    $first ? $row['agent_amount'] : null,
+                    $first ? $row['venox'] : null,
+                    $first ? $row['factory'] : null,
+                ];
+            }
+
+            $endRow = count($data) + 2;
+            if ($endRow > $startRow) {
+                foreach (['A', 'B', 'C', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'] as $column) {
+                    $this->mergeRanges[] = $column.$startRow.':'.$column.$endRow;
+                }
+            }
+        }
+
+        return $this->reportRows = $data;
+    }
+
     public function headings(): array
     {
         return ['№', 'Sana', 'Agent', 'Tovar', 'Zavod narxi', 'Sotilish narxi', 'Klient', 'Bonus / bez bonus', 'Prihod summa (USD)', 'Summa USD', 'KPI', 'Fiksa agent', 'Venox bonus kassa', 'Zavod kassa'];
@@ -65,7 +105,7 @@ class AccountingCashReportExport implements FromArray, WithHeadings, WithCustomS
 
     public function styles(Worksheet $sheet): array
     {
-        $lastRow = $this->rows->count() + 3;
+        $lastRow = count($this->reportRows()) + 3;
         $sheet->setShowGridlines(false);
         $sheet->freezePane('A3');
         $sheet->setAutoFilter('A2:N2');
@@ -79,9 +119,9 @@ class AccountingCashReportExport implements FromArray, WithHeadings, WithCustomS
         $sheet->getDefaultRowDimension()->setRowHeight(44);
         $sheet->getRowDimension(1)->setRowHeight(28);
         $sheet->getRowDimension(2)->setRowHeight(48);
-        foreach ($this->rows->values() as $index => $row) {
-            $lineCount = max(1, count($row['products'] ?? []));
-            $sheet->getRowDimension($index + 3)->setRowHeight(max(44, $lineCount * 19));
+
+        foreach ($this->mergeRanges as $range) {
+            $sheet->mergeCells($range);
         }
 
         foreach (['A' => 8, 'B' => 14, 'C' => 24, 'D' => 52, 'E' => 16, 'F' => 18,
@@ -100,6 +140,7 @@ class AccountingCashReportExport implements FromArray, WithHeadings, WithCustomS
         $sheet->getStyle('A2:N'.$lastRow)->getBorders()->getAllBorders()
             ->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('C9C9C9');
         $sheet->getStyle('A'.$lastRow.':N'.$lastRow)->getFont()->setBold(true);
+        $sheet->getStyle('E3:F'.$lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
         $sheet->getStyle('I3:N'.$lastRow)->getNumberFormat()->setFormatCode('#,##0.00');
 
         $sheet->getStyle('T1:U2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setWrapText(true);
