@@ -49,4 +49,12 @@ class Client extends Model
                     ->where('status', 1)
                     ->latest('date'); // Yoki created_at, qaysi sana ustuni bo'lsa
     }
+
+    // LIDAZ zavodi (yetkazib beruvchi). Unga qilingan chiqim zavodga
+    // qaytarilgan tovar hisoblanadi, sotuv emas.
+    public function isFactorySupplier(): bool
+    {
+        return (bool) $this->is_supplier
+            && $this->name === config('services.lidaz_factory.supplier_name', 'LIDAZ MCHJ');
+    }
 }

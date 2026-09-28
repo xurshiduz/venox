@@ -124,6 +124,8 @@
                         <tr>
 							@php
 								$isReturnedCheckout = $item instanceof \App\Models\Checkout && (int) $item->checkout_tip_id === 2;
+								// Zavodga (LIDAZ) chiqim — yetkazib beruvchiga qaytarish. Summa debetda qoladi.
+								$isSupplierReturn = $item instanceof \App\Models\Checkout && !$isReturnedCheckout && $client->isFactorySupplier();
 								$checkinTypeName = $item instanceof \App\Models\Checkin
 									? optional($item->typeid)->name
 									: null;
@@ -134,7 +136,7 @@
                             <td style="padding: 0px 5px; text-align: center;">{{ $item->date }}</td>
                             <td style="padding: 0px 5px; text-align: center; font-weight: bold;">
                                 @if($item instanceof \App\Models\Checkout)
-                                    {{ $isReturnedCheckout ? 'Возврат товара' : (optional($item->checktypeid)->name ?: 'Продажа') }}
+                                    {{ ($isReturnedCheckout || $isSupplierReturn) ? 'Возврат товара' : (optional($item->checktypeid)->name ?: 'Продажа') }}
                                 @elseif($item instanceof \App\Models\Returns)
                                     Возврат товара
                                 @elseif($item instanceof \App\Models\Checkin)
@@ -147,7 +149,7 @@
                             </td>
                             <td style="padding: 0px 5px;">
                                 @if(isset($item->checkout_tip_id)) 
-                                    <a target="_blank" href="{{ route('checkout_form', ['id' => $item->code, 'view' => 'full']) }}" style="text-decoration: none; color: #000;"> {{ $isReturnedCheckout ? 'Возврат товара; накладная' : 'Накладная - счет фактура' }} №{{ $item->number_work }};</a>
+                                    <a target="_blank" href="{{ route('checkout_form', ['id' => $item->code, 'view' => 'full']) }}" style="text-decoration: none; color: #000;"> {{ $isReturnedCheckout ? 'Возврат товара; накладная' : ($isSupplierReturn ? 'Возврат товара поставщику; накладная' : 'Накладная - счет фактура') }} №{{ $item->number_work }};</a>
                                 @elseif($item instanceof \App\Models\Returns)
                                     Возврат товара по накладной №{{ $item->number_doc }}; {{ optional($item->prodid)->name }} — {{ number_format((float) $item->qty, 2, '.', ' ') }}
                                 @elseif(isset($item->step)) 

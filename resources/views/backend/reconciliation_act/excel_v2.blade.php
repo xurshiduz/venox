@@ -23,8 +23,11 @@
         <?php
         $nak = 0;
         $pos = 0;
+        $isFactorySupplier = $client->isFactorySupplier();
         foreach ($data as $item) {
             $isReturnedCheckout = $item instanceof \App\Models\Checkout && (int) $item->checkout_tip_id === 2;
+            // Zavodga (LIDAZ) chiqim — yetkazib beruvchiga qaytarish. Summa debetda qoladi.
+            $isSupplierReturn = $item instanceof \App\Models\Checkout && !$isReturnedCheckout && $isFactorySupplier;
             $checkinTypeName = $item instanceof \App\Models\Checkin
                 ? optional($item->typeid)->name
                 : null;
@@ -68,7 +71,7 @@
             <td style="text-align: center;">{{ $item->date }}</td>
             <td style="text-align: center; font-weight: bold;">
                 @if($item instanceof \App\Models\Checkout)
-                    {{ $isReturnedCheckout ? 'Возврат товара' : (optional($item->checktypeid)->name ?: 'Продажа') }}
+                    {{ ($isReturnedCheckout || $isSupplierReturn) ? 'Возврат товара' : (optional($item->checktypeid)->name ?: 'Продажа') }}
                 @elseif($item instanceof \App\Models\Returns)
                     Возврат товара
                 @elseif($item instanceof \App\Models\Checkin)
@@ -81,7 +84,7 @@
             </td>
             <td>
                 @if($item instanceof \App\Models\Checkout)
-                    {{ $isReturnedCheckout ? 'Возврат товара; накладная' : 'Накладная - счет фактура' }} №{{ $item->number_work }};
+                    {{ $isReturnedCheckout ? 'Возврат товара; накладная' : ($isSupplierReturn ? 'Возврат товара поставщику; накладная' : 'Накладная - счет фактура') }} №{{ $item->number_work }};
                 @elseif($item instanceof \App\Models\Returns)
                     Возврат товара по накладной №{{ $item->number_doc }}; {{ optional($item->prodid)->name }} — {{ number_format((float) $item->qty, 2, '.', ' ') }}
                 @elseif($item instanceof \App\Models\Checkin)
