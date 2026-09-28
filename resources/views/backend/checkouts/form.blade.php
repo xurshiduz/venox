@@ -114,6 +114,19 @@
                                                     <input type="text" value="{{ $item && $item->reference ? $item->reference : NULL }}" data-id="{{ $item ? $item->id : null}}" class="form-control {{ $item ? 'referencechange' : null}}" name="reference" id="default-01" placeholder="{{ trans('backend.input.comment') }}">
                                                 </div>
                                             </div>
+                                        </div>
+
+                                        <div class="col-lg-2 col-md-3 col-sm-4">
+                                            <div class="form-group">
+                                                <label class="form-label" for="vehicle_number">Машина рақами</label>
+                                                <div class="form-control-wrap">
+                                                    <input type="text" maxlength="32"
+                                                        value="{{ old('vehicle_number', $item ? $item->vehicle_number : '') }}"
+                                                        data-id="{{ $item ? $item->id : null }}"
+                                                        class="form-control text-uppercase {{ $item ? 'vehicle-number-change' : null }}"
+                                                        name="vehicle_number" id="vehicle_number" placeholder="01 A 123 BC">
+                                                </div>
+                                            </div>
                                         </div><!-- 
                                         <div class="col-lg-2 col-sm-2">
                                             <div class="form-group">
@@ -1044,6 +1057,29 @@
             success: function(data) {
                 if (data.status) {
                     //$('#price_id'+cid).val(data.price);
+                }
+            },
+            error: function(ajaxContext) {
+                alert(ajaxContext.responseText)
+            }
+        });
+    });
+
+    $('.vehicle-number-change').change(function() {
+        var input = $(this),
+            cid = input.data('id');
+
+        $.ajax({
+            type: "POST",
+            url: '{{ route("checkout_vehicle_number_change") }}',
+            dataType: 'JSON',
+            data: {
+                cid: cid,
+                vehicle_number: input.val()
+            },
+            success: function(data) {
+                if (data.status) {
+                    input.val(data.vehicle_number || '');
                 }
             },
             error: function(ajaxContext) {

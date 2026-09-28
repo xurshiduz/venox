@@ -17,6 +17,7 @@ use App\Exports\AccountingCashReportExport;
 use App\Services\AccountingCashReportService;
 use App\Services\ApprovedProductPriceService;
 use App\Services\ContractBonusService;
+use App\Services\CheckoutDayReportService;
 
 use App\Models\CashExpenditure;
 use App\Models\InventoryDetail;
@@ -1691,6 +1692,18 @@ class CheckoutController extends Controller
         $item->update(['reference' => $reference]);
         return response()->json(['status' => 'success']);
     }
+
+    public function checkout_vehicle_number_change(Request $request)
+    {
+        $validated = $request->validate([
+            'cid' => ['required', 'integer', 'exists:checkouts,id'],
+            'vehicle_number' => ['nullable', 'string', 'max:32'],
+        ]);
+        $vehicleNumber = $this->normalizeVehicleNumber($validated['vehicle_number'] ?? null);
+        Checkout::findOrFail($validated['cid'])->update(['vehicle_number' => $vehicleNumber]);
+
+        return response()->json(['status' => 'success', 'vehicle_number' => $vehicleNumber]);
+    }
     
     public function price_total()
     {
@@ -1814,6 +1827,10 @@ class CheckoutController extends Controller
     
     public function save(Request $request, $id = null)
     {
+        $request->validate([
+            'vehicle_number' => ['nullable', 'string', 'max:32'],
+        ]);
+
         if (Auth::user()->hasAnyRole('admin|select_manager')) {
             $request->validate([
                 'manager_id' => ['required', 'exists:users,id'],
@@ -1862,6 +1879,7 @@ class CheckoutController extends Controller
             $data = [
                 'date' => Carbon::parse($request->date)->format('Y-m-d'),
                 'reference' => $request->reference,
+                'vehicle_number' => $this->normalizeVehicleNumber($request->vehicle_number),
                 'type_id' => 1,
                 'checkout_tip_id' => $request->checkout_tip_id ?: 1,
                 'warehouse_id' => $warehouseId,
@@ -1961,6 +1979,13 @@ class CheckoutController extends Controller
     
             return redirect()->route('checkout_form', ['id' => $item->code]);
         });
+    }
+
+    private function normalizeVehicleNumber(?string $vehicleNumber): ?string
+    {
+        $vehicleNumber = preg_replace('/\s+/u', ' ', trim((string) $vehicleNumber));
+
+        return $vehicleNumber === '' ? null : mb_strtoupper($vehicleNumber, 'UTF-8');
     }
     public function save_old(Request $request, $id = null)
     {
@@ -2392,7 +2417,22 @@ class CheckoutController extends Controller
         $todate         = $request->todate;
         $checkouttip    = $request->checkout_tip_id;
         $ch_tip_id      = $request->ch_tip_id;
-        $result = Checkout::query()->whereBetween('date', [Carbon::parse($fromdate)->format('Y-m-d'), Carbon::parse($todate)->format('Y-m-d')])->orderBy('date', 'asc');
+        $result = Checkout::query()
+            ->where('type_id', 1)
+            ->where('status', 1)
+            ->whereBetween('date', [Carbon::parse($fromdate)->format('Y-m-d'), Carbon::parse($todate)->format('Y-m-d')])
+            ->whereHas('checkoutDetails', fn ($query) => $query->where('qty', '>', 0))
+            ->with([
+                'checkoutDetails' => fn ($query) => $query->where('qty', '>', 0),
+                'checkoutDetails.prodid.unitid',
+                'checkoutDetails.warehouseid',
+                'supid',
+                'managerid',
+                'payments' => fn ($query) => $query->where('status', 1)->with('tname'),
+                'returns',
+            ])
+            ->orderBy('date', 'asc')
+            ->orderBy('id', 'asc');
         
         if($selmanager != 'all'){
             $result = $result->where('manager_id', $selmanager);
@@ -2405,14 +2445,21 @@ class CheckoutController extends Controller
         if($ch_tip_id != 'all'){
             $result = $result->where('checkout_tip_id', $ch_tip_id);
         }
+
+        if($checkouttip != 'all'){
+            $result = $result->whereHas('payments', function ($query) use ($checkouttip) {
+                $query->where('status', 1)->where('cash_receipt_type', $checkouttip);
+            });
+        }
         
         $data = $result->get();
+        $rows = app(CheckoutDayReportService::class)->rows($data, $checkouttip);
         
         if($request->type == 'pdf'){
-            return view('backend.checkouts.day_print_all', compact('data', 'fromdate', 'todate', 'checkouttip'));
+            return view('backend.checkouts.day_print_all', compact('data', 'rows', 'fromdate', 'todate', 'checkouttip'));
         } 
         
-        return Excel::download(new DayExcel($data, $fromdate, $todate, $checkouttip), 'Фильтр по продажам от ' . Carbon::parse($fromdate)->format('Y-m-d') . ' до ' . Carbon::parse($todate)->format('Y-m-d') . '.xlsx');
+        return Excel::download(new DayExcel($rows, $fromdate, $todate), 'Фильтр по продажам от ' . Carbon::parse($fromdate)->format('Y-m-d') . ' до ' . Carbon::parse($todate)->format('Y-m-d') . '.xlsx');
         
         if($finish){
             $result = $result->where('status', 1);

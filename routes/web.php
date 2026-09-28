@@ -336,6 +336,7 @@ Route::group(
         Route::post('/type_checkout_change', 'Backend\CheckoutController@select_checkout_type')->name('type_checkout_change');
         Route::post('/date_checkout_change', 'Backend\CheckoutController@select_checkout_date')->name('date_checkout_change');
         Route::post('/checkout_reference_change', 'Backend\CheckoutController@checkout_reference_change')->name('checkout_reference_change');
+        Route::post('/checkout_vehicle_number_change', 'Backend\CheckoutController@checkout_vehicle_number_change')->name('checkout_vehicle_number_change');
         Route::get('/checkout/{id}/status', 'Backend\CheckoutController@status')->name('checkout_status');
         Route::get('/checkou_select/{id}/delete', 'Backend\CheckoutController@delete')->name('checkout_delete');
         Route::get('/checkout_done/{id}/select/{page?}/{ctypeAlias?}', 'Backend\CheckoutController@done_status')->name('checkout_done_status');
