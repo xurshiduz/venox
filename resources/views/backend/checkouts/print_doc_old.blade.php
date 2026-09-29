@@ -246,6 +246,10 @@
                         <td style="border: 0px; padding: 5px 0px;" width="50%">Товар отпустил ____________________</td>
                         <td style="border: 0px; padding: 0px; vertical-align: text-bottom;" width="50%">&nbsp; &nbsp; &nbsp; &nbsp;ФИО получателя</td>
                     </tr>
+                    <tr>
+                        <td style="border: 0px; padding: 5px 0px;" width="50%">Автомобиль рақами: <b>{{ $item->vehicle_number ?: '—' }}</b></td>
+                        <td style="border: 0px; padding: 5px 0px;" width="50%"></td>
+                    </tr>
                 </tbody>
             </table>
 			</div>

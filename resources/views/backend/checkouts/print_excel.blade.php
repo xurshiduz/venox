@@ -157,5 +157,13 @@
             <td></td>
             <td style="border: 0px; padding: 0px; vertical-align: text-bottom;">&nbsp; &nbsp; &nbsp; &nbsp;ФИО получателя</td>
         </tr>
+        <tr>
+            <td></td>
+            <td style="border: 0px; padding: 5px 0px;">Автомобиль рақами: <b>{{ $item->vehicle_number ?: '—' }}</b></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+        </tr>
     </tbody>
 </table>

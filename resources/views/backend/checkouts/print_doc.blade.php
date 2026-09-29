@@ -224,6 +224,10 @@
                         <td style="border: 0px; padding: 5px 0px;" width="50%">Менеджер Ф.И.О: {{ $item->managerid ? $item->managerid->name : NULL }}</td>
                         <td style="border: 0px; padding: 5px 0px;" width="50%">Менеджер Тел: {{ $item->managerid ? $item->managerid->phone : NULL }}</td>
                     </tr>
+                    <tr>
+                        <td style="border: 0px; padding: 5px 0px;" width="50%">Автомобиль рақами: <b>{{ $item->vehicle_number ?: '—' }}</b></td>
+                        <td style="border: 0px; padding: 5px 0px;" width="50%"></td>
+                    </tr>
                 </tbody>
             </table>
 			</div>
@@ -385,6 +389,10 @@
                     <tr>
                         <td style="border: 0px; padding: 5px 0px;" width="50%">Менеджер Ф.И.О: {{ $item->managerid ? $item->managerid->name : NULL }}</td>
                         <td style="border: 0px; padding: 5px 0px;" width="50%">Менеджер Тел: {{ $item->managerid ? $item->managerid->phone : NULL }}</td>
+                    </tr>
+                    <tr>
+                        <td style="border: 0px; padding: 5px 0px;" width="50%">Автомобиль рақами: <b>{{ $item->vehicle_number ?: '—' }}</b></td>
+                        <td style="border: 0px; padding: 5px 0px;" width="50%"></td>
                     </tr>
                 </tbody>
             </table>
