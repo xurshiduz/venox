@@ -43,8 +43,9 @@ class WarehouseController extends Controller
         $keyword = NULL; 
         $usdRate = Currency::usdRate();
         $stockDate = $request->input('stock_date', now()->toDateString());
+        $selectedWarehouse = $request->input('id', optional($data->first())->code);
 
-        return view('backend.warehouses.index', compact('data', 'keyword', 'usdRate', 'stockDate'));
+        return view('backend.warehouses.index', compact('data', 'keyword', 'usdRate', 'stockDate', 'selectedWarehouse'));
         
         //
         

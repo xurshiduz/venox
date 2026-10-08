@@ -29,9 +29,9 @@
                                         <div class="col-md-4">
                                             <div class="form-group">
                                                 <label class="form-label">{{ trans('backend.input.name') }}</label>
-                                                <select class="form-select js-select2" name="id" required data-search="on">
+                                                <select class="form-select js-select2" name="id" required data-search="on" onchange="this.form.submit()">
                                                     @foreach($data as $warehouse)
-                                                    <option value="{{ $warehouse->code }}">{{ $warehouse->name }}</option>
+                                                    <option value="{{ $warehouse->code }}" {{ $selectedWarehouse === $warehouse->code ? 'selected' : '' }}>{{ $warehouse->name }}</option>
                                                     @endforeach
                                                 </select>
                                             </div>
@@ -39,7 +39,7 @@
                                         <div class="col-md-3">
                                             <div class="form-group">
                                               <label class="form-label">Остаток санаси</label>
-                                              <input type="date" max="{{ now()->toDateString() }}" class="form-control" name="stock_date" value="{{ $stockDate }}" required>
+                                              <input type="date" max="{{ now()->toDateString() }}" class="form-control" name="stock_date" value="{{ $stockDate }}" required onchange="this.form.submit()">
                                             </div>
                                         </div>
                                         <div class="col-md-3">
