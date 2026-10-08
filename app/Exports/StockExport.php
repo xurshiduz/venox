@@ -10,22 +10,26 @@ use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use App\Models\Warehouse;
+use App\Services\WarehouseStockAsOfService;
+use Carbon\Carbon;
 
 class StockExport implements FromView, WithEvents, WithTitle
 { 
     
-    function __construct($id, $usdRate = null) {
+    function __construct($id, $usdRate = null, $stockDate = null) {
         $this->id = $id;
         $this->usdRate = (float) $usdRate;
+        $this->stockDate = $stockDate ?: now()->toDateString();
     }
         
     public function view(): View
     {
-        $wareid = Warehouse::where('code', $this->id)->first();
-        
+        $wareid = Warehouse::where('code', $this->id)->firstOrFail();
         $usdRate = $this->usdRate;
+        $stockDate = $this->stockDate;
+        $stocks = app(WarehouseStockAsOfService::class)->get($wareid, Carbon::parse($stockDate));
 
-        return view('backend.warehouses.excel', compact('wareid', 'usdRate'));
+        return view('backend.warehouses.excel', compact('wareid', 'usdRate', 'stockDate', 'stocks'));
     }
 
     public function title(): string

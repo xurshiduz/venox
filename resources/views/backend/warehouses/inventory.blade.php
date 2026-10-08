@@ -58,7 +58,7 @@
                         <h3 class="title">Отчет</h3>
                         <ul class="list-plain">
                             <li class="invoice-id"><span>Invoice ID</span>:<span>{{ rand(10000, 99999) }}</span></li>
-                            <li class="invoice-date"><span>дата отчета</span>:<span>{{ \Carbon\Carbon::now()->format('Y-m-d H:i') }}</span></li>
+                            <li class="invoice-date"><span>Остаток санаси</span>:<span>{{ \Carbon\Carbon::parse($stockDate)->format('d.m.Y') }}</span></li>
                         </ul>
                     </div>
                 </div><!-- .invoice-head -->

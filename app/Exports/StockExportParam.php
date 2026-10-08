@@ -4,6 +4,8 @@ namespace App\Exports;
 
 use Illuminate\Contracts\View\View;
 use App\Models\Warehouse;
+use App\Services\WarehouseStockAsOfService;
+use Carbon\Carbon;
 
 class StockExportParam extends StockExport
 { 
@@ -21,7 +23,12 @@ class StockExportParam extends StockExport
         $take = $this->take;
         $pag = $this->pag;
         $usdRate = $this->usdRate;
+        $stockDate = now()->toDateString();
+        $stocks = app(WarehouseStockAsOfService::class)
+            ->get($wareid, Carbon::parse($stockDate))
+            ->slice((int) $take, (int) $pag)
+            ->values();
         
-        return view('backend.warehouses.excel', compact('wareid', 'take', 'pag', 'usdRate'));
+        return view('backend.warehouses.excel', compact('wareid', 'take', 'pag', 'usdRate', 'stockDate', 'stocks'));
     }
 }

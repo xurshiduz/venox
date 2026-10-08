@@ -22,6 +22,7 @@ use App\Models\Product;
 use App\Models\History;
 use App\Models\Dealer;
 use App\Models\Currency;
+use App\Services\WarehouseStockAsOfService;
 
 use Carbon\Carbon;
 use Session;
@@ -41,8 +42,9 @@ class WarehouseController extends Controller
         } 
         $keyword = NULL; 
         $usdRate = Currency::usdRate();
+        $stockDate = $request->input('stock_date', now()->toDateString());
 
-        return view('backend.warehouses.index', compact('data', 'keyword', 'usdRate'));
+        return view('backend.warehouses.index', compact('data', 'keyword', 'usdRate', 'stockDate'));
         
         //
         
@@ -70,21 +72,14 @@ class WarehouseController extends Controller
         dd('success');
     }
     
-    public function warehouse_inventory($id)
+    public function warehouse_inventory(Request $request, $id, WarehouseStockAsOfService $stockAsOf)
     { 
         $keyword = NULL;
-        $ware = Warehouse::where('code', $id)->first(); 
+        $ware = Warehouse::where('code', $id)->firstOrFail();
         if(Auth::user()->hasAnyRole('admin|cashier')){
-            $data = \App\Models\WarehouseStock::where('warehouse_id', $ware->id)
-                ->where('stock', '>', 0) // Agar faqat bor narsalar kerak bo'lsa (ixtiyoriy)
-                ->with(['productid' => function($query) {
-                    $query->where('status', 1); // Faqat aktiv productlar
-                }])
-                ->whereHas('productid', function($query) {
-                    $query->where('status', 1); // Product o'chirilmagan bo'lishi kerak
-                })
-                ->get();
-            return view('backend.warehouses.inventory', compact('data', 'keyword', 'ware'));
+            $stockDate = $this->validatedStockDate($request);
+            $data = $stockAsOf->get($ware, Carbon::parse($stockDate));
+            return view('backend.warehouses.inventory', compact('data', 'keyword', 'ware', 'stockDate'));
             
             $data = CheckinDetail::where('warehouse_id', $ware->id)->get()->groupBy('product_id');
         } elseif(Auth::user()->hasAnyRole('dealer_admin')) {
@@ -121,9 +116,10 @@ class WarehouseController extends Controller
     { 
         $usdRate = Currency::usdRate();
         $warehouse = Warehouse::where('code', $id)->firstOrFail();
-        $fileName = 'ombor-qoldigi-' . (Str::slug($warehouse->name) ?: 'ombor') . '-' . now()->format('Y-m-d') . '.xlsx';
+        $stockDate = $this->validatedStockDate($request);
+        $fileName = 'ombor-qoldigi-' . (Str::slug($warehouse->name) ?: 'ombor') . '-' . $stockDate . '.xlsx';
 
-        return Excel::download(new StockExport($id, $usdRate), $fileName);
+        return Excel::download(new StockExport($id, $usdRate, $stockDate), $fileName);
     }
     
     public function warehouse_stock_param($id, $take, $pag)
@@ -133,17 +129,30 @@ class WarehouseController extends Controller
     
     public function warehouse_stock_input(Request $request)
     { 
+        $request->validate([
+            'id' => 'required|exists:warehouses,code',
+            'stock_date' => 'required|date_format:Y-m-d|before_or_equal:today',
+        ]);
+
         $warehouse = Warehouse::where('code', $request->id)->firstOrFail();
         $wareid = $warehouse->name;
         
         $id = $request->id;
-        $take = $request->take;
-        $pag = $request->pag;
+        $stockDate = $request->stock_date;
         $usdRate = Currency::usdRate();
 
-        $fileName = 'ombor-qoldigi-' . (Str::slug($wareid) ?: 'ombor') . '-qism-' . $take . '-' . $pag . '.xlsx';
+        $fileName = 'ombor-qoldigi-' . (Str::slug($wareid) ?: 'ombor') . '-' . $stockDate . '.xlsx';
 
-        return Excel::download(new StockExportParam($id, $take, $pag, $usdRate), $fileName);
+        return Excel::download(new StockExport($id, $usdRate, $stockDate), $fileName);
+    }
+
+    private function validatedStockDate(Request $request): string
+    {
+        $validated = $request->validate([
+            'stock_date' => 'nullable|date_format:Y-m-d|before_or_equal:today',
+        ]);
+
+        return $validated['stock_date'] ?? now()->toDateString();
     }
 
     public function warehouse_stock_refresh($id)

@@ -26,7 +26,7 @@
                             <div class="col-md-9">
                                 <form method="GET" action="{{ route('warehouses_stock_excel_input') }}">
                                     <div class="row align-items-end">
-                                        <div class="col-md-2">
+                                        <div class="col-md-4">
                                             <div class="form-group">
                                                 <label class="form-label">{{ trans('backend.input.name') }}</label>
                                                 <select class="form-select js-select2" name="id" required data-search="on">
@@ -36,20 +36,13 @@
                                                 </select>
                                             </div>
                                         </div>
-                                        <div class="col-md-2">
+                                        <div class="col-md-3">
                                             <div class="form-group">
-                                              <label class="form-label">{{ trans('backend.table.from_text') }}</label>
-                                              <input type="number" min="0" class="form-control" name="take" required placeholder="0">
+                                              <label class="form-label">Остаток санаси</label>
+                                              <input type="date" max="{{ now()->toDateString() }}" class="form-control" name="stock_date" value="{{ $stockDate }}" required>
                                             </div>
                                         </div>
-                                        
-                                        <div class="col-md-2">
-                                            <div class="form-group">
-                                              <label class="form-label">{{ trans('backend.table.to_text') }}</label>
-                                              <input type="number" min="1" class="form-control" name="pag" required placeholder="{{ App\Models\Product::count() }}">
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
+                                        <div class="col-md-3">
                                             <div class="alert alert-primary mb-0 py-2 px-3" style="min-height: 42px;">
                                                 <small class="d-block">Excel UZSda hisoblanadi</small>
                                                 <strong>1 USD = {{ number_format($usdRate, 2, '.', ' ') }} UZS</strong>
@@ -101,7 +94,7 @@
                                        @hasanyrole('admin|arrival')
                                        <!--<td><a href="#"><img width="22px" src="/upload/view-files.png"> PDF </a></td>-->
                                        <td>
-                                           <a class="btn btn-sm btn-success warehouse-action" href="{{ route('warehouses_stock_excel', ['id' => $item->code]) }}"><em class="icon ni ni-download"></em> Excel</a>
+                                           <a class="btn btn-sm btn-success warehouse-action" href="{{ route('warehouses_stock_excel', ['id' => $item->code, 'stock_date' => $stockDate]) }}"><em class="icon ni ni-download"></em> Excel</a>
                                            <!--<a href="{{ route('warehouses_stock_excel_param', ['id' => $item->code, 'take' => 0, 'pag' => 8000]) }}"><img width="22px" src="/upload/excel.png"> Excel 0-8000</a> <br>
                                            <a href="{{ route('warehouses_stock_excel_param', ['id' => $item->code, 'take' => 8000, 'pag' => 16000]) }}"><img width="22px" src="/upload/excel.png"> Excel 8001-16000</a> -->
                                        </td>
@@ -109,7 +102,7 @@
                                            <a href="{{ route('warehouses_excel_product_list', ['id' => $item->code]) }}"><img width="22px" src="/upload/excel.png"> {{ trans('backend.table.download') }}</a>
                                        </td>-->
                                        @endhasanyrole
-                                       <td><a class="btn btn-sm btn-light warehouse-action" href="{{ route('warehouse_inventory', ['id' => $item->code]) }}"><em class="icon ni ni-printer"></em> Print</a></td>
+                                       <td><a class="btn btn-sm btn-light warehouse-action" href="{{ route('warehouse_inventory', ['id' => $item->code, 'stock_date' => $stockDate]) }}"><em class="icon ni ni-printer"></em> Print</a></td>
                                        <td>{{ $item->address }} </td>
                                        <td>{{ $item->phone }} </td>
                                        @hasanyrole('admin|arrival')

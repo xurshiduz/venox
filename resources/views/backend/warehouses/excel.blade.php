@@ -5,7 +5,7 @@
     <tbody>
         <tr>
             <td></td>
-            <th colspan="8">Ombor qoldig'i: {{ $wareid->name }}</th>
+            <th colspan="8">Ombor qoldig'i: {{ $wareid->name }} — {{ \Carbon\Carbon::parse($stockDate)->format('d.m.Y') }}</th>
         </tr>
         <tr>
             <td></td>
@@ -20,18 +20,6 @@
         </tr>
 
         @php
-            $stocks = App\Models\WarehouseStock::where('warehouse_id', $wareid->id)
-                ->where('stock', '>', 0)
-                ->whereHas('productid')
-                ->with(['productid.unitid'])
-                ->orderBy('product_id');
-
-            if (isset($take, $pag)) {
-                $stocks->skip((int) $take)->take((int) $pag);
-            }
-
-            $stocks = $stocks->get();
-
             $usdRate = $usdRate > 0 ? $usdRate : 1;
 
         @endphp
@@ -41,12 +29,14 @@
                 $checkinQuery = $item->productid->checkindetails()
                     ->with('checkid')
                     ->where('status', 1)
+                    ->whereHas('checkid', function ($query) use ($stockDate) {
+                        $query->where('status', 1)
+                            ->where('type_id', 1)
+                            ->whereDate('date', '<=', $stockDate);
+                    })
                     // 1.00 bilan yozilgan eski inventar/ko'chirish qatorlari
                     // haqiqiy xarid tannarxi emas.
-                    ->where('price', '>', 1)
-                    ->whereHas('checkid', function ($query) {
-                        $query->where('status', 1)->where('type_id', 1);
-                    });
+                    ->where('price', '>', 1);
 
                 $latestCheckin = (clone $checkinQuery)
                     ->where('warehouse_id', $wareid->id)
@@ -73,9 +63,11 @@
                     ->with('checkid')
                     ->where('status', 1)
                     ->where('price', '>', 0)
-                    ->whereHas('checkid', function ($query) {
+                    ->whereHas('checkid', function ($query) use ($stockDate) {
                         // Ombor marjasi uchun faqat USDda sotilgan narx olinadi.
-                        $query->where('status', 1)->where('currency_type', 1);
+                        $query->where('status', 1)
+                            ->where('currency_type', 1)
+                            ->whereDate('date', '<=', $stockDate);
                     })
                     ->orderByDesc(App\Models\Checkout::select('date')
                         ->whereColumn('checkouts.id', 'checkout_details.checkout_id')
