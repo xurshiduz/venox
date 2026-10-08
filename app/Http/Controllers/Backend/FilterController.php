@@ -18,6 +18,9 @@ use App\Models\Product;
 use App\Models\Setting;
 use App\Models\Client;
 use App\Models\User;
+use App\Exports\CheckinFilterExport;
+
+use Maatwebsite\Excel\Facades\Excel;
 
 use Carbon\Carbon;
 use Auth;
@@ -47,6 +50,36 @@ class FilterController extends Controller
     
     public function filter(Request $request)
     {
+        $managers = User::role('sale')->get();
+        $types = CashReceiptType::all();
+        $keyword = $request->input('search');
+
+        $fromdate       = $request->fromdate;
+        $todate         = $request->todate;
+        $shipment       = $request->shipment;
+        $finish         = $request->finish;
+        $selmanager     = $request->input('manager', 'all');
+
+        $data = $this->checkinQuery($request)
+            ->paginate(20)
+            ->appends($request->all());
+
+        return view('backend.filter.filter', compact('data', 'keyword', 'types', 'managers', 'shipment', 'finish', 'selmanager', 'fromdate', 'todate'));
+    }
+
+    public function excel(Request $request)
+    {
+        $data = $this->checkinQuery($request)->get();
+        $fromdate = $request->fromdate;
+        $todate = $request->todate;
+        $fileName = 'kirim-' . Carbon::createFromFormat('d.m.Y', $fromdate)->format('Y-m-d')
+            . '-' . Carbon::createFromFormat('d.m.Y', $todate)->format('Y-m-d') . '.xlsx';
+
+        return Excel::download(new CheckinFilterExport($data, $fromdate, $todate), $fileName);
+    }
+
+    private function checkinQuery(Request $request)
+    {
         $request->validate([
             'fromdate' => ['required', 'date_format:d.m.Y'],
             'todate' => ['required', 'date_format:d.m.Y', 'after_or_equal:fromdate'],
@@ -56,20 +89,15 @@ class FilterController extends Controller
             'barcode' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $managers = User::role('sale')->get();
-        $types = CashReceiptType::all();
-        $keyword = $request->input('search');
-        
         $fromdate       = $request->fromdate;
         $todate         = $request->todate;
-        
         $shipment       = $request->shipment;
         $finish         = $request->finish;
         $selmanager     = $request->input('manager', 'all');
         $warehouse      = $request->input('warehouse', 'all');
         $barcode        = trim((string) $request->barcode);
         $client_id      = $request->input('client_id', 'all');
-        
+
         $result = CheckinDetail::query()
             ->with([
                 'prodid:id,name,barcode',
@@ -123,13 +151,9 @@ class FilterController extends Controller
             $result->where('checkin_details.warehouse_id', $warehouse);
         }
 
-        $data = $result
+        return $result
             ->orderBy('checkins.date', 'desc')
-            ->orderBy('checkin_details.id', 'desc')
-            ->paginate(20)
-            ->appends($request->all());
-
-        return view('backend.filter.filter', compact('data', 'keyword', 'types', 'managers', 'shipment', 'finish', 'selmanager', 'fromdate', 'todate'));
+            ->orderBy('checkin_details.id', 'desc');
     }
     
     

@@ -19,6 +19,9 @@
                                 </div>
                             </div>-->
 
+                        <div class="mb-3 text-end">
+                            <a href="{{ route('filter_excel', request()->query()) }}" class="btn btn-success"><em class="icon ni ni-file-xls"></em> Excel</a>
+                        </div>
                         <div class="card">
                             @include('layouts.message.success')
                             @include('layouts.message.error')

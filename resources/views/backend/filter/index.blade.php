@@ -91,9 +91,14 @@
                                                 <label class="custom-control-label" for="finish"> {{ trans('backend.index.check_finish') }} </label>
                                             </div>
                                         </div>
-                                        <div class="col-12">
+                                        <div class="col-md-9">
                                             <div class="form-group">
                                                 <button type="submit" class="btn btn-secondary btn-block">{{ trans('backend.table.filter') }}</button>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="form-group">
+                                                <button type="submit" formaction="{{ route('filter_excel') }}" class="btn btn-success btn-block"><em class="icon ni ni-file-xls"></em> Excel</button>
                                             </div>
                                         </div>
                                     </div>

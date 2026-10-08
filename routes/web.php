@@ -51,6 +51,7 @@ Route::group(
         //Filter
         Route::get('/filter_index', 'Backend\FilterController@index')->name('filter_index');
         Route::get('/filter_param', 'Backend\FilterController@filter')->name('filter_param');
+        Route::get('/filter_excel', 'Backend\FilterController@excel')->name('filter_excel');
         
         Route::get('/kpi_plans', 'Backend\KpiController@plan_index')->name('kpi_plan_index');
         Route::get('/kpi_plan_show/{id}', 'Backend\KpiController@plan_index_show')->name('plan_index_show');
