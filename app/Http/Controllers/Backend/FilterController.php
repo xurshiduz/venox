@@ -30,21 +30,24 @@ class FilterController extends Controller
 {
     public function index()
     { 
-        $fromdate       = Carbon::parse('21.02.2024')->format('d.m.Y');
-        $todate     = Carbon::now()->format('d.m.Y');
-        
-        
+        return view('backend.filter.index', $this->formOptions());
+    }
+
+    private function formOptions(): array
+    {
         if(Auth::user()->hasAnyRole('admin')){
             $clients = Client::orderBy('id', 'desc')->where('status', 1)->get();
         } else {
             $clients = Client::where('user_id', Auth::id())->where('status', 1)->get(); 
         } 
-        
-            $managers   = User::role('sale')->get();
-            $warehouses = Warehouse::all();
-        
-        
-        return view('backend.filter.index', compact('managers', 'fromdate', 'todate', 'clients', 'warehouses'));
+
+        return [
+            'fromdate' => Carbon::parse('21.02.2024')->format('d.m.Y'),
+            'todate' => Carbon::now()->format('d.m.Y'),
+            'clients' => $clients,
+            'managers' => User::role('sale')->get(),
+            'warehouses' => Warehouse::all(),
+        ];
     }
     
     
@@ -64,7 +67,10 @@ class FilterController extends Controller
             ->paginate(20)
             ->appends($request->all());
 
-        return view('backend.filter.filter', compact('data', 'keyword', 'types', 'managers', 'shipment', 'finish', 'selmanager', 'fromdate', 'todate'));
+        return view('backend.filter.filter', array_merge(
+            $this->formOptions(),
+            compact('data', 'keyword', 'types', 'managers', 'shipment', 'finish', 'selmanager', 'fromdate', 'todate')
+        ));
     }
 
     public function excel(Request $request)
