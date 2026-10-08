@@ -24,7 +24,7 @@
                         <div class="warehouse-toolbar">
                           <div class="row align-items-end">
                             <div class="col-md-9">
-                                <form method="GET" action="{{ route('warehouses_stock_excel_input') }}">
+                                <form method="GET" action="{{ route('warehouses_index') }}">
                                     <div class="row align-items-end">
                                         <div class="col-md-4">
                                             <div class="form-group">
@@ -49,7 +49,7 @@
                                             </div>
                                         </div>
                                         <div class="col-md-2">
-                                           <button type="submit" class="btn btn-success btn-block warehouse-action"><em class="icon ni ni-download"></em>{{ trans('backend.table.download') }}</button>
+                                           <button type="submit" formaction="{{ route('warehouses_stock_excel_input') }}" class="btn btn-success btn-block warehouse-action"><em class="icon ni ni-download"></em>{{ trans('backend.table.download') }}</button>
                                         </div>
                                     </div>
                                 </form>
@@ -60,6 +60,48 @@
                           </div>
                         </div>
                         @endhasanyrole
+
+                        @if($selectedWarehouseItem)
+                        <div class="card warehouse-table-card mb-4">
+                            <div class="card-inner border-bottom">
+                                <div class="d-flex flex-wrap justify-content-between align-items-center">
+                                    <div>
+                                        <h5 class="mb-1">Омбор қолдиғи: {{ $selectedWarehouseItem->name }}</h5>
+                                        <span class="text-soft">Сана: {{ \Carbon\Carbon::parse($stockDate)->format('d.m.Y') }}</span>
+                                    </div>
+                                    <span class="badge badge-dim bg-primary">{{ $filteredStocks->count() }} та маҳсулот</span>
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-bordered warehouse-table">
+                                    <thead>
+                                        <tr class="text-center">
+                                            <th style="width: 60px;">№</th>
+                                            <th>Маҳсулот</th>
+                                            <th>Штрих-код</th>
+                                            <th>Ўлчов бирлиги</th>
+                                            <th>Остатка</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse($filteredStocks as $stockItem)
+                                        <tr>
+                                            <td class="text-center">{{ $loop->iteration }}</td>
+                                            <td>{{ $stockItem->productid->name }}</td>
+                                            <td class="text-center">{{ $stockItem->productid->barcode }}</td>
+                                            <td class="text-center">{{ optional($stockItem->productid->unitid)->name }}</td>
+                                            <td class="text-center"><strong>{{ $stockItem->stock * 1 }}</strong></td>
+                                        </tr>
+                                        @empty
+                                        <tr>
+                                            <td colspan="5" class="text-center text-soft py-4">Танланган санада остатка топилмади.</td>
+                                        </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        @endif
 
                         <div class="card warehouse-table-card">
                             

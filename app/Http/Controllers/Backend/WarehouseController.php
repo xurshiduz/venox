@@ -32,7 +32,7 @@ use Str;
 
 class WarehouseController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, WarehouseStockAsOfService $stockAsOf)
     {
         
         if(Auth::user()->hasAnyRole('admin|cashier')){
@@ -40,12 +40,29 @@ class WarehouseController extends Controller
         } elseif(Auth::user()->hasAnyRole('dealer_admin')) {
             $data = Warehouse::orderBy('id', 'desc')->where('dealer_id', Auth::user()->dealer_id)->paginate(20); 
         } 
+        $validated = $request->validate([
+            'id' => 'nullable|string',
+            'stock_date' => 'nullable|date_format:Y-m-d|before_or_equal:today',
+        ]);
         $keyword = NULL; 
         $usdRate = Currency::usdRate();
-        $stockDate = $request->input('stock_date', now()->toDateString());
-        $selectedWarehouse = $request->input('id', optional($data->first())->code);
+        $stockDate = $validated['stock_date'] ?? now()->toDateString();
+        $selectedWarehouseItem = $data->getCollection()
+            ->firstWhere('code', $validated['id'] ?? null) ?: $data->first();
+        $selectedWarehouse = optional($selectedWarehouseItem)->code;
+        $filteredStocks = $selectedWarehouseItem
+            ? $stockAsOf->get($selectedWarehouseItem, Carbon::parse($stockDate))
+            : collect();
 
-        return view('backend.warehouses.index', compact('data', 'keyword', 'usdRate', 'stockDate', 'selectedWarehouse'));
+        return view('backend.warehouses.index', compact(
+            'data',
+            'keyword',
+            'usdRate',
+            'stockDate',
+            'selectedWarehouse',
+            'selectedWarehouseItem',
+            'filteredStocks'
+        ));
         
         //
         
