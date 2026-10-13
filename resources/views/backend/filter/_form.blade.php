@@ -28,6 +28,17 @@
         
         <div class="col-lg-4 col-md-6">
             <div class="form-group">
+                <label class="overline-title overline-title-alt">Тип</label>
+                <select class="form-select js-select2" name="type">
+                    <option value="all">Приход и расход</option>
+                    <option value="kirim" {{ request('type') === 'kirim' ? 'selected' : '' }}>Приход</option>
+                    <option value="chiqim" {{ request('type') === 'chiqim' ? 'selected' : '' }}>Расход</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="col-lg-4 col-md-6">
+            <div class="form-group">
                 <label class="overline-title overline-title-alt">{{ trans('backend.input.warehouse') }}</label>
                 <select class="form-select js-select2" name="warehouse">
                     <option value="all">{{ trans('backend.input.all_select') }}</option>

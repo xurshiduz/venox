@@ -9,9 +9,10 @@ use Maatwebsite\Excel\Concerns\WithTitle;
 
 class CheckinFilterExport implements FromView, ShouldAutoSize, WithTitle
 {
-    public function __construct($data, $fromdate, $todate)
+    public function __construct($data, $totals, $fromdate, $todate)
     {
         $this->data = $data;
+        $this->totals = $totals;
         $this->fromdate = $fromdate;
         $this->todate = $todate;
     }
@@ -20,6 +21,7 @@ class CheckinFilterExport implements FromView, ShouldAutoSize, WithTitle
     {
         return view('backend.filter.excel', [
             'data' => $this->data,
+            'totals' => $this->totals,
             'fromdate' => $this->fromdate,
             'todate' => $this->todate,
         ]);
@@ -27,6 +29,6 @@ class CheckinFilterExport implements FromView, ShouldAutoSize, WithTitle
 
     public function title(): string
     {
-        return 'Kirim';
+        return 'Kirim-chiqim';
     }
 }
