@@ -100,7 +100,7 @@
                                                   <td width="19%">{{ $item->typename ? $item->typename->name : NULL }}</td>
                                                   <td width="19%">{{ $item->comment }}</td>
                                                   <td width="19%">{{ $item->created_at->format('Y-m-d H:i') }}</td>
-                                                  <td width="19%">{{ $item->user_id ? $item->uname->name : NULL }}</td>
+                                                  <td width="19%">{{ optional($item->uname)->name }}</td>
                                                 </tr>
                                             @endforeach
                                         
@@ -122,7 +122,7 @@
                                                   <td width="19%">{{ number_format($item->price, 0, '.', ' ') }} сум</td>
                                                   <td width="19%">{{ $item->comment }}</td>
                                                   <td width="19%">{{ $item->created_at->format('Y-m-d H:i') }}</td>
-                                                  <td width="19%">{{ $item->user_id ? $item->uname->name : NULL }}</td>
+                                                  <td width="19%">{{ optional($item->uname)->name }}</td>
                                                 </tr>
                                             @endforeach
                                         @endhasanyrole

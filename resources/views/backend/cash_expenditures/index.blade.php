@@ -129,7 +129,7 @@
                                       <td>{{ $item->typename ? $item->typename->name : NULL }}</td>
                                       <td>{{ $item->comment }}</td>
                                       <td>{{ $item->created_at->format('Y-m-d H:i') }}</td>
-                                      <td>{{ $item->user_id ? $item->uname->name : NULL }}</td>
+                                      <td>{{ optional($item->uname)->name }}</td>
                                       <td><a href="{{ route('cash_exp_delete', ['id' => $item->code])}}" style="text-decoration:underline;">Удалить</a></td>
                                       <td><a href="{{ route('cash_expenditure_form', ['id' => $item->code])}}" style="text-decoration:underline;">Редактировать</a></td>
                                     </tr>

@@ -40,7 +40,7 @@
                                       <td width="180px">{{ $item->name }}</td>
                                       <td width="180px;">{{ number_format($item->price, 2, '.', ' ') }}</td>
                                       <td width="150px">{{ $item->created_at->format('Y-m-d H:i') }}</td>
-                                      <td width="120px">{{ $item->user_id ? $item->uname->name : NULL }}</td>
+                                      <td width="120px">{{ optional($item->uname)->name }}</td>
                                       <td width="120px"><a href="{{ route('cash_expenditure_type_form', ['id' => $item->code])}}" style="text-decoration:underline;">Редактировать</a></td>
                                     </tr>
                                     @endforeach

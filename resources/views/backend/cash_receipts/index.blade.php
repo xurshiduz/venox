@@ -79,7 +79,7 @@
                                       <td>{{ $item->tname ? $item->tname->name : NULL }}</td>
                                       <!--<td>{{ $item->comment }}</td>-->
                                       <td>{{ $item->created_at->format('Y-m-d H:i') }}</td>
-                                      <td>{{ $item->user_id ? $item->uname->name : NULL }}</td>
+                                      <td>{{ optional($item->uname)->name }}</td>
                                       <td>{{ $item->status ? trans('backend.table.pay_success') : trans('backend.table.pay_cancel') }}</td>
                                       <td class="table-actions">
                                           @if($item->status)
