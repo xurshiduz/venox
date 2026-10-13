@@ -43,7 +43,7 @@
                                         <td>{{ $item->prodid ? $item->prodid->name : 'Удалено' }}</td>
                                         <td>{{ $item->checkdetid ? $item->checkdetid->warehouseid->name : 'Удалено' }}</td>
                                         <td>{{ $item->prodid ? $item->prodid->barcode : 'Удалено' }}</td>
-                                        <td>{{ $item->qty }} из {{ $item->qty + ($item->checkdetid ? $item->checkdetid->qty : 0)}} {{ $item->checkdetid ? $item->checkdetid->prodid->unitid->name : null }} </td>
+                                        <td>{{ $item->qty }} из {{ $item->qty + ($item->checkdetid ? $item->checkdetid->qty : 0)}} {{ $item->checkdetid ? optional($item->checkdetid->prodid->unitid)->name : null }} </td>
                                         <td>{{ $item->userid ? $item->userid->name : NULL }}</td>
                                         <td>{{ $item->sellerid ? $item->sellerid->name : NULL }}</td>
                                         <td>{{ $item->created_at->format('Y-m-d H:i') }}</td>

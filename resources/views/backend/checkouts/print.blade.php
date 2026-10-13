@@ -29,7 +29,7 @@
                 <td rowspan="3" style="text-align: center;"><img style="padding: 10px" src="data:image/png;base64, {!! base64_encode(QrCode::format('png')->size(100)->generate($item->part_number)) !!} "></td>
             </tr>
             <tr>
-                <td style="width: 50%; padding: 5px;"><span style="font-size: 12px;">Категория:</span><br>{{ $item->catid->name }}</td>
+                <td style="width: 50%; padding: 5px;"><span style="font-size: 12px;">Категория:</span><br>{{ optional($item->catid)->name }}</td>
             </tr>
             <tr>
                 <td style="width: 50%; padding: 5px;"><span style="font-size: 12px;">Страна:</span><br>{{ $item->contryid->name }}</td>

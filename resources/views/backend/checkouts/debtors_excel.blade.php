@@ -16,7 +16,7 @@
        <td>
             @if($item->number_work) {{ $item->number_work }} @else Чер. #{{ $item->id }} @endif
        </td>
-       <td>{{ $item->client_id ? Str::limit($item->supid->name, 30, '') : NULL }} {{ $item->checkout_tip_id == 3 ? '*' : NULL }}</td>
+       <td>{{ $item->client_id ? Str::limit(optional($item->supid)->name, 30, '') : NULL }} {{ $item->checkout_tip_id == 3 ? '*' : NULL }}</td>
        <td>{{ $item->managerid ? $item->managerid->name : NULL }}</td>
        <td>{{ $item->details()->count() }} </td>
        <td>{{ number_format($item->sumtotal(), 0, '.', ' ') }}</td>

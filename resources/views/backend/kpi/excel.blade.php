@@ -66,7 +66,7 @@
         @endphp
         
         <tr class="text-center">
-          <td style="text-align: center; border: 1px solid #000000;">{{ $ditem->managerid->name }}</td>
+          <td style="text-align: center; border: 1px solid #000000;">{{ optional($ditem->managerid)->name }}</td>
           <td style="text-align: center; border: 1px solid #000000;">{{ $ditem->managerid->checkouts()->whereBetween('created_at', [$from1, $to1])->count() }} {{ trans('backend.table.qty_short_t') }}</td>
           <td style="text-align: center; border: 1px solid #000000;">{{ number_format($ditem->plan_sum, 0, '.', ' ') }} {{ trans('backend.table.sum_belgi') }}</td>
           <td style="text-align: center; border: 1px solid #000000;">{{ number_format($dsum[$key], 0, '.', ' ') }} {{ trans('backend.table.sum_belgi') }}</td>

@@ -347,7 +347,7 @@
                                       <td style="padding: 0px; vertical-align: middle;" class="table-actions"><a href="{{ route('checkout_print', ['id' => $item->code, 'view' => 'full']) }}" class="btn btn-icon btn-sm btn-outline-primary" title="{{ trans('backend.ui.pdf') }}" aria-label="{{ trans('backend.ui.pdf') }}"><em class="icon ni ni-file-pdf"></em></a> <a href="{{ route('checkout_excel', ['id' => $item->code]) }}" class="btn btn-icon btn-sm btn-outline-success" title="{{ trans('backend.ui.excel') }}" aria-label="{{ trans('backend.ui.excel') }}"><em class="icon ni ni-file-xls"></em></a> </td>
                                       <!--<td style="min-width: 60px; padding: 0px; vertical-align: middle;"><a href="{{ route('checkout_print', ['id' => $item->code, 'view' => 'short']) }}"><img width="22px" src="/upload/view-files.png"></a> <a href="{{ route('checkout_excel_null', ['id' => $item->code]) }}"><img width="22px" src="/upload/excel.png"></a> </td>
                                       -->@endhasanyrole
-                                       <td style="padding: 2px; {{ $item->total_price_debt != 0 &&  $item->checkout_tip_id == 1 ? 'background-color: #fff29c' : NULL }}"><span data-bs-toggle="tooltip" data-bs-placement="top" title="{{ $item->client_id ? $item->supid->name : NULL }}">{{ $item->client_id ? Str::limit($item->supid->name, 30, '') : NULL }} {{ $item->checkout_tip_id == 3 ? '*' : NULL }}</span></td>
+                                       <td style="padding: 2px; {{ $item->total_price_debt != 0 &&  $item->checkout_tip_id == 1 ? 'background-color: #fff29c' : NULL }}"><span data-bs-toggle="tooltip" data-bs-placement="top" title="{{ optional($item->supid)->name }}">{{ $item->client_id ? Str::limit(optional($item->supid)->name, 30, '') : NULL }} {{ $item->checkout_tip_id == 3 ? '*' : NULL }}</span></td>
                                        <td>{{ $item->managerid ? $item->managerid->name : NULL }}</td>
                                        <td>{{ $item->details()->count() }} </td>
                                        <td>
@@ -446,12 +446,12 @@
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        @if($item->client_id && $item->supid->balance)
+                                                        @if($item->client_id && optional($item->supid)->balance)
                                                         <div class="col-lg-12 col-sm-12 d-none">
                                                             <div class="form-group">
                                                                 <label class="form-label" for="comment">{{ trans('backend.menu.client_balance') }}</label>
                                                                 <div class="form-control-wrap">
-                                                                    <input type="text" class="form-control" readonly id="comment" value="{{ $item->supid->balance }}">
+                                                                    <input type="text" class="form-control" readonly id="comment" value="{{ optional($item->supid)->balance }}">
                                                                 </div>
                                                             </div>
                                                         </div>

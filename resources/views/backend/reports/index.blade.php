@@ -40,7 +40,7 @@
                                     <tr class="text-center">
                                       <td>{{ $item->id }}</td>
                                       <td>{{ $item->name }}</td>
-                                      <td>{{ $item->category_id ? $item->catid->name : NULL}}</td>
+                                      <td>{{ optional($item->catid)->name}}</td>
                                       <td>{{ $item->tolshina }}</td>
                                       <td>{{ $item->tolshina }}</td>
                                       <td><a href="{{ route('product_form', ['id' => $item->code])}}" style="text-decoration:underline;">Редактировать</a></td>

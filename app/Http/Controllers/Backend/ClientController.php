@@ -312,7 +312,9 @@ class ClientController extends Controller
         $item = CashReceipt::where('code',$id)->first();
         if($item) {
             $item->update(['status' => 0]);
-            $item->clientname->update(['balance' => $item->clientname->balance - $item->price]);
+            if ($item->clientname) {
+                $item->clientname->update(['balance' => $item->clientname->balance - $item->price]);
+            }
             $request->session()->flash('success', trans('backend.post_update'));
         }
         return back();

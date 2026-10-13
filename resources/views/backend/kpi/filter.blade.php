@@ -61,8 +61,8 @@
                                       <td><a href="{{ route('checkout_print', ['id' => $item->code, 'view' => 'full']) }}">{{ trans('backend.table.nak_view_one') }}</a> </td>
                                       <td><a href="{{ route('checkout_print', ['id' => $item->code, 'view' => 'short']) }}">{{ trans('backend.table.nak_view_two') }}</a> </td>
                                       @endhasanyrole
-                                       <td>{{ $item->client_id ? $item->supid->name : NULL }}</td>
-                                       <td>{{ $item->manager_id ? $item->managerid->name : NULL }}</td>
+                                       <td>{{ optional($item->supid)->name }}</td>
+                                       <td>{{ optional($item->managerid)->name }}</td>
                                        <td>{{ $item->details()->count() }} </td>
                                        @hasanyrole('admin|cashier|report')
                                        <td>{{ number_format($item->sumtotal(), 2, '.', ' ') }} {{ $item->currencytypeid->belgi }}</td>

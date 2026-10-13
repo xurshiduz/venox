@@ -19,7 +19,7 @@
 			<td></td>
 			<td></td>
 			<td style="border-top: 1px solid #000000; border-left: 1px solid #000000;" width="100px">Получатель</td>
-			<td colspan="3" style="word-wrap: break-word; border-top: 1px solid #000000; border-right: 1px solid #000000; border-bottom: 1px dotted #000;" width="300px"><b>{{ $item->supid->name }}</b></td>
+			<td colspan="3" style="word-wrap: break-word; border-top: 1px solid #000000; border-right: 1px solid #000000; border-bottom: 1px dotted #000;" width="300px"><b>{{ optional($item->supid)->name }}</b></td>
 		</tr>
 		<tr>
 			<td colspan="2" style="border-left: 1px solid #000000;" width="100px">Адрес</td>
@@ -27,7 +27,7 @@
 			<td></td>
 			<td></td>
 			<td style="border-left: 1px solid #000000;" width="100px">Адрес</td>
-			<td colspan="3" style="word-wrap: break-word; border-right: 1px solid #000000; border-bottom: 1px dotted #000;" width="300px">{{ $item->supid->address }}</td>
+			<td colspan="3" style="word-wrap: break-word; border-right: 1px solid #000000; border-bottom: 1px dotted #000;" width="300px">{{ optional($item->supid)->address }}</td>
 		</tr>
 		<tr>
 			<td colspan="2" style="border-left: 1px solid #000000;" width="100px">Телефон</td>
@@ -35,7 +35,7 @@
 			<td></td>
 			<td></td>
 			<td style="border-left: 1px solid #000000;" width="100px">Телефон</td>
-			<td colspan="3" style="word-wrap: break-word; border-right: 1px solid #000000; border-bottom: 1px dotted #000;" width="300px">{{ $item->supid->phone }}</td>
+			<td colspan="3" style="word-wrap: break-word; border-right: 1px solid #000000; border-bottom: 1px dotted #000;" width="300px">{{ optional($item->supid)->phone }}</td>
 		</tr>
 		<tr>
 			<td colspan="2" style="border-left: 1px solid #000000;" width="100px">Р/сч</td>
@@ -43,7 +43,7 @@
 			<td></td>
 			<td></td>
 			<td style="border-left: 1px solid #000000;" width="100px">Р/сч</td>
-			<td colspan="3" style="word-wrap: break-word; border-right: 1px solid #000000; border-bottom: 1px dotted #000;" width="300px">{{ $item->supid->schet }}</td>
+			<td colspan="3" style="word-wrap: break-word; border-right: 1px solid #000000; border-bottom: 1px dotted #000;" width="300px">{{ optional($item->supid)->schet }}</td>
 		</tr>
 		<tr>
 			<td colspan="2" style="border-left: 1px solid #000000;" width="100px">Банк</td>
@@ -59,7 +59,7 @@
 			<td></td>
 			<td></td>
 			<td style="border-left: 1px solid #000000;" width="100px">МФО</td>
-			<td colspan="3" style="word-wrap: break-word; border-right: 1px solid #000000; border-bottom: 1px dotted #000;" width="300px">{{ $item->supid->mfo }}</td>
+			<td colspan="3" style="word-wrap: break-word; border-right: 1px solid #000000; border-bottom: 1px dotted #000;" width="300px">{{ optional($item->supid)->mfo }}</td>
 		</tr>
 		<tr>
 			<td colspan="2" style="border-left: 1px solid #000000;" width="100px">ИНН</td>
@@ -67,7 +67,7 @@
 			<td></td>
 			<td></td>
 			<td style="border-left: 1px solid #000000;" width="100px">ИНН</td>
-			<td colspan="3" style="word-wrap: break-word; border-right: 1px solid #000000; border-bottom: 1px dotted #000;" width="300px">{{ $item->supid->inn }}</td>
+			<td colspan="3" style="word-wrap: break-word; border-right: 1px solid #000000; border-bottom: 1px dotted #000;" width="300px">{{ optional($item->supid)->inn }}</td>
 		</tr>
 		<tr>
 			<td colspan="2" style="border-bottom: 1px solid #000000; border-left: 1px solid #000000;" width="100px">ОКЭД</td>
@@ -75,7 +75,7 @@
 			<td></td>
 			<td></td>
 			<td style="border-bottom: 1px solid #000000; border-left: 1px solid #000000;" width="100px">ОКЭД</td>
-			<td colspan="3" style="word-wrap: break-word; border-right: 1px solid #000000; border-bottom: 1px solid #000;" width="300px">{{ $item->supid->oked }}</td>
+			<td colspan="3" style="word-wrap: break-word; border-right: 1px solid #000000; border-bottom: 1px solid #000;" width="300px">{{ optional($item->supid)->oked }}</td>
 		</tr>
 	</tbody>
 </table>
@@ -108,7 +108,7 @@
 			<td style="text-align: center; border: 1px solid #000000;">{{$loop->iteration}}</td>
 			<td colspan="2" style="word-wrap: break-word; border: 1px solid #000000;" >{{ $detail->prodid->name }}</td>
 			<td style="word-wrap: break-word; border: 1px solid #000000;" >{{ $detail->prodid->barcode }}</td>
-			<td style="padding: 0px 5px; text-align: center; border: 1px solid #000000;">{{ $detail->prodid->unit_id ? $detail->prodid->unitid->name : NULL }}</td>
+			<td style="padding: 0px 5px; text-align: center; border: 1px solid #000000;">{{ optional($detail->prodid->unitid)->name }}</td>
 			<td style="padding: 0px 5px; text-align: center; border: 1px solid #000000;">{{ $detail->qty }}</td>
 			<td style="padding: 0px 5px; text-align: center; border: 1px solid #000000;">{{ $detail->price }}</td>
 			<td style="padding: 0px 5px; text-align: center; border: 1px solid #000000;">{{ $detail->total_price }}</td>

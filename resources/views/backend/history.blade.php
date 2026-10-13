@@ -41,9 +41,9 @@
                                     @foreach($data as $key => $item)
                                     <tr class="text-center">
                                        <td>{{ $item->modulid->name }}</td>
-                                       <td>{{ $item->userid->name }}</td>
+                                       <td>{{ optional($item->userid)->name }}</td>
                                        <td>{{ $item->ip_address }} </td>
-                                       <td>{{ $item->userid->phone }} </td>
+                                       <td>{{ optional($item->userid)->phone }} </td>
                                        <td>{{ $item->created_at->format('Y-m-d H:i') }} </td>
                                        <td><a data-bs-toggle="modal" data-bs-target="#modal{{ $key }}" href="#" style="text-decoration:underline;">{{ trans('backend.index.view_button') }}</a></td>
                                     </tr>

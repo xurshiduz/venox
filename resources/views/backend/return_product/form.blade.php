@@ -64,8 +64,8 @@
                                       <td><a href="{{ route('checkout_print', ['id' => $item->code, 'view' => 'full']) }}">{{ trans('backend.table.nak_view_one') }}</a> </td>
                                       <td><a href="{{ route('checkout_print', ['id' => $item->code, 'view' => 'short']) }}">{{ trans('backend.table.nak_view_two') }}</a> </td>
                                       @endhasanyrole
-                                       <td>{{ $item->client_id ? $item->supid->name : NULL }}</td>
-                                       <td>{{ $item->manager_id ? $item->managerid->name : NULL }}</td>
+                                       <td>{{ optional($item->supid)->name }}</td>
+                                       <td>{{ optional($item->managerid)->name }}</td>
                                        <td>{{ $item->details()->count() }} </td>
                                        @hasanyrole('admin|cashier|report')
                                        <td>{{ number_format($item->sumtotal(), 2, '.', ' ') }} {{ $item->currencytypeid->belgi }}</td>
@@ -100,7 +100,7 @@
                                             <td>{{ $detail->prodid->name }}</td>
                                             <td>{{ $detail->warehouseid->name }}</td>
                                             <td>{{ $detail->prodid->barcode }}</td>
-                                            <td width="100px">{{$detail->prodid->checkindetails()->where('warehouse_id', $detail->warehouse_id)->where('status', 1)->sum('qty')) - ($detail->prodid->checkoutdetails()->where('warehouse_id', $detail->warehouse_id)->where('status', 1)->sum('qty') }} {{ $detail->prodid->unitid->name}}</td>
+                                            <td width="100px">{{$detail->prodid->checkindetails()->where('warehouse_id', $detail->warehouse_id)->where('status', 1)->sum('qty')) - ($detail->prodid->checkoutdetails()->where('warehouse_id', $detail->warehouse_id)->where('status', 1)->sum('qty') }} {{ optional($detail->prodid->unitid)->name}}</td>
                                             <td> {{ $detail->price }} </td>
                                             <td> {{ $detail->qty }} </td>
                                             <td width="50px">@if($detail->qty > 0)<a href="#" data-bs-toggle="modal" data-bs-target="#modalDefault{{ $detail->id }}"><em class="icon ni ni-undo"></em></a>@endif</td>

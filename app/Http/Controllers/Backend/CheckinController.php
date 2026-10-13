@@ -215,7 +215,7 @@ class CheckinController extends Controller
                     
             $clientid       = $citem->number_work ? $citem->number_work : 'Черновик ID#' . $citem->id;
             $ip             = request()->ip();
-            $dealer         = $citem->supid->name;
+            $dealer         = optional($citem->supid)->name;
             $warehouse      = $item->warehouseid?->name;
             $barcode        = $item->prodid->barcode;
             $hid            = $history->id;
@@ -525,7 +525,7 @@ class CheckinController extends Controller
                 
         $clientid       = $item->checkid->number_work ? $item->checkid->number_work : 'Черновик ID#' . $item->checkid->id;
         $ip             = $request->ip();
-        $dealer         = $item->checkid->supid->name;
+        $dealer         = optional($item->checkid->supid)->name;
         $warehouse      = $item->warehouseid?->name;
         $barcode        = $item->prodid->barcode;
         $hid            = $history->id;

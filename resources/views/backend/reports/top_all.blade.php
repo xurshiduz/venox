@@ -30,7 +30,7 @@
                                     <tr class="text-center">
                                       <td>{{ $item->barcode }}</td>
                                       <td style="text-align: left;">{{ $item->name }}</td>
-                                      <td>{{ $item->category_id ? $item->catid->name : NULL}}</td>
+                                      <td>{{ optional($item->catid)->name}}</td>
                                       <td>{{ number_format($item->balance, 0, '.', ' ') }}</td>
                                     </tr>
                                     @endforeach

@@ -120,19 +120,19 @@
 						<tbody>
 							<tr>
 								<td style="border: 0px; padding: 0px 5px;" width="30%">Получатель</td>
-								<td style="border: 0px; padding: 0px 5px; border-bottom: 1px dotted #000;" width="70%"><b>{{ $item->supid->name }}</b></td>
+								<td style="border: 0px; padding: 0px 5px; border-bottom: 1px dotted #000;" width="70%"><b>{{ optional($item->supid)->name }}</b></td>
 							</tr>
 							<tr>
 								<td style="border: 0px; padding: 0px 5px;" width="30%">Адрес</td>
-								<td style="border: 0px; padding: 0px 5px; border-bottom: 1px dotted #000;" width="70%">{{ $item->supid->address }}</td>
+								<td style="border: 0px; padding: 0px 5px; border-bottom: 1px dotted #000;" width="70%">{{ optional($item->supid)->address }}</td>
 							</tr>
 							<tr>
 								<td style="border: 0px; padding: 0px 5px;" width="30%">Телефон</td>
-								<td style="border: 0px; padding: 0px 5px; border-bottom: 1px dotted #000;" width="70%">{{ $item->supid->phone }}</td>
+								<td style="border: 0px; padding: 0px 5px; border-bottom: 1px dotted #000;" width="70%">{{ optional($item->supid)->phone }}</td>
 							</tr>
 							<tr>
 								<td style="border: 0px; padding: 0px 5px;" width="30%">Р/сч</td>
-								<td style="border: 0px; padding: 0px 5px; border-bottom: 1px dotted #000;" width="70%">{{ $item->supid->schet }}</td>
+								<td style="border: 0px; padding: 0px 5px; border-bottom: 1px dotted #000;" width="70%">{{ optional($item->supid)->schet }}</td>
 							</tr>
 							<tr>
 								<td style="border: 0px; padding: 0px 5px;" width="30%">Банк</td>
@@ -140,15 +140,15 @@
 							</tr>
 							<tr>
 								<td style="border: 0px; padding: 0px 5px;" width="30%">МФО</td>
-								<td style="border: 0px; padding: 0px 5px; border-bottom: 1px dotted #000;" width="70%">{{ $item->supid->mfo }}</td>
+								<td style="border: 0px; padding: 0px 5px; border-bottom: 1px dotted #000;" width="70%">{{ optional($item->supid)->mfo }}</td>
 							</tr>
 							<tr>
 								<td style="border: 0px; padding: 0px 5px;" width="30%">ИНН</td>
-								<td style="border: 0px; padding: 0px 5px; border-bottom: 1px dotted #000;" width="70%">{{ $item->supid->inn }}</td>
+								<td style="border: 0px; padding: 0px 5px; border-bottom: 1px dotted #000;" width="70%">{{ optional($item->supid)->inn }}</td>
 							</tr>
 							<tr>
 								<td style="border: 0px; padding: 0px 5px;" width="30%">ОКЭД</td>
-								<td style="border: 0px; padding: 0px 5px; border-bottom: 1px dotted #000;" width="70%">{{ $item->supid->oked }}</td>
+								<td style="border: 0px; padding: 0px 5px; border-bottom: 1px dotted #000;" width="70%">{{ optional($item->supid)->oked }}</td>
 							</tr>
 						</tbody>
 					</table>
@@ -181,7 +181,7 @@
 							<td style="padding: 0px 5px;">{{$loop->iteration}}</td>
 							<td style="padding: 0px 5px;">{{ $detail->prodid->name }}</td>
 							<td style="padding: 0px 5px;">{{ $detail->prodid->barcode }}</td>
-							<td style="padding: 0px 5px; text-align: center;">{{ $detail->prodid->unit_id ? $detail->prodid->unitid->name : NULL }}</td>
+							<td style="padding: 0px 5px; text-align: center;">{{ optional($detail->prodid->unitid)->name }}</td>
 							<td style="padding: 0px 5px; text-align: center;">{{ $detail->qty }}</td>
 							<td style="padding: 0px 5px; text-align: center;">@if($view == 'short') 1.00 @else {{ $detail->price }} @endif</td>
 							<td style="padding: 0px 5px; text-align: center;">@if($view == 'short') {{ $detail->qty }}.00 @else {{ $detail->total_price }} @endif</td>

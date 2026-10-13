@@ -44,7 +44,7 @@
                                     @foreach($data as $item)
                                     <tr class="text-center">
                                       <td width="180px">{{ $item->checkout_id ? $item->contracktname?->number_work : NULL }}</td>
-                                      <td>{{ $item->client_id ? $item->clientname->name : NULL }}</td>
+                                      <td>{{ optional($item->clientname)->name }}</td>
                                       <td>{{ number_format($item->price, 2, '.', ' ') }}</td>
                                       <td>{{ $item->tname ? $item->tname->name : NULL }}</td>
                                       <td>{{ $item->comment }}</td>

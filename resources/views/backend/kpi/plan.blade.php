@@ -39,7 +39,7 @@
                                        <td><a href="{{ route('kpi_plan_print', ['id' => $item->code]) }}"><img width="22px" src="/upload/view-files.png"> PDF </a></td>
                                        <td><a href="#"><a href="{{ route('kpi_plan_excel', ['id' => $item->code]) }}"><img width="22px" src="/upload/excel.png"> Excel</a> </td>
                                       <td>{{ $item->created_at->format('Y-m-d H:i') }}</td>
-                                      <td>{{ $item->userid->name }}</td>
+                                      <td>{{ optional($item->userid)->name }}</td>
                                       <td><a href="{{ route('kpi_form', ['id' => $item->code])}}" style="text-decoration:underline;">{{ trans('backend.table.post_edit') }}</a></td>
                                       <td><a href="{{ route('plan_index_show', ['id' => $item->code])}}" style="text-decoration:underline;">{{ trans('backend.index.view_button') }}</a></td>
                                     </tr>

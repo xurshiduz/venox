@@ -35,7 +35,7 @@
                                     <tr>
                                       <td>{{ $item->name }}</td>
                                       <td class="text-center">{{ $item->barcode }}</td>
-                                      <td class="text-center">{{ $item->category_id ? $item->catid->name : NULL}}</td>
+                                      <td class="text-center">{{ optional($item->catid)->name}}</td>
                                       <td class="text-center">{{ ($item->checkindetails->where('status', 1)->sum('qty') - $item->checkoutdetails->where('status', 1)->sum('qty')) }} {{ $item->unitid ? $item->unitid->name : null}}</td>
                                       <td class="text-center">
                                         @if($item->checkoutdetails->sum('qty') != 0)

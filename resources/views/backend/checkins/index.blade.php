@@ -79,7 +79,7 @@
                                        </td>
                                        <td>{{ $item->warid?->name }} </td>
                                        <td>{{ $item->typeid?->name }} </td>
-                                       <td>{{ $item->client_id ? $item->supid->name : NULL }}</td>
+                                       <td>{{ optional($item->supid)->name }}</td>
                                        <td>{{ $item->details->count() }} </td>
                                        <td>{{ number_format($item->currency_type_price, 0, '.', ' ') }}</td>
                                        <td>

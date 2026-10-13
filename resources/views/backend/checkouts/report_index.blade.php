@@ -171,8 +171,8 @@
                                       <td style="min-width: 75px;"><a href="{{ route('checkout_print', ['id' => $item->code, 'view' => 'full']) }}"><img width="22px" src="/upload/view-files.png"></a> <a href="{{ route('checkout_excel', ['id' => $item->code]) }}"><img width="22px" src="/upload/excel.png"></a> </td>
                                       <td style="min-width: 75px;"><a href="{{ route('checkout_print', ['id' => $item->code, 'view' => 'short']) }}"><img width="22px" src="/upload/view-files.png"></a> <a href="{{ route('checkout_excel_null', ['id' => $item->code]) }}"><img width="22px" src="/upload/excel.png"></a> </td>
                                       <td><a href="{{ route('checkouts_report_print', ['id' => $item->code]) }}">{{ trans('backend.index.view_button') }}</a></td>
-                                       <td>{{ $item->client_id ? $item->supid->name : NULL }}</td>
-                                       <td>{{ $item->manager_id ? $item->managerid->name : NULL }}</td>
+                                       <td>{{ optional($item->supid)->name }}</td>
+                                       <td>{{ optional($item->managerid)->name }}</td>
                                        <td>{{ $item->details()->count() }} </td>
                                        <td><a href="{{ route('checkout_form', ['id' => $item->code, 'page' => $data->currentPage()])}}" style="text-decoration:underline;">{{ trans('backend.table.post_edit') }}</a></td>
                                        <td>{{ number_format($item->sumtotal(), 2, '.', ' ') }} {{ $item->currencytypeid->belgi }}</td>

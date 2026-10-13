@@ -30,7 +30,7 @@
   @endphp
 
   <tr class="text-center">
-    <td>{{ $ditem->managerid->name }}</td>
+    <td>{{ optional($ditem->managerid)->name }}</td>
     <td>{{ number_format($ditem->plan_sum, 0, '.', ' ') }} {{ trans('backend.table.sum_belgi') }}</td>
     <td>{{ number_format($dsum[$key], 0, '.', ' ') }} {{ trans('backend.table.sum_belgi') }}</td>
     @foreach($cars as $sptype)

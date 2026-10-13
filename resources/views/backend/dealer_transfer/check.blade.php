@@ -66,7 +66,7 @@
         <table style="width: 100%;">
             <tr>
                 <td>Клиент:</td>
-                <td style="float: right;">{{ $item->client_id ? $item->supid->name : null }}</td>
+                <td style="float: right;">{{ optional($item->supid)->name }}</td>
             </tr>
             <tr>
                 <td>Дата:</td>

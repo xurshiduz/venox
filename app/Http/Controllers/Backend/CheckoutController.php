@@ -1147,7 +1147,7 @@ class CheckoutController extends Controller
                     
             $clientid       = $citem->number_work ? $citem->number_work : 'Черновик ID#' . $citem->id;
             $ip             = request()->ip();
-            $dealer         = $citem->managerid->name;
+            $dealer         = optional($citem->managerid)->name;
             $warehouse      = $item->warehouseid?->name;
             $barcode        = $item->prodid->barcode;
             $hid            = $history->id;
@@ -1221,7 +1221,7 @@ class CheckoutController extends Controller
                     
             $clientid       = $citem->number_work ? $citem->number_work : 'Черновик ID#' . $citem->id;
             $ip             = request()->ip();
-            $dealer         = $citem->managerid->name;
+            $dealer         = optional($citem->managerid)->name;
             $warehouse      = $item->warehouseid?->name;
             $barcode        = $item->prodid->barcode;
             $hid            = $history->id;
@@ -1448,7 +1448,7 @@ class CheckoutController extends Controller
                     
             $clientid       = $citem->number_work ? $citem->number_work : 'Черновик ID#' . $citem->id;
             $ip             = request()->ip();
-            $dealer         = $citem->managerid->name;
+            $dealer         = optional($citem->managerid)->name;
             $warehouse      = $item->warehouseid?->name;
             $barcode        = $item->prodid->barcode;
             $hid            = $history->id;
@@ -2137,7 +2137,7 @@ class CheckoutController extends Controller
                 
         $clientid       = $item->checkid->number_work ? $item->checkid->number_work : 'Черновик ID#' . $item->checkid->id;
         $ip             = $request->ip();
-        $dealer         = $item->checkid->supid->name;
+        $dealer         = optional($item->checkid->supid)->name;
         $warehouse      = $item->warehouseid?->name;
         $qty            = $item->qty;
         $barcode        = $item->prodid->barcode;
@@ -2507,7 +2507,7 @@ class CheckoutController extends Controller
     public function checkout_excel($id)
     {
         $item = Checkout::where('code', $id)->first();
-        return Excel::download(new CheckoutOne($id), 'Накладной ' . ($item->number_work ? $item->number_work : 'Чер. ID' . $item->id) . '  Клиент ' . $item->supid->name . '.xlsx');
+        return Excel::download(new CheckoutOne($id), 'Накладной ' . ($item->number_work ? $item->number_work : 'Чер. ID' . $item->id) . '  Клиент ' . optional($item->supid)->name . '.xlsx');
     }
     
     public function checkout_excel_null($id)

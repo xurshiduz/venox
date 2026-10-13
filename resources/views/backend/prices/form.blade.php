@@ -39,7 +39,7 @@
                                         <div class="col-lg-4 col-sm-4">
                                             <div class="form-group">
                                                 <label class="form-label" for="unit">Ед. изм</label>
-                                                <input list="units" class="form-control" type="text" name="unit_id" placeholder="Ед. изм" id="unit" autocomplete="off" value="{{ $item ? ( $item->unit_id ? $item->unitid->name : NULL) : NULL }}" />
+                                                <input list="units" class="form-control" type="text" name="unit_id" placeholder="Ед. изм" id="unit" autocomplete="off" value="{{ $item ? ( optional($item->unitid)->name) : NULL }}" />
                                                     <datalist id="units">
                                                         @foreach($units as $unit)
                                                         <option value="{{ $unit->name }}">{{ $unit->name }}</option>
@@ -50,7 +50,7 @@
                                         <div class="col-lg-4 col-sm-4">
                                             <div class="form-group">
                                                 <label class="form-label" for="unit">Категория</label>
-                                                <input list="categories" class="form-control" type="text" name="category_id" placeholder="Категория" autocomplete="off" id="unit" value="{{ $item ? ( $item->category_id ? $item->catid->name : NULL) : NULL }}" />
+                                                <input list="categories" class="form-control" type="text" name="category_id" placeholder="Категория" autocomplete="off" id="unit" value="{{ $item ? ( optional($item->catid)->name) : NULL }}" />
                                                     <datalist id="categories">
                                                         @foreach($categories as $category)
                                                         <option value="{{ $category->name }}">{{ $category->name }}</option>
